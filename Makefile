@@ -6,8 +6,14 @@ BUN      := cd $(FRONTEND) && bun
 GOLANGCI := golangci-lint
 WAILS    := wails
 
+# Version from git: v0.2.0 on a tag, v0.2.0-3-gabc1234 after one, a bare hash before the
+# first tag, -dirty with uncommitted changes. Override with `make dmg VERSION=...`.
+VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+APP      := build/bin/SparkX MIDI.app
+DMG      := build/bin/SparkX-MIDI-$(VERSION).dmg
+
 .DEFAULT_GOAL := help
-.PHONY: help install dist icon dev app cli frontend fmt fmt-go fmt-web lint lint-go lint-web \
+.PHONY: help install dist icon dev app dmg cli frontend fmt fmt-go fmt-web lint lint-go lint-web \
         test test-go test-web build check hooks precommit clean
 
 help: ## List targets
@@ -31,8 +37,25 @@ icon: ## Build the app icon (ICON=<.svg|.png>, default build/icon/appicon.svg)
 dev: ## Run the app with live reload
 	$(WAILS) dev
 
-app: ## Build build/bin/SparkX MIDI.app
-	$(WAILS) build -clean
+app: ## Build build/bin/SparkX MIDI.app (VERSION from git)
+	$(WAILS) build -clean -ldflags "-X main.version=$(VERSION)"
+	@# wails.json's productVersion is the bundle version. On a release tag (vX.Y.Z) the tag
+	@# wins: patch the plist, then re-sign ad hoc because the signature covers it.
+	@v="$(VERSION)"; v="$${v#v}"; \
+	if echo "$$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+	  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $$v" \
+	    -c "Set :CFBundleVersion $$v" "$(APP)/Contents/Info.plist" && \
+	  codesign --force --deep -s - "$(APP)" && \
+	  echo "bundle version: $$v"; \
+	fi
+
+dmg: app ## Pack the .app into build/bin/SparkX-MIDI-<version>.dmg
+	rm -rf build/dmg "$(DMG)"
+	mkdir -p build/dmg
+	cp -R "$(APP)" build/dmg/
+	ln -s /Applications build/dmg/Applications
+	hdiutil create -volname "SparkX MIDI" -srcfolder build/dmg -fs HFS+ -format UDZO -ov "$(DMG)"
+	rm -rf build/dmg
 
 cli: dist ## Build the headless bridge (milestone 1) into build/bin/sparkx-midi
 	go build -o build/bin/sparkx-midi ./cmd/sparkx-midi
@@ -81,4 +104,4 @@ precommit: ## Fast pre-commit gate: format check + lint
 	@$(MAKE) -s lint-go lint-web
 
 clean:
-	rm -rf $(FRONTEND)/dist build/bin
+	rm -rf $(FRONTEND)/dist build/bin build/dmg
