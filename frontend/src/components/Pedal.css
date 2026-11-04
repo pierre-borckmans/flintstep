@@ -1,0 +1,82 @@
+/* The Spark Control X, drawn. Local material tokens: the hardware's own gold, nickel and
+   tolex, which the app's palette has no business owning. */
+.pedal {
+  --pedal-gold: #c8a96b;
+  --pedal-gold-hi: #f3d79c;
+  --pedal-gold-lo: #8c7142;
+  --pedal-cream: #e2cfa5;
+  --pedal-ink: #241b10;
+}
+
+/* The switch layers sit over the drawing; the light in them switches like an LED. */
+.pedal-led,
+.pedal-led * {
+  transition:
+    opacity var(--dur-led) var(--ease-led),
+    stroke var(--dur-led) var(--ease-led);
+}
+
+.pedal-cap {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
+}
+.pedal-cap[data-held="true"] {
+  transform: translateY(1.5px) scale(0.93);
+  filter: brightness(0.72);
+}
+
+/* The gold bracket: quiet at rest, warmer on hover, lit when the switch is being edited. */
+.pedal-bracket {
+  stroke: var(--pedal-gold);
+  stroke-opacity: 0.62;
+  transition:
+    stroke var(--dur-up) var(--ease-incand),
+    stroke-opacity var(--dur-up) var(--ease-incand),
+    filter var(--dur-up) var(--ease-incand);
+}
+.pedal-switch:hover .pedal-bracket {
+  stroke-opacity: 0.9;
+}
+.pedal-switch[aria-pressed="true"] .pedal-bracket {
+  stroke: var(--pedal-gold-hi);
+  stroke-opacity: 1;
+  filter: drop-shadow(0 0 3px rgb(255 196 110 / 0.75)) drop-shadow(0 0 9px rgb(255 180 84 / 0.4));
+}
+
+.pedal-label {
+  fill: var(--pedal-cream);
+  fill-opacity: 0.82;
+  transition: fill-opacity var(--dur-up) var(--ease-incand);
+}
+.pedal-switch:hover .pedal-label,
+.pedal-switch[aria-pressed="true"] .pedal-label {
+  fill-opacity: 1;
+}
+
+/* A and B: the letter on a solid gold tile. */
+.pedal-tile {
+  transition: filter var(--dur-up) var(--ease-incand);
+}
+.pedal-switch:hover .pedal-tile {
+  filter: brightness(1.08);
+}
+.pedal-switch[aria-pressed="true"] .pedal-tile {
+  filter: brightness(1.12) drop-shadow(0 0 4px rgb(255 196 110 / 0.7))
+    drop-shadow(0 0 10px rgb(255 180 84 / 0.4));
+}
+
+.pedal-switch:focus-visible {
+  outline: 1px solid var(--color-key);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.pedal-off {
+  filter: var(--off-dim);
+}
+.pedal-body {
+  transition: filter var(--dur-down) var(--ease-incand);
+}
