@@ -60,6 +60,8 @@ func TestParseMsg(t *testing.T) {
 		{name, Msg{Kind: MsgProfileName, Value: 1, Text: "Rock Set"}},
 		{[]byte{0x14, 0, 0, 0, 1, 2, 3}, Msg{Kind: MsgLayout, Raw: []byte{1, 2, 3}}},
 		{[]byte{0x42, 0, 0, 0, 9}, Msg{Kind: MsgOther, Value: 0x42, Raw: []byte{9}}},
+		{[]byte{0x11, 0, 0, 0, 1}, Msg{Kind: MsgPower, Value: 1}},
+		{[]byte{0x11, 0, 0, 0, 0}, Msg{Kind: MsgPower, Value: 0}},
 	}
 	for _, c := range cases {
 		got, ok := ParseMsg(c.in)
@@ -75,6 +77,8 @@ func TestParseMsg(t *testing.T) {
 		{0x0f, 0, 0, 0, 101},              // not a percent
 		{0x0c, 0, 0, 0, 1, 2, 3},          // short exp
 		{0x0c, 0, 0, 0, 2, 0, 0, 1, 0, 0}, // inputs out of order
+		{0x11, 0, 0, 0},                   // power without a payload
+		{0x11, 0, 0, 0, 2},                // power neither on nor off
 	} {
 		if m, ok := ParseMsg(bad); ok {
 			t.Errorf("ParseMsg(% x) = %+v, want no message", bad, m)
@@ -84,9 +88,9 @@ func TestParseMsg(t *testing.T) {
 
 func TestRequestsAreSafe(t *testing.T) {
 	// The only types we may ever write: info requests and lamps.
-	safe := map[byte]bool{0x01: true, 0x08: true, 0x0b: true, 0x0d: true, 0x0f: true, 0x12: true}
+	safe := map[byte]bool{0x01: true, 0x08: true, 0x0b: true, 0x0d: true, 0x0f: true, 0x11: true, 0x12: true}
 	reqs := [][]byte{FirmwareRequest(), ProfileRequest(), BatteryRequest(),
-		CablesRequest(), ProfileNameRequest(2)}
+		CablesRequest(), ProfileNameRequest(2), PowerRequest()}
 	reqs = append(reqs, LampMessages(0, Colour{R: 1})...)
 	for _, r := range reqs {
 		if !safe[r[0]] || r[1] != 0 || r[2] != 0 || r[3] != 0 {
@@ -95,6 +99,9 @@ func TestRequestsAreSafe(t *testing.T) {
 	}
 	if got := FirmwareRequest(); len(got) != 32 {
 		t.Errorf("firmware request is %d bytes, want 32 (0b + 31 zeros as verified)", len(got))
+	}
+	if got := PowerRequest(); !bytes.Equal(got, []byte{0x11, 0, 0, 0}) {
+		t.Errorf("power request % x, want 11 00 00 00 as verified", got)
 	}
 	if got := ProfileNameRequest(2); !bytes.Equal(got, []byte{0x12, 0, 0, 0, 2}) {
 		t.Errorf("profile name request % x", got)

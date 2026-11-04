@@ -94,6 +94,7 @@ const (
 	sxExp         = 0x0C // pedal → host: both expression values
 	sxCables      = 0x0D // request/reply and unsolicited: which exp jacks have a cable
 	sxBattery     = 0x0F // request/reply: battery percent
+	sxPower       = 0x11 // request/reply: 1 on USB power, 0 on battery
 	sxProfileName = 0x12 // request/reply: a profile's name, ASCII
 	sxLayout      = 0x14 // request/reply: a profile's per-switch command layout
 )
@@ -109,7 +110,8 @@ type Msg struct {
 	Exp [ExpInputs]int
 	// Cables has bit 0 for input 1 and bit 1 for input 2 (MsgCables).
 	Cables int
-	// Value is the battery percent, the profile number or the profile command.
+	// Value is the battery percent, the profile number, the profile command, or
+	// for MsgPower 1 on USB power and 0 on battery.
 	Value int
 	// Text is the firmware version or a profile name.
 	Text string
@@ -127,6 +129,7 @@ const (
 	MsgProfileName = "profileName"
 	MsgProfileCmd  = "profileCmd"
 	MsgLayout      = "layout"
+	MsgPower       = "power"
 	MsgOther       = "other"
 )
 
@@ -159,6 +162,13 @@ func ParseMsg(b []byte) (Msg, bool) {
 			return Msg{}, false
 		}
 		return Msg{Kind: MsgBattery, Value: v}, true
+	case sxPower:
+		// "11 00 00 00 01" on USB power, "... 00" on battery (docs/PROTOCOL-NOTES.md).
+		v, ok := last()
+		if !ok || v > 1 {
+			return Msg{}, false
+		}
+		return Msg{Kind: MsgPower, Value: v}, true
 	case sxProfile:
 		v, ok := last()
 		return Msg{Kind: MsgProfile, Value: v}, ok
@@ -204,6 +214,10 @@ func ProfileRequest() []byte          { return sxRequest(sxProfile) }
 func BatteryRequest() []byte          { return sxRequest(sxBattery) }
 func CablesRequest() []byte           { return sxRequest(sxCables, make([]byte, 28)...) }
 func ProfileNameRequest(p int) []byte { return sxRequest(sxProfileName, byte(p)) }
+
+// PowerRequest asks whether USB is powering the pedal. Read-only: a Spark II amp sends
+// it routinely, and the reply is MsgPower.
+func PowerRequest() []byte { return sxRequest(sxPower) }
 
 // Colour is a lamp colour. All zero is off.
 type Colour struct {
@@ -313,6 +327,9 @@ type Status struct {
 	ProfileName string `json:"profileName"`
 	// Battery is 0..100, or NoBattery until read.
 	Battery int `json:"battery"`
+	// Powered is true while USB powers the pedal. Charging is Powered with the battery
+	// below 100: the pedal reports nothing more.
+	Powered bool `json:"powered"`
 	// Cables says which expression jacks have a cable: [input 1, input 2].
 	Cables [ExpInputs]bool `json:"cables"`
 	// Exp is each input's value 0..127, or -1 with no cable or no reading yet.
