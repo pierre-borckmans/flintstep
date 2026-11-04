@@ -1,3 +1,4 @@
+import type { ThemeMode } from "./lib/theme";
 import type { Activity, Config, Device, ExpEdge, PresetInfo, PresetSource, State } from "./types";
 
 /** What the UI needs from the Go side. In the desktop app this is the Wails
@@ -12,6 +13,8 @@ export interface Backend {
   CalibrateExp(n: number, edge: ExpEdge): Promise<Config>;
   SetLaunchAtLogin(on: boolean): Promise<void>;
   RevealLogs(): Promise<void>;
+  /** Themes the native window (appearance, background) and keeps it for the next launch. */
+  SetTheme(mode: ThemeMode): Promise<void>;
   ListPresets(): Promise<PresetInfo[]>;
   /** Makes the preset the active one and runs it; resolves to its mapping. */
   SelectPreset(id: string): Promise<Config>;
@@ -65,6 +68,7 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     CalibrateExp: (n, edge) => app.CalibrateExp(n, edge),
     SetLaunchAtLogin: (on) => app.SetLaunchAtLogin(on),
     RevealLogs: () => app.RevealLogs(),
+    SetTheme: (mode) => app.SetTheme(mode),
     ListPresets: () => app.ListPresets(),
     SelectPreset: (id) => app.SelectPreset(id),
     CreatePreset: (name, from) => app.CreatePreset(name, from),

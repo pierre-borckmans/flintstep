@@ -676,6 +676,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     RevealLogs: async () => {
       console.info("[mock] RevealLogs");
     },
+    SetTheme: async () => {},
     ListPresets: async () => lib.list(),
     SelectPreset: async (id) => {
       await sleep(60);

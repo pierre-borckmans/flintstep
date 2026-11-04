@@ -13,7 +13,7 @@ React 19 + TS + Tailwind v4, bun 1.3.14, Biome, vitest, golangci-lint v2.
 - App / product: **SparkX MIDI** (bundle id `com.silversol.sparkxmidi`)
 - Virtual MIDI source: **Spark Control X**
 - Virtual MIDI destination (LED feedback): **Spark Control X LEDs**
-- Data dir: `~/Library/Application Support/SparkX MIDI/` (library.json, app.log, ble-trace.log;
+- Data dir: `~/Library/Application Support/SparkX MIDI/` (library.json, prefs.json, app.log, ble-trace.log;
   config.json from before presets is kept as a backup and no longer written)
 
 ## internal/sparkx (done, pure)
@@ -174,6 +174,15 @@ func Dir() (string, error)                 // the data dir, created
 func Load(path string) (mapping.Config, error) // missing file -> Default(), no error; corrupt -> Default() + error
 func Save(path string, c mapping.Config) error // atomic (temp + rename)
 func WriteAtomic(path string, b []byte) error  // the same, for any file
+
+// prefs.json: how this Mac shows the app, never part of a preset.
+type Theme string // "system" | "dark" | "light"
+type Prefs struct { Theme Theme `json:"theme"` }
+const PrefsFile = "prefs.json"
+func ParseTheme(s string) (Theme, bool)
+func DefaultPrefs() Prefs                // Theme "system"
+func LoadPrefs(path string) Prefs        // missing, damaged or unknown -> defaults; never fails
+func SavePrefs(path string, p Prefs) error // atomic
 ```
 
 ## internal/presets (pure, files only)
@@ -331,6 +340,8 @@ CalibrateExp(n: number, edge: "min" | "max"): Promise<Config> // stores the inpu
                                                               // or toe ("max") as it is, never swapped; errors if heel == toe
 SetLaunchAtLogin(on: boolean): Promise<void>
 RevealLogs(): Promise<void>
+SetTheme(mode: "system" | "dark" | "light"): Promise<void> // native window appearance + background,
+                                                           // saved to prefs.json; errors on another mode
 
 // Presets. SaveConfig, ResetConfig and CalibrateExp write into the active preset.
 ListPresets(): Promise<PresetInfo[]>
@@ -369,6 +380,13 @@ deleting a preset drops its entries. A switch made from the menu bar becomes an 
 
 Menu bar: with two or more presets, they are listed flat under a separator (the tray has no
 submenus), the active one checked; clicking one selects it.
+
+Theme: the frontend keeps the choice in localStorage (`sparkx.theme`), sets
+`<html data-theme>` ("light" / "dark", absent for system, where CSS follows
+`prefers-color-scheme`), and calls SetTheme on load and on every change. Go keeps its own
+copy in prefs.json so main.go opens the window in the right appearance and background
+before the webview loads. On darwin SetTheme sets `NSApp.appearance` (nil for system) and
+gives the Wails window a dynamic background that follows the effective appearance.
 
 The bridge computes the Amp and App lamps with mapping.IndicatorLamps from the config, the
 pedal's status (connected, powered) and two flash timers: a MIDI flash stays lit 120 ms after

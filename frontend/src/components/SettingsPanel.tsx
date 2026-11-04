@@ -12,6 +12,7 @@ import { Seg } from "../ui/Seg";
 import { Toggle } from "../ui/Toggle";
 import { NutSetting } from "./NutSetting";
 import { Section } from "./Section";
+import { ThemeSetting } from "./ThemeSetting";
 
 function Slider({
   value,
@@ -240,6 +241,7 @@ export function SettingsPanel({
       </Section>
 
       <Section title="Appearance">
+        <ThemeSetting />
         <NutSetting />
       </Section>
 
