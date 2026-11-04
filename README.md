@@ -71,6 +71,7 @@ and golangci-lint v2.
 ```sh
 make install   # frontend deps
 make dev       # wails dev, live reload
+make cert      # once per Mac: local signing cert, so Bluetooth permission survives rebuilds
 make app       # build/bin/SparkX MIDI.app
 make dmg       # build/bin/SparkX-MIDI-<version>.dmg, version from git describe
 make cli       # build/bin/sparkx-midi

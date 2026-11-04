@@ -5,6 +5,7 @@ FRONTEND := frontend
 BUN      := cd $(FRONTEND) && bun
 GOLANGCI := golangci-lint
 WAILS    := wails
+SIGN_ID  := SparkX MIDI Local Signing
 
 # Version from git: v0.2.0 on a tag, v0.2.0-3-gabc1234 after one, a bare hash before the
 # first tag, -dirty with uncommitted changes. Override with `make dmg VERSION=...`.
@@ -13,7 +14,7 @@ APP      := build/bin/SparkX MIDI.app
 DMG      := build/bin/SparkX-MIDI-$(VERSION).dmg
 
 .DEFAULT_GOAL := help
-.PHONY: help install dist icon dev app dmg cli frontend fmt fmt-go fmt-web lint lint-go lint-web \
+.PHONY: help install dist icon dev app cert dmg cli frontend fmt fmt-go fmt-web lint lint-go lint-web \
         test test-go test-web build check hooks precommit clean
 
 help: ## List targets
@@ -45,9 +46,19 @@ app: ## Build build/bin/SparkX MIDI.app (VERSION from git)
 	if echo "$$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 	  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $$v" \
 	    -c "Set :CFBundleVersion $$v" "$(APP)/Contents/Info.plist" && \
-	  codesign --force --deep -s - "$(APP)" && \
 	  echo "bundle version: $$v"; \
 	fi
+	@# Sign last, since the signature covers the plist. With the local certificate (make
+	@# cert) the app keeps its identity across rebuilds and macOS stops asking for
+	@# Bluetooth each time; without it, ad hoc as before.
+	@if security find-certificate -c "$(SIGN_ID)" >/dev/null 2>&1; then \
+	  codesign --force --deep -s "$(SIGN_ID)" "$(APP)" 2>/dev/null && echo "signed with \"$(SIGN_ID)\""; \
+	else \
+	  codesign --force --deep -s - "$(APP)" && echo "signed ad hoc (run 'make cert' to keep Bluetooth permission across rebuilds)"; \
+	fi
+
+cert: ## Create the local signing certificate (once per Mac)
+	scripts/signing/local-cert.sh
 
 dmg: app ## Pack the .app into build/bin/SparkX-MIDI-<version>.dmg
 	rm -rf build/dmg "$(DMG)"
