@@ -51,7 +51,7 @@ const (
 // ConfigVersion is the Version a Normalized Config carries.
 const ConfigVersion = 1
 
-// Ranges and defaults.
+// Ranges and defaults. frontend/src/lib/config.ts mirrors these (LONG_PRESS, RAW_MAX).
 const (
 	DefaultLongPressMS = 500
 	MinLongPressMS     = 150 // shorter and a normal tap reads as a long press

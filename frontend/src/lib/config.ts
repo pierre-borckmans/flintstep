@@ -7,7 +7,8 @@ import { RAW_MAX } from "./exp";
 // the UI's copy of the same rules so a bad edit is caught before Save, and the reducer the
 // editor goes through so every change is a plain function of (config, op).
 
-export const LONG_PRESS = { min: 200, max: 2000, step: 50 } as const;
+/** mapping.MinLongPressMS / MaxLongPressMS: the slider and validate both use these. */
+export const LONG_PRESS = { min: 150, max: 3000, step: 50 } as const;
 
 const OFF: Action = { kind: "off", channel: 1, number: 0, value: 127, mode: "momentary" };
 

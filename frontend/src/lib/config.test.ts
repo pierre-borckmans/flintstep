@@ -59,6 +59,13 @@ describe("validate", () => {
     ).toBeNull());
   it("takes an uncalibrated 0/0 input as the whole jack", () =>
     expect(validate(edit(base(), { type: "exp", n: 0, patch: { min: 0, max: 0 } }))).toBeNull());
+  it("bounds long press to Go's MinLongPressMS..MaxLongPressMS", () => {
+    const lp = (value: number) => validate(edit(base(), { type: "longPressMs", value }));
+    expect(lp(150)).toBeNull();
+    expect(lp(3000)).toBeNull();
+    expect(lp(149)).toBe("long-press time must be 150 to 3000 ms");
+    expect(lp(3001)).toBe("long-press time must be 150 to 3000 ms");
+  });
   it("bounds long press and brightness", () => {
     expect(validate(edit(base(), { type: "longPressMs", value: 50 }))).toMatch(/long-press/);
     expect(edit(base(), { type: "brightness", value: 140 }).brightness).toBe(100);
