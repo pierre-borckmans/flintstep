@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { Backend } from "./api";
 import { ActivityLog } from "./components/Activity";
 import { ExpressionPanel } from "./components/ExpressionPanel";
 import { Header } from "./components/Header";
 import { HistoryBar } from "./components/HistoryBar";
 import { IndicatorEditor } from "./components/IndicatorEditor";
-import { Pedal } from "./components/Pedal";
+import { PedalViewer } from "./components/PedalViewer";
 import { type PickerStart, PresetPicker } from "./components/PresetPicker";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SwitchEditor, SwitchTabs } from "./components/SwitchEditor";
+import { readViewPreference, saveViewPreference } from "./lib/view";
 import type { IndicatorIndex } from "./types";
 import { cx } from "./ui/cx";
 import { useBridge } from "./useBridge";
@@ -33,7 +34,10 @@ export default function App({ backend }: { backend: Backend }) {
   );
   const [tab, setTab] = useState<Tab>(() => (q.get("tab") as Tab) || "switches");
   const status = state?.pedal ?? null;
-  const live = status?.state === "connected";
+  const [split, setSplit] = useState(() => readViewPreference("sparkx.viewer.split", 72, 40, 82));
+  const workspace = useRef<HTMLDivElement>(null);
+  const drag = useRef(false);
+  useEffect(() => saveViewPreference("sparkx.viewer.split", split), [split]);
 
   // Browser dev only: replay ?demo=... edits once the history exists (see mock.ts).
   const demoed = useRef(false);
@@ -67,11 +71,15 @@ export default function App({ backend }: { backend: Backend }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="app-shell">
       <Header state={state} />
-      <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(320px,360px)] gap-3 p-3">
-        <div className="flex min-h-0 min-w-0 flex-col gap-3">
-          <Pedal
+      <main className="workspace">
+        <div
+          ref={workspace}
+          className="monitor-column"
+          style={{ "--viewer-split": `${split}%` } as CSSProperties}
+        >
+          <PedalViewer
             status={status}
             config={config}
             selected={ind === null ? sel : -1}
@@ -79,29 +87,67 @@ export default function App({ backend }: { backend: Backend }) {
             selectedIndicator={ind}
             onSelectIndicator={selectIndicator}
           />
-          <p className="-mt-1 text-center text-ui-xs text-faint">
-            {live
-              ? "Click a switch, or the AMP and APP lamps, to edit it. Pressing a switch lights it here too."
-              : status?.detail || "Waiting for the app"}
-          </p>
+          <div
+            className="viewer-divider"
+            role="separator"
+            tabIndex={0}
+            aria-label="Resize pedal viewer"
+            aria-orientation="horizontal"
+            aria-valuemin={40}
+            aria-valuemax={82}
+            aria-valuenow={Math.round(split)}
+            title="Drag to resize · arrow keys to adjust · double-click to reset"
+            onDoubleClick={() => setSplit(72)}
+            onPointerDown={(e) => {
+              drag.current = true;
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              if (!drag.current || !workspace.current) return;
+              const rect = workspace.current.getBoundingClientRect();
+              setSplit(Math.max(40, Math.min(82, ((e.clientY - rect.top) / rect.height) * 100)));
+            }}
+            onPointerUp={(e) => {
+              drag.current = false;
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }}
+            onLostPointerCapture={() => {
+              drag.current = false;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                e.preventDefault();
+                setSplit((value) =>
+                  Math.max(40, Math.min(82, value + (e.key === "ArrowDown" ? 2 : -2))),
+                );
+              } else if (e.key === "Home") {
+                e.preventDefault();
+                setSplit(40);
+              } else if (e.key === "End") {
+                e.preventDefault();
+                setSplit(82);
+              }
+            }}
+          >
+            <span />
+          </div>
           <ActivityLog log={bridge.log} midi={state?.midi ?? null} />
         </div>
 
-        <aside className="relative flex min-h-0 flex-col overflow-hidden rounded-ui-lg border border-edge bg-panel shadow-card">
+        <aside className="inspector" aria-label="Controller settings">
+          <div className="inspector-heading">
+            <span className="eyebrow">Configuration</span>
+            <span className="inspector-meta">6 switches · 2 inputs</span>
+          </div>
           <PresetPicker presets={bridge.presets} start={(q.get("picker") as PickerStart) || null} />
-          <nav className="flex h-10 shrink-0 items-center gap-1 border-b border-edge px-2">
+          <nav className="inspector-tabs" aria-label="Controller sections">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
                 aria-current={tab === t.id ? "page" : undefined}
-                className={cx(
-                  "h-7 flex-1 rounded-ui-sm text-ui-sm font-semibold transition-[color,box-shadow,background-color] duration-(--dur) ease-(--ease)",
-                  tab === t.id
-                    ? "lit bg-panel3 text-bone"
-                    : "text-muted hover:warm hover:text-text",
-                )}
+                className={cx("inspector-tab", tab === t.id && "is-active")}
               >
                 {t.label}
               </button>

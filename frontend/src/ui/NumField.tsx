@@ -50,7 +50,7 @@ export function NumField({
   return (
     <label
       className={cx(
-        "flex h-7 items-center gap-1.5 rounded-ui-sm border bg-sunken px-2 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]",
+        "flex h-9 items-center gap-1.5 rounded-ui-sm border bg-sunken px-2 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]",
         bad && focus ? "border-hot/60" : "border-edge focus-within:border-edge-strong",
         disabled && "opacity-40",
         className,

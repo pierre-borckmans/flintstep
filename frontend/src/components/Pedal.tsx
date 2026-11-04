@@ -711,46 +711,87 @@ function FootSwitch({
   );
 }
 
-function Caption({
-  n,
+/** Equal label columns; the outer leaders angle back to the physical switches. */
+function CaptionRow({
+  top,
   config,
   selected,
-  top,
+  onSelect,
+  children,
 }: {
-  n: number;
-  config: Config | null;
-  selected: boolean;
   top: boolean;
+  config: Config | null;
+  selected: number;
+  onSelect: (n: number) => void;
+  children?: React.ReactNode;
 }) {
-  const sw = config?.switches[n];
-  const cap = sw ? actionCaption(sw.tap) : "";
-  const capShort = sw ? actionCaption(sw.tap, true) : "";
-  const hold = sw ? longCaption(sw.long) : "";
-  const holdShort = sw ? longCaption(sw.long, true) : "";
-  // centred on the column, held inside the case's width
-  const centre = Math.min(Math.max(COL[n % 3] / W, 0.14), 0.86);
+  const indices = top ? [0, 1, 2] : [3, 4, 5];
   return (
-    <span
-      className={cx(
-        "absolute flex w-[28%] min-w-0 flex-col items-center leading-tight",
-        top ? "bottom-0" : "top-0",
-      )}
-      style={{ left: `${(centre - 0.14) * 100}%` }}
-    >
-      <span
-        className={cx(
-          "max-w-full truncate text-ui-xs transition-colors duration-(--dur)",
-          selected ? "text-text" : "text-muted",
-        )}
-      >
-        <span className="@max-md:hidden">{cap}</span>
-        <span className="hidden @max-md:inline">{capShort}</span>
-      </span>
-      <span className="h-3 max-w-full truncate text-ui-2xs text-faint">
-        <span className="@max-md:hidden">{hold}</span>
-        <span className="hidden @max-md:inline">{holdShort}</span>
-      </span>
-    </span>
+    <div className="pedal-captions" data-top={top}>
+      <svg aria-hidden viewBox="0 0 1000 72" preserveAspectRatio="none" className="pedal-leaders">
+        {indices.map((n) => {
+          const x = COL[n % 3];
+          const label = (((n % 3) + 0.5) / 3) * W;
+          const y = (value: number) => (top ? value : 72 - value);
+          return (
+            <path
+              key={n}
+              data-selected={selected === n}
+              d={`M ${label} ${y(32)} V ${y(40)} L ${x} ${y(56)} V ${y(72)}`}
+            />
+          );
+        })}
+      </svg>
+      {indices.map((n) => {
+        const sw = config?.switches[n];
+        const cap = sw ? actionCaption(sw.tap) : "Not assigned";
+        const hold = sw ? longCaption(sw.long) : "";
+        return (
+          <button
+            type="button"
+            key={n}
+            className="pedal-caption"
+            data-selected={selected === n}
+            aria-label={`Edit switch ${SWITCH_NAMES[n]}: ${cap}${hold ? `, ${hold}` : ""}`}
+            onClick={() => onSelect(n)}
+            title={`${cap}${hold ? ` · ${hold}` : ""}`}
+            style={{ left: `${((n % 3) / 3) * 100}%` }}
+          >
+            <span className="pedal-caption-main">
+              <span className="@max-md:hidden">{cap}</span>
+              <span className="hidden @max-md:inline">
+                {sw ? actionCaption(sw.tap, true) : "—"}
+              </span>
+            </span>
+            <span className="pedal-caption-hold">
+              <span className="@max-md:hidden">{hold}</span>
+              <span className="hidden @max-md:inline">{sw ? longCaption(sw.long, true) : ""}</span>
+            </span>
+          </button>
+        );
+      })}
+      {children}
+    </div>
+  );
+}
+
+/** Extend each leader to the edge of its switch's nut, using the hardware geometry. */
+function SwitchLeaders({ selected }: { selected: number }) {
+  const end = fy(REF.nut.y - REF.nut.r) - 7;
+  return (
+    <svg aria-hidden viewBox={`0 0 ${W} ${H}`} className="pedal-leaders pedal-leaders-body">
+      {[0, 1, 2, 3, 4, 5].map((n) => {
+        const x = COL[n % 3];
+        const top = n < 3;
+        const target = top ? end : MIRROR - end;
+        return (
+          <g key={n} data-selected={selected === n}>
+            <path d={`M ${x} ${top ? 0 : H} V ${target}`} />
+            <circle cx={x} cy={target} r="3" />
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -865,14 +906,11 @@ export function Pedal({
   return (
     <div className="pedal @container flex flex-col items-center px-2 pt-1 pb-1">
       <Defs id={id} />
-      <div className="relative w-full max-w-[500px]">
-        <div className="relative h-8">
-          {[0, 1, 2].map((n) => (
-            <Caption key={n} n={n} config={config} selected={selected === n} top />
-          ))}
+      <div className="relative w-full">
+        <CaptionRow top config={config} selected={selected} onSelect={onSelect}>
           <Jack n={0} cable={!!status?.cables?.[0]} />
           <Jack n={1} cable={!!status?.cables?.[1]} />
-        </div>
+        </CaptionRow>
         <div
           className={cx("pedal-body relative w-full", !live && "pedal-off")}
           style={{
@@ -882,6 +920,7 @@ export function Pedal({
           }}
         >
           <Case id={id} />
+          <SwitchLeaders selected={selected} />
           <Lamps
             id={id}
             lamps={lamps}
@@ -919,11 +958,7 @@ export function Pedal({
             );
           })}
         </div>
-        <div className="relative h-8">
-          {[3, 4, 5].map((n) => (
-            <Caption key={n} n={n} config={config} selected={selected === n} top={false} />
-          ))}
-        </div>
+        <CaptionRow top={false} config={config} selected={selected} onSelect={onSelect} />
       </div>
     </div>
   );

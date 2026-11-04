@@ -40,7 +40,7 @@ function SwitchSelect({
  *  edited) shows none of them chosen. */
 export function SwitchTabs({ sw, onSelect }: { sw: number | null; onSelect: (n: number) => void }) {
   return (
-    <div className="px-4 pt-3 pb-1">
+    <div className="switch-selector px-5 pt-4 pb-4">
       <Seg
         label="Switch"
         options={SWITCH_NAMES.map((name, i) => ({ value: String(i), label: name }))}

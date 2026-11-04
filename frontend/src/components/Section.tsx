@@ -12,7 +12,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2.5 border-t border-edge px-4 pt-3 pb-4 first:border-t-0">
+    <section className="editor-section flex flex-col gap-3 border-t border-edge px-5 pt-4 pb-5 first:border-t-0">
       <div className="flex min-h-5 items-center gap-2">
         <Kicker>{title}</Kicker>
         <div className="flex-1" />

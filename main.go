@@ -25,16 +25,16 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "SparkX MIDI",
-		Width:     980,
-		Height:    700,
-		MinWidth:  780,
+		Width:     1180,
+		Height:    820,
+		MinWidth:  560,
 		MinHeight: 560,
 		// A menu-bar app: closing the window only hides it. The bridge keeps running and
 		// Quit lives in the menu-bar menu.
 		HideWindowOnClose: true,
 		StartHidden:       hidden,
 		AssetServer:       &assetserver.Options{Assets: assets},
-		BackgroundColour:  &options.RGBA{R: 8, G: 9, B: 11, A: 1},
+		BackgroundColour:  &options.RGBA{R: 20, G: 21, B: 20, A: 1},
 		Mac: &mac.Options{
 			// No title bar; the traffic lights stay, inset over the app's own header,
 			// which declares the drag region.

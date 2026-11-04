@@ -36,9 +36,10 @@ export function ActivityLog({ log, midi }: { log: LoggedActivity[]; midi: Midi |
   const now = useNow();
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-ui-lg border border-edge bg-panel shadow-card">
-      <div className="flex h-9 shrink-0 items-center gap-3 border-b border-edge px-3">
+    <section className="activity-panel">
+      <div className="activity-heading">
         <Kicker>MIDI activity</Kicker>
+        <span className="activity-count">{log.length} messages</span>
         <div className="flex-1" />
         <span className="flex items-center gap-1.5 text-ui-xs text-muted" title={midi?.source}>
           <Lamp on={outOn} colour="live" size={6} />
@@ -50,11 +51,10 @@ export function ActivityLog({ log, midi }: { log: LoggedActivity[]; midi: Midi |
         </span>
       </div>
       {log.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
-          <span className="text-ui-md text-muted">Nothing yet</span>
+        <div className="activity-empty">
+          <span className="text-ui-md text-muted">Listening for MIDI</span>
           <span className="text-ui-sm text-faint">
-            Press a switch. Each message sent to “{midi?.source || "Spark Control X"}” shows up
-            here.
+            Press a switch. Messages sent to “{midi?.source || "Spark Control X"}” appear here.
           </span>
         </div>
       ) : (
@@ -62,7 +62,7 @@ export function ActivityLog({ log, midi }: { log: LoggedActivity[]; midi: Midi |
           {log.map((a) => (
             <li
               key={a.id}
-              className="row-in grid grid-cols-[30px_1fr_auto] items-center gap-2 px-3 py-[3px]"
+              className="activity-row row-in grid grid-cols-[30px_1fr_auto] items-center gap-2 px-4 py-2"
               title={a.bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ")}
             >
               <span
