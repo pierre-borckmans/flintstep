@@ -1,6 +1,7 @@
 package ble
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -207,5 +208,41 @@ func TestTraceLeavesOutExp(t *testing.T) {
 	out := string(b)
 	if !strings.Contains(out, "RX sw  01") || !strings.Contains(out, "RX cmd 0d00000001") || strings.Contains(out, "0c000000") {
 		t.Errorf("trace:\n%s", out)
+	}
+}
+
+// slowDial holds the first dial until open is closed.
+type slowDial struct {
+	*fakeAir
+	once    sync.Once
+	arrived chan struct{}
+	open    chan struct{}
+}
+
+func (a *slowDial) dial(ctx context.Context, addr string, timeout time.Duration, s sink) (conn, error) {
+	a.once.Do(func() { close(a.arrived); <-a.open })
+	return a.fakeAir.dial(ctx, addr, timeout, s)
+}
+
+// A pedal chosen while another connect is still dialling: when that dial lands, the
+// old pedal must not be reported as connected, or the app remembers it over the
+// user's choice.
+func TestNoOnConnectedForAnOldTarget(t *testing.T) {
+	air := &slowDial{fakeAir: &fakeAir{answers: map[string]bool{"a": true, "b": true}},
+		arrived: make(chan struct{}), open: make(chan struct{})}
+	m := newManager(Handlers{}, air, fastTiming)
+	var mu sync.Mutex
+	var got []string
+	m.OnConnected(func(d Device) { mu.Lock(); got = append(got, d.Address); mu.Unlock() })
+	m.Start(Target{Address: "a"})
+	defer m.Stop()
+	<-air.arrived
+	m.SetTarget(Target{Address: "b"})
+	close(air.open)
+	waitFor(t, "b", func() bool { mu.Lock(); defer mu.Unlock(); return len(got) > 0 && got[len(got)-1] == "b" })
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 {
+		t.Errorf("OnConnected for %v, want only b", got)
 	}
 }

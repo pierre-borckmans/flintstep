@@ -237,7 +237,8 @@ func (m *Manager) SetLamps(l [sparkx.Switches]sparkx.Colour) {
 	}
 }
 
-// OnConnected installs fn, called with the pedal after each successful connect.
+// OnConnected installs fn, called with the pedal after each successful connect to the
+// target of the moment (not for a dial that lands after SetTarget changed it).
 func (m *Manager) OnConnected(fn func(Device)) {
 	m.mu.Lock()
 	m.onConn = fn

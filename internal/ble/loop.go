@@ -93,7 +93,7 @@ func (m *Manager) loop(ctx context.Context, prev <-chan struct{}, done chan stru
 			return
 		}
 		failures = 0
-		m.adopt(s, path)
+		m.adopt(s, path, tg)
 		end := m.hold(ctx, s)
 		m.release(s, end)
 		switch end {
@@ -132,14 +132,20 @@ func (m *Manager) sleep(ctx context.Context, d time.Duration) {
 	}
 }
 
-// adopt makes s the connected pedal.
-func (m *Manager) adopt(s *session, path connectPath) {
+// adopt makes s the connected pedal, found for tg.
+func (m *Manager) adopt(s *session, path connectPath, tg Target) {
 	m.trace.note("connect " + s.dev.Address + " " + s.dev.Name)
 	m.mu.Lock()
 	m.cur = s
 	m.name, m.addr = s.dev.Name, s.dev.Address
 	lamps := m.lamps
 	fn := m.onConn
+	if m.target != tg {
+		// The target changed while this dial was in flight: this is not the pedal
+		// asked for now, so it is not the one to remember. hold lets go of it
+		// unless the new target takes any pedal.
+		fn = nil
+	}
 	m.mu.Unlock()
 	s.start(s.c, lamps)
 	log.Printf("ble: connected %s %s", describe(Target{s.dev.Address, s.dev.Name}), path)
