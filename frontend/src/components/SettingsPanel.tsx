@@ -9,6 +9,7 @@ import { cx } from "../ui/cx";
 import { Lamp } from "../ui/Lamp";
 import { Seg } from "../ui/Seg";
 import { Toggle } from "../ui/Toggle";
+import { NutSetting } from "./NutSetting";
 import { Section } from "./Section";
 
 function Slider({
@@ -235,6 +236,10 @@ export function SettingsPanel({
 
       <Section title="Pedal">
         <PedalPicker backend={backend} state={state} />
+      </Section>
+
+      <Section title="Appearance">
+        <NutSetting />
       </Section>
 
       <Section title="App">

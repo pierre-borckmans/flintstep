@@ -134,3 +134,49 @@
     animation: none;
   }
 }
+
+/* Match my pedal: over a nut, a faint cold ring says it turns, a grab cursor says how,
+   and a tiny readout under it says where it is. Off the nut the switch is a switch. */
+.pedal-nut-ring {
+  stroke: var(--color-cold);
+  stroke-width: 1px;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+  stroke-opacity: 0;
+  transition: stroke-opacity var(--dur-up) var(--ease-incand);
+}
+.pedal-switch[data-nut="over"],
+.pedal-switch[data-nut="over"] * {
+  cursor: grab;
+}
+.pedal-switch[data-nut="drag"],
+.pedal-switch[data-nut="drag"] * {
+  cursor: grabbing;
+}
+.pedal-switch[data-nut="over"] .pedal-nut-ring,
+.pedal-switch[data-nut="drag"] .pedal-nut-ring {
+  stroke-opacity: 0.6;
+}
+.pedal-nut-readout {
+  position: absolute;
+  left: 50%;
+  translate: -50% -50%;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgb(8 9 11 / 0.82);
+  color: var(--color-cold);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+  line-height: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-up) var(--ease-incand);
+}
+.pedal-switch[data-nut="over"] .pedal-nut-readout,
+.pedal-switch[data-nut="drag"] .pedal-nut-readout,
+.pedal-switch[data-nut]:focus-visible .pedal-nut-readout,
+.pedal-nut-readout[data-peek] {
+  opacity: 1;
+}
