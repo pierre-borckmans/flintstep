@@ -24,7 +24,7 @@ describe("defaultConfig", () => {
   // mapping.Default(), field for field: what ResetConfig would return.
   it("is Go's Default()", () =>
     expect(defaultConfig()).toEqual({
-      version: 2,
+      version: 3,
       pedal: { address: "", name: "" },
       switches: [
         { r: 255, g: 150, b: 0 },
@@ -40,9 +40,22 @@ describe("defaultConfig", () => {
       })),
       combos: [],
       exp: [
-        { enabled: true, channel: 1, cc: 11, min: 0, max: 65535, invert: false },
-        { enabled: true, channel: 1, cc: 7, min: 0, max: 65535, invert: false },
-      ],
+        [11, 102],
+        [7, 103],
+      ].map(([cc, trig]) => ({
+        enabled: true,
+        channel: 1,
+        cc,
+        min: 0,
+        max: 65535,
+        invert: false,
+        trigger: {
+          mode: "off",
+          action: { kind: "cc", channel: 1, number: trig, value: 127, mode: "momentary" },
+          threshold: 4,
+          offDelayMs: 400,
+        },
+      })),
       ledMode: "local",
       longPressMs: 500,
       brightness: 100,
@@ -244,6 +257,67 @@ describe("opKey", () => {
   it("is null for steps of their own", () => {
     expect(opKey({ type: "addCombo" })).toBeNull();
     expect(opKey({ type: "removeCombo", index: 0 })).toBeNull();
+  });
+});
+
+describe("expression triggers", () => {
+  const base = () => defaultConfig();
+  it("picking a mode fills in a working trigger", () => {
+    const c = edit(base(), { type: "triggerMode", n: 1, mode: "toe" });
+    expect(c.exp[1].trigger).toEqual({
+      mode: "toe",
+      action: { kind: "cc", channel: 1, number: 103, value: 127, mode: "toggle" },
+      threshold: 96,
+      offDelayMs: 400,
+    });
+    expect(c.exp[0]).toEqual(base().exp[0]);
+    expect(validate(c)).toBeNull();
+  });
+  it("edits the threshold, delay and action", () => {
+    let c = edit(base(), { type: "triggerMode", n: 0, mode: "engage" });
+    c = edit(c, { type: "trigger", n: 0, patch: { threshold: 7, offDelayMs: 650 } });
+    c = edit(c, { type: "trigger", n: 0, patch: {}, action: { kind: "note", number: 60 } });
+    expect(c.exp[0].trigger).toMatchObject({ threshold: 7, offDelayMs: 650 });
+    expect(c.exp[0].trigger.action).toMatchObject({ kind: "note", number: 60 });
+  });
+  it("leaves the trigger alone on other expression edits", () => {
+    const c = edit(base(), { type: "triggerMode", n: 0, mode: "engage" });
+    expect(edit(c, { type: "exp", n: 0, patch: { cc: 4 } }).exp[0].trigger).toEqual(
+      c.exp[0].trigger,
+    );
+  });
+  it("Go's rule: a trigger that sends nothing, in Go's words", () => {
+    const c = edit(base(), { type: "triggerMode", n: 1, mode: "engage" });
+    expect(validate(edit(c, { type: "trigger", n: 1, patch: {}, action: { kind: "off" } }))).toBe(
+      "expression 2: the trigger does nothing: pick what it sends",
+    );
+    // Off, it does not matter what it would send.
+    const off = edit(base(), { type: "trigger", n: 1, patch: {}, action: { kind: "off" } });
+    expect(validate(off)).toBeNull();
+  });
+  it("the ranges Go would clamp", () => {
+    const t = (patch: { threshold?: number; offDelayMs?: number }) =>
+      validate(edit(base(), { type: "trigger", n: 0, patch }));
+    expect(t({ threshold: 0 })).toBe("EXP 1: trigger threshold must be 1 to 99%");
+    expect(t({ threshold: 100 })).toBe("EXP 1: trigger threshold must be 1 to 99%");
+    expect(t({ threshold: 4.5 })).toBe("EXP 1: trigger threshold must be 1 to 99%");
+    expect(t({ offDelayMs: 2001 })).toBe("EXP 1: off delay must be 0 to 2000 ms");
+    expect(t({ offDelayMs: 0 })).toBeNull();
+    expect(
+      validate(edit(base(), { type: "trigger", n: 0, patch: {}, action: { channel: 0 } })),
+    ).toBe("EXP 1 trigger: channel must be 1 to 16");
+    const bad = base();
+    bad.exp[0].trigger.mode = "wah" as "off";
+    expect(validate(bad)).toBe("EXP 1: unknown trigger mode");
+  });
+  it("a threshold drag is one undo step, a mode pick its own", () => {
+    expect(opKey({ type: "trigger", n: 0, patch: { threshold: 5 } })).toBe(
+      opKey({ type: "trigger", n: 0, patch: { threshold: 9 } }),
+    );
+    expect(opKey({ type: "trigger", n: 0, patch: { threshold: 5 } })).not.toBe(
+      opKey({ type: "trigger", n: 1, patch: { threshold: 5 } }),
+    );
+    expect(opKey({ type: "triggerMode", n: 0, mode: "toe" })).toBeNull();
   });
 });
 

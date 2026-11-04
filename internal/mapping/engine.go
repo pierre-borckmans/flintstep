@@ -66,6 +66,7 @@ type Engine struct {
 	comboOn map[[2]int]bool       // combo toggles that are on, by pairKey
 	fb      map[fbKey]bool        // feedback received: lit or not
 	exp     *sparkx.ExpScale
+	trig    [sparkx.ExpInputs]trigger // expression triggers (trigger.go)
 }
 
 // NewEngine starts with nothing held and every toggle off.
@@ -81,8 +82,20 @@ func NewEngine(cfg Config) *Engine {
 // SetConfig switches to cfg. A toggle keeps its state if its action is still a CC
 // toggle, so editing a colour does not turn effects off behind the user's back.
 // An expression input whose settings changed sends its next value whatever it is.
-func (e *Engine) SetConfig(cfg Config) {
+//
+// It returns the release half of an expression trigger that has to let go: its input
+// was switched off, or its mode or action changed. A new threshold is only read on the
+// next value.
+func (e *Engine) SetConfig(cfg Config) [][]byte {
 	cfg = cfg.Normalize()
+	var out [][]byte
+	for n := range e.trig {
+		if trigKey(e.cfg.Exp[n]) != trigKey(cfg.Exp[n]) {
+			out = append(out, e.letGo(n)...)
+			tr := cfg.Exp[n].Trigger
+			e.trig[n].on = e.trig[n].on && isToggle(tr.Action) && tr.Action == e.cfg.Exp[n].Trigger.Action
+		}
+	}
 	for n := range e.tapOn {
 		e.tapOn[n] = e.tapOn[n] && isToggle(cfg.Switches[n].Tap)
 		e.longOn[n] = e.longOn[n] && isToggle(cfg.Switches[n].Long)
@@ -101,6 +114,7 @@ func (e *Engine) SetConfig(cfg Config) {
 		}
 	}
 	e.cfg = cfg
+	return out
 }
 
 // Switch takes one edge and returns the MIDI to send now. Timers due by at fire
@@ -193,13 +207,13 @@ func (e *Engine) up(n int) [][]byte {
 }
 
 // Tick fires the timers due by at: combo windows that closed without a partner, and
-// long presses. Called every ~10 ms while Pending.
+// long presses, and expression triggers' off delays. Called every ~10 ms while Pending.
 func (e *Engine) Tick(at time.Time) [][]byte {
 	var out [][]byte
 	for {
 		n := e.nextDue(at)
 		if n < 0 {
-			return out
+			return append(out, e.tickTriggers(at)...)
 		}
 		s := &e.sw[n]
 		switch s.phase {
@@ -235,12 +249,12 @@ func (e *Engine) Pending() bool {
 			return true
 		}
 	}
-	return false
+	return e.triggerPending()
 }
 
 // Reset forgets every press: the pedal is gone, and so are its switches. Toggles
 // stay as they are, since the DAW still has them on. The expression inputs send
-// their next value whatever it is.
+// their next value whatever it is, and their triggers let go.
 //
 // It returns the release half of everything still sounding, so a pedal that drops
 // mid-press does not leave a note hanging or a momentary CC stuck on in the DAW.
@@ -260,7 +274,7 @@ func (e *Engine) Reset() [][]byte {
 	}
 	e.sw = [sparkx.Switches]press{}
 	for n := range e.cfg.Exp {
-		e.exp.Reset(n)
+		out = append(out, e.ExpRelease(n)...)
 	}
 	return out
 }
@@ -322,11 +336,15 @@ func isToggle(a Action) bool { return a.Kind == KindCC && a.Mode == Toggle }
 // whatever order the numbers fall: heel sends 0 and toe 127 either way, and Invert
 // (the user's own choice) flips that on top. The calibrated travel is stretched to
 // the full raw range first, so ExpScale's hysteresis (half a step and a margin) is
-// measured in steps of the pedal the user actually has. false: nothing to send,
-// because the input is off or the value did not move a step.
-func (e *Engine) Exp(n, raw int) ([]byte, bool) {
+// measured in steps of the pedal the user actually has. Nothing comes back for the CC
+// when the input is off or the value did not move a step.
+//
+// The same travel drives the input's trigger (trigger.go): a press half goes before
+// the CC, a release half after it. Timers due by at fire first, as in Switch.
+func (e *Engine) Exp(n, raw int, at time.Time) [][]byte {
+	out := e.Tick(at)
 	if n < 0 || n >= sparkx.ExpInputs || !e.cfg.Exp[n].Enabled {
-		return nil, false
+		return out
 	}
 	x := e.cfg.Exp[n]
 	heel, toe := x.Min, x.Max
@@ -344,11 +362,12 @@ func (e *Engine) Exp(n, raw int) ([]byte, bool) {
 	if x.Invert {
 		scaled = ExpRawMax - scaled
 	}
-	v, changed := e.exp.Feed(n, scaled)
-	if !changed {
-		return nil, false
+	press, release := e.trigger(n, scaled, at)
+	out = append(out, press...)
+	if v, changed := e.exp.Feed(n, scaled); changed {
+		out = append(out, ccMsg(x.Channel, x.CC, v))
 	}
-	return ccMsg(x.Channel, x.CC, v), true
+	return append(out, release...)
 }
 
 // Feedback takes a message from the LED destination. A CC or note records whether
