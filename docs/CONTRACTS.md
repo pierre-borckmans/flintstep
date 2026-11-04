@@ -54,9 +54,9 @@ type ExpConfig struct {
     Enabled bool `json:"enabled"`
     Channel int  `json:"channel"`
     CC      int  `json:"cc"`
-    Min     int  `json:"min"` // raw calibration 0..65535, Min < Max
-    Max     int  `json:"max"`
-    Invert  bool `json:"invert"`
+    Min     int  `json:"min"`    // raw value at the heel, 0..65535
+    Max     int  `json:"max"`    // raw value at the toe; may be below Min, never equal to it
+    Invert  bool `json:"invert"` // the user's own flip, on top of heel=0 toe=127
 }
 
 type LEDMode string // "local" | "feedback"
@@ -68,14 +68,14 @@ type Config struct {
     Combos      []Combo             `json:"combos"`
     Exp         [2]ExpConfig        `json:"exp"`
     LEDMode     LEDMode             `json:"ledMode"`
-    LongPressMS int                 `json:"longPressMs"` // default 500
+    LongPressMS int                 `json:"longPressMs"` // 150..3000 (MinLongPressMS..MaxLongPressMS), default 500
     Brightness  int                 `json:"brightness"`  // 0..100 lamp dimming, default 100
 }
 type PedalRef struct { Address string `json:"address"`; Name string `json:"name"` }
 
 func Default() Config        // the spec's table: switch n = CC 80+n momentary ch1, exp1 CC11, exp2 CC7, local LEDs
 func (c Config) Normalize() Config // clamps everything into range, fills zero values with defaults
-func (c Config) Validate() error   // human-readable error for the UI (e.g. "combo uses the same switch twice")
+func (c Config) Validate() error   // human-readable error for the UI (e.g. "combo I + I uses the same switch twice")
 ```
 
 Engine (not safe for concurrent use; the bridge serialises calls):
@@ -89,7 +89,8 @@ func (e *Engine) Pending() bool                     // whether Tick has work
 func (e *Engine) Exp(n, raw int) ([]byte, bool)     // calibrated + inverted + hysteresis -> CC; false = nothing to send
 func (e *Engine) Feedback(msg []byte) bool          // MIDI from the LED destination; true if Lamps() changed
 func (e *Engine) Lamps() [6]sparkx.Colour           // what the six switch lamps should show now (brightness applied)
-func (e *Engine) Reset()                            // pedal disconnected: forget held/pending, keep toggles
+func (e *Engine) Reset() [][]byte                   // pedal disconnected: forget held/pending, keep toggles;
+                                                    // returns the release half of anything still sounding
 ```
 
 Behaviour:
@@ -104,8 +105,20 @@ Behaviour:
 - Local LED mode: a switch is lit (its Colour) while held, and while its toggle is on.
   Feedback mode: a switch is lit when the last CC/note received on its Tap's channel+number
   was non-zero (CC value > 0, note on velocity > 0); PC switches never light from feedback.
-- Exp: raw outside a cable is never passed. Calibrated to Min..Max, inverted if asked,
-  scaled to 0..127 with the same hysteresis idea as sparkx.ExpScale.
+- Exp: raw outside a cable is never passed. Min is always the heel and Max always the
+  toe, in whatever order the numbers fall: a pedal whose toe reads lower than its heel
+  just has Min > Max. Heel maps to 0 and toe to 127 either way; Invert is only the user's
+  toggle, applied on top. Normalize never swaps Min and Max or touches Invert.
+  Min == Max on an enabled input is a Validate error (0/0 is "not calibrated" and
+  Normalize makes it 0..65535); the engine treats one-point calibration as the whole jack.
+  Scaled to 0..127 with the same hysteresis idea as sparkx.ExpScale.
+- Long press: LongPressMS is clamped to MinLongPressMS..MaxLongPressMS (150..3000 ms); the
+  frontend's slider and validate use the same range.
+- Validate runs on a Normalized config. Its rules, in order: per combo, a switch that does
+  not exist, the same switch twice, an "off" action, a pair already used; then an enabled
+  expression input with Min == Max. The frontend's validate() checks exactly these first,
+  in the same words, then the ranges Normalize would otherwise clamp silently.
+  The frontend's defaultConfig() equals Default() field for field (colours included).
 
 ## internal/store
 
@@ -137,14 +150,18 @@ type Handlers struct {
     Status func(Status)            // whenever it changes, at most every 50 ms
 }
 
-func NewManager(h Handlers) *Manager
-func (m *Manager) Start(target mapping.PedalRef) // keeps the pedal connected: reconnects forever with backoff (1s..15s); empty target = first SparkX found
-func (m *Manager) SetTarget(target mapping.PedalRef) // reconnects to the new pedal
+type Target struct { Address, Name string } // mapping.PedalRef at the ble boundary (ble does not import mapping); empty Address = first SparkX found
+
+func NewManager(h Handlers, tracePath string) *Manager // tracePath "" = no trace
+func (m *Manager) Start(target Target)     // keeps the pedal connected: reconnects forever with backoff (1s..15s)
+func (m *Manager) SetTarget(target Target) // lets go of a pedal that is not the new target and connects to it
 func (m *Manager) Stop()                         // lamps dark, disconnect, stop reconnecting
 func (m *Manager) Scan(timeout time.Duration) ([]Device, error) // Spark Control X pedals in range or held by macOS
 func (m *Manager) SetLamps(l [6]sparkx.Colour)   // only changed lamps are written
 func (m *Manager) Status() Status
-func (m *Manager) OnConnected(fn func(Device))   // called after each successful connect (bridge saves the remembered pedal)
+func (m *Manager) OnConnected(fn func(Device))   // called after each successful connect to the target of the moment
+                                                 // (app saves the remembered pedal); not called for a connect whose
+                                                 // target was replaced by SetTarget while it was dialling
 ```
 
 Finding a pedal: remembered address by identifier -> a SparkX the Mac already holds
@@ -189,7 +206,7 @@ Owns one Engine, feeds it from ble.Handlers, sends to the virtual source, pipes 
 destination back, drives Manager.SetLamps, emits UI events. Interfaces so it is testable:
 
 ```go
-type Pedal interface { Start(mapping.PedalRef); SetTarget(mapping.PedalRef); Stop(); SetLamps([6]sparkx.Colour); Status() ble.Status }
+type Pedal interface { SetLamps([6]sparkx.Colour); Status() ble.Status } // the app owns Start/SetTarget/Stop
 type MIDIOut interface { Send([]byte) error }
 type Activity struct { Dir string `json:"dir"`; Bytes []int `json:"bytes"`; Label string `json:"label"`; At int64 `json:"at"` } // "out" | "in"
 ```
@@ -201,9 +218,10 @@ GetState(): Promise<State>
 SaveConfig(cfg: Config): Promise<void>      // validates, persists, applies live
 ResetConfig(): Promise<Config>
 Scan(): Promise<Device[]>                   // ~4 s
-ChoosePedal(address: string, name: string): Promise<void>
-ForgetPedal(): Promise<void>
-CalibrateExp(n: number, edge: "min" | "max"): Promise<Config> // stores the input's current raw value
+ChoosePedal(address: string, name: string): Promise<void> // saves the pedal and calls SetTarget under one lock
+ForgetPedal(): Promise<void>                               // same, with an empty target
+CalibrateExp(n: number, edge: "min" | "max"): Promise<Config> // stores the input's current raw value as heel ("min")
+                                                              // or toe ("max") as it is, never swapped; errors if heel == toe
 SetLaunchAtLogin(on: boolean): Promise<void>
 RevealLogs(): Promise<void>
 ```
