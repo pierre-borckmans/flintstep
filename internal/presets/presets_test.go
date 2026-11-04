@@ -18,6 +18,10 @@ func custom() mapping.Config {
 	c := mapping.Default()
 	c.Switches[0].Tap.Number = 20
 	c.LEDMode = mapping.LEDFeedback
+	// Not the default, so every round trip below shows a newer Config field survives
+	// the library, which never names it.
+	c.Exp[1].Trigger.Mode = mapping.TriggerToe
+	c.Exp[1].Trigger.Threshold = 77
 	return c.Normalize()
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { errorText } from "../api";
 import type { Op } from "../lib/config";
 import { expFraction, expValue, rawFraction } from "../lib/exp";
@@ -9,6 +9,7 @@ import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
 import { NumField } from "../ui/NumField";
 import { Toggle } from "../ui/Toggle";
+import { ThresholdOverlay, ThresholdZone, TriggerBlock } from "./Trigger";
 
 /** The live reading: a bar of the value the input sends (0..127), and under it the raw
  *  jack range with the heel and toe marks, so calibrating is something you can see. */
@@ -17,18 +18,24 @@ function Meter({
   min,
   max,
   invert,
+  trigger,
+  zone,
 }: {
   raw: number;
   min: number;
   max: number;
   invert: boolean;
+  /** The trigger's threshold marker, over the bar, while one is on. */
+  trigger?: ReactNode;
+  /** The trigger's zones, inside the bar under the fill. */
+  zone?: ReactNode;
 }) {
   const v = expValue(raw, { min, max, invert });
   const f = expFraction(raw, { min, max, invert }) ?? 0;
   const has = v !== null;
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-end gap-3">
+      <div className={cx("flex items-end gap-3", !!trigger && "pt-2.5")}>
         <span
           className={cx(
             "w-10 font-mono text-[22px] leading-none font-medium tabular-nums",
@@ -37,8 +44,9 @@ function Meter({
         >
           {has ? v : "--"}
         </span>
-        <div className="mb-[3px] flex-1">
+        <div className="relative mb-[3px] flex-1">
           <div className="relative h-2.5 overflow-hidden rounded-[3px] bg-sunken shadow-[inset_0_1px_2px_rgb(0_0_0/0.7)]">
+            {zone}
             <div
               className="absolute inset-y-0 left-0 rounded-[3px]"
               style={{
@@ -58,6 +66,7 @@ function Meter({
               />
             ))}
           </div>
+          {trigger}
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -115,16 +124,19 @@ function ExpCard({
   n,
   config,
   status,
+  engaged,
   apply,
   calibrate,
 }: {
   n: number;
   config: Config;
   status: Status | null;
+  engaged: boolean;
   apply: (op: Op) => void;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
 }) {
   const x = config.exp[n];
+  const trigOn = x.trigger.mode !== "off";
   const cable = !!status?.cables?.[n] && status?.state === "connected";
   const raw = status?.expRaw?.[n] ?? -1;
   const [err, setErr] = useState<string | null>(null);
@@ -159,7 +171,24 @@ function ExpCard({
         className="transition-[filter] duration-(--dur-down) ease-(--ease-incand)"
         style={{ filter: cable && x.enabled ? "none" : "var(--off-dim)" }}
       >
-        <Meter raw={cable ? raw : -1} min={x.min} max={x.max} invert={x.invert} />
+        <Meter
+          raw={cable ? raw : -1}
+          min={x.min}
+          max={x.max}
+          invert={x.invert}
+          zone={
+            trigOn && <ThresholdZone trigger={x.trigger} engaged={cable && x.enabled && engaged} />
+          }
+          trigger={
+            trigOn && (
+              <ThresholdOverlay
+                trigger={x.trigger}
+                label={`EXP ${n + 1} trigger threshold`}
+                onChange={(threshold) => apply({ type: "trigger", n, patch: { threshold } })}
+              />
+            )
+          }
+        />
       </div>
 
       <div className={cx("grid grid-cols-2 gap-2", !x.enabled && "opacity-50")}>
@@ -212,20 +241,26 @@ function ExpCard({
           Plug an expression pedal into EXP {n + 1} to see it and calibrate it.
         </p>
       )}
+      <TriggerBlock n={n} x={x} engaged={engaged} cable={cable} apply={apply} />
     </div>
   );
 }
 
-export function ExpressionPanel(props: {
+export function ExpressionPanel({
+  engaged,
+  ...props
+}: {
   config: Config;
   status: Status | null;
+  /** Each input's trigger engaged now (State.expTrigger). */
+  engaged: boolean[];
   apply: (op: Op) => void;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      <ExpCard n={0} {...props} />
-      <ExpCard n={1} {...props} />
+      <ExpCard n={0} engaged={!!engaged[0]} {...props} />
+      <ExpCard n={1} engaged={!!engaged[1]} {...props} />
       <p className="px-1 text-ui-xs leading-snug text-faint">
         <Kicker className="mr-1">Tip</Kicker>
         Set heel and toe with the pedal resting where you want each end. The value only moves when

@@ -1,6 +1,6 @@
 import type { Backend } from "./api";
 import { cc, defaultConfig, mappingOf, type Op, validate } from "./lib/config";
-import { expValue, RAW_MAX } from "./lib/exp";
+import { expFraction, expValue, RAW_MAX } from "./lib/exp";
 import { indicatorLit } from "./lib/indicators";
 import { describeMidi } from "./lib/midi";
 import {
@@ -11,6 +11,7 @@ import {
   exportFileName,
   uniqueName,
 } from "./lib/presets";
+import { idleTrigger, pickMode, stepTrigger, type TriggerState, triggerLit } from "./lib/trigger";
 import type {
   Action,
   Activity,
@@ -22,6 +23,7 @@ import type {
   PresetSource,
   State,
   Status,
+  TriggerMode,
 } from "./types";
 import { LAMP_AMP, LAMP_APP, SWITCHES } from "./types";
 
@@ -57,6 +59,10 @@ export interface SimOptions {
    *  every 40 s. */
   powered?: boolean;
   epoch?: number;
+  /** The expression triggers' modes; unset, input 1 auto-engages and input 2 is off. */
+  triggers?: [TriggerMode, TriggerMode];
+  /** Pin each pedal at a travel percent instead of sweeping it (null: sweep). */
+  expAt?: [number | null, number | null];
 }
 
 const DARK: Colour = { r: 0, g: 0, b: 0 };
@@ -65,6 +71,38 @@ const scale = (c: Colour, pct: number): Colour => ({
   g: Math.round((c.g * pct) / 100),
   b: Math.round((c.b * pct) / 100),
 });
+
+/** A foot on the pedal, as [ms, travel 0..1] keyframes over a 9 s loop: rest on the
+ *  heel, rock in the middle, push to the toe stop and hold, a quick heel touch (shorter
+ *  than the off delay, so auto-engage stays on), then back to rest. */
+const SWEEP: [number, number][] = [
+  [0, 0],
+  [1500, 0],
+  [2300, 0.55],
+  [3000, 0.42],
+  [3800, 0.7],
+  [4500, 0.5],
+  [5200, 1],
+  [6200, 1],
+  [6900, 0.3],
+  [7150, 0],
+  [7300, 0],
+  [7800, 0.5],
+  [8500, 0.15],
+  [8800, 0],
+  [9000, 0],
+];
+
+/** Where the foot has the pedal at time t (ms), 0 heel to 1 toe. */
+export function sweep(t: number): number {
+  const p = ((t % 9000) + 9000) % 9000;
+  for (let i = 1; i < SWEEP.length; i++) {
+    const [t1, f1] = SWEEP[i];
+    const [t0, f0] = SWEEP[i - 1];
+    if (p <= t1) return f0 + ((f1 - f0) * (p - t0)) / (t1 - t0);
+  }
+  return 0;
+}
 
 export function createSim(opts: SimOptions = {}) {
   const rand = rng(opts.seed ?? 7);
@@ -77,12 +115,16 @@ export function createSim(opts: SimOptions = {}) {
   config.combos = [
     { a: 0, b: 1, action: { kind: "cc", channel: 1, number: 100, value: 127, mode: "momentary" } },
   ];
+  const modes = opts.triggers ?? ["engage", "off"];
+  config.exp.forEach((x, n) => {
+    x.trigger = pickMode(x.trigger, modes[n], n);
+  });
 
   const cables = opts.cables ?? [true, false];
   const raw = [21000, -1];
-  const rawTarget = [40000, 30000];
   const lastExpSent = [-1, -1];
   let lastExpAt = [0, 0];
+  let trig: TriggerState[] = [idleTrigger(), idleTrigger()];
 
   let held = opts.holdMask ?? 0;
   const pressedAt: number[] = Array(SWITCHES).fill(0);
@@ -123,6 +165,22 @@ export function createSim(opts: SimOptions = {}) {
     const ch = (a.channel - 1) & 15;
     if (a.kind === "cc" && a.mode === "momentary") emit("out", [0xb0 | ch, a.number, 0]);
     else if (a.kind === "note") emit("out", [0x80 | ch, a.number, 0]);
+  }
+
+  // Expression triggers, sent like mapping.Engine sends them.
+  function triggerDown(a: Action, on: boolean) {
+    const ch = (a.channel - 1) & 15;
+    if (a.kind === "cc")
+      emit("out", [0xb0 | ch, a.number, a.mode === "toggle" && !on ? 0 : a.value]);
+    else if (a.kind === "note") emit("out", [0x90 | ch, a.number, a.value]);
+    else if (a.kind === "pc") emit("out", [0xc0 | ch, a.number]);
+  }
+  const triggerUp = up;
+  /** Input n's trigger lets go: the cable came out, the link dropped, the config changed. */
+  function letGo(n: number) {
+    if (!trig[n].held) return;
+    trig[n] = { ...trig[n], held: false, due: null };
+    triggerUp(config.exp[n].trigger.action);
   }
 
   function press(sw: number) {
@@ -196,17 +254,29 @@ export function createSim(opts: SimOptions = {}) {
         }
       });
     }
-    // Expression: a slow walk toward a target that moves now and then, plus jitter.
+    // Expression: a foot rocking the pedal. It rests on the heel now and then, sweeps
+    // to somewhere in the middle, or pushes to the toe stop, with a little jitter, so
+    // the triggers visibly engage and let go.
     for (let n = 0; n < 2; n++) {
+      const x = config.exp[n];
       if (!live || !cables[n]) {
         raw[n] = -1;
+        letGo(n);
         continue;
       }
-      if (raw[n] < 0) raw[n] = rawTarget[n];
-      if (rand() < dt / 9000) rawTarget[n] = Math.floor(rand() * RAW_MAX);
-      raw[n] += (rawTarget[n] - raw[n]) * Math.min(1, dt / 500) + (rand() - 0.5) * 120;
-      raw[n] = Math.round(Math.min(RAW_MAX, Math.max(0, raw[n])));
-      const x = config.exp[n];
+      const pin = opts.expAt?.[n];
+      if (pin !== undefined && pin !== null) {
+        raw[n] = Math.round(x.min + ((x.max - x.min) * pin) / 100);
+      } else {
+        const f = sweep(t + n * 4000);
+        raw[n] = x.min + (x.max - x.min) * f + (f > 0 && f < 1 ? (rand() - 0.5) * 120 : 0);
+        raw[n] = Math.round(Math.min(RAW_MAX, Math.max(0, raw[n])));
+      }
+      const f = x.enabled ? expFraction(raw[n], x) : null;
+      const r = stepTrigger(trig[n], x.trigger, f === null ? null : f * 100, t);
+      trig[n] = r.state;
+      if (r.release) triggerUp(x.trigger.action);
+      if (r.press) triggerDown(x.trigger.action, r.state.on);
       if (x.enabled && t - lastExpAt[n] >= 90) {
         const v = expValue(raw[n], x) ?? 0;
         if (Math.abs(v - lastExpSent[n]) >= 2) {
@@ -273,7 +343,23 @@ export function createSim(opts: SimOptions = {}) {
     /** Press and release a switch by hand (tests, screenshots). */
     press,
     release: unpress,
+    /** Which inputs' triggers are engaged now (State.expTrigger). */
+    triggers(): boolean[] {
+      const live = connState === "connected";
+      return trig.map((s, n) => live && cables[n] && triggerLit(s, config.exp[n].trigger));
+    },
     setConfig(c: Config) {
+      // Like Engine.SetConfig: a trigger whose input, mode or action changed lets go.
+      c.exp.forEach((x, n) => {
+        const was = config.exp[n];
+        const sameAction = JSON.stringify(x.trigger.action) === JSON.stringify(was.trigger.action);
+        if (x.enabled !== was.enabled || x.trigger.mode !== was.trigger.mode || !sameAction) {
+          letGo(n);
+          const keep =
+            sameAction && x.trigger.action.kind === "cc" && x.trigger.action.mode === "toggle";
+          trig = trig.map((s, i) => (i === n ? { ...s, on: s.on && keep } : s));
+        }
+      });
       config = structuredClone(c);
     },
     reconnect() {
@@ -477,8 +563,10 @@ export function demoScript(name: string): DemoStep[] {
  *  ?state=off|searching|connecting|connected, ?seed=N, ?hold=I,A (switch names),
  *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
  *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
- *  ?lamp=amp|app (open on an indicator lamp), ?presets=one (a single preset; otherwise
- *  four samples), ?library=corrupt (the library error Go shows after a damaged file),
+ *  ?lamp=amp|app (open on an indicator lamp), ?trigger=engage,toe (the two inputs'
+ *  trigger modes; unset, engage,off), ?exp=60,98 (pin each pedal at a travel percent;
+ *  "-" or unset sweeps it), ?presets=one (a single preset; otherwise four samples),
+ *  ?library=corrupt (the library error Go shows after a damaged file),
  *  ?picker=open|rename|delete (App opens the preset picker). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
@@ -488,7 +576,13 @@ export function createMockBackend(q: URLSearchParams): Backend {
     .filter((i) => i >= 0)
     .reduce((m, i) => m | (1 << i), 0);
   const cablesQ = q.get("cables");
+  const modeQ = (s: string | undefined): TriggerMode => (s === "engage" || s === "toe" ? s : "off");
+  const trigQ = q.get("trigger")?.split(",");
+  const expQ = q.get("exp")?.split(",");
+  const pinQ = (s: string | undefined) => (s && /^\d+(\.\d+)?$/.test(s) ? Number(s) : null);
   const sim = createSim({
+    triggers: trigQ ? [modeQ(trigQ[0]), modeQ(trigQ[1])] : undefined,
+    expAt: expQ ? [pinQ(expQ[0]), pinQ(expQ[1])] : undefined,
     seed: Number(q.get("seed") ?? 7),
     fixedState: (q.get("state") as BleState | null) ?? undefined,
     cables: cablesQ ? [cablesQ[0] === "1", cablesQ[1] === "1"] : undefined,
@@ -526,6 +620,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     presets: lib.list(),
     activePreset: lib.activeId(),
     libraryError,
+    expTrigger: sim.triggers(),
   });
 
   let last = performance.now();

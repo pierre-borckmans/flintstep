@@ -35,7 +35,12 @@ describe("mock pedal", () => {
     expect(sim.status().lamps[1]).toEqual({ r: 0, g: 0, b: 0 });
   });
   it("calibrates from the live raw value", () => {
-    const sim = createSim({ seed: 1, fixedState: "connected", autoPress: false });
+    const sim = createSim({
+      seed: 1,
+      fixedState: "connected",
+      autoPress: false,
+      expAt: [50, null],
+    });
     sim.step(50);
     const raw = sim.status().expRaw[0];
     sim.calibrate(0, "max");
@@ -86,6 +91,43 @@ describe("mock pedal", () => {
     expect(sim.status().lamps[6]).toEqual(sim.config.indicators[0].colour);
     sim.step(200);
     expect(sim.status().lamps[6]).toEqual({ r: 0, g: 0, b: 0 });
+  });
+  it("sweeps the pedal so auto-engage engages and lets go", () => {
+    const sim = createSim({ seed: 3, fixedState: "connected", autoPress: false });
+    const seen = new Set<boolean>();
+    const log: string[] = [];
+    for (let i = 0; i < 1200; i++) {
+      for (const a of sim.step(50)) log.push(a.bytes.join(","));
+      seen.add(sim.triggers()[0]);
+    }
+    expect(seen).toEqual(new Set([true, false]));
+    expect(log).toContain("176,102,127");
+    expect(log).toContain("176,102,0");
+  });
+  it("a pinned pedal at the toe clicks a toe trigger", () => {
+    const sim = createSim({
+      seed: 1,
+      fixedState: "connected",
+      autoPress: false,
+      triggers: ["toe", "off"],
+      expAt: [98, null],
+    });
+    sim.step(50);
+    expect(sim.triggers()).toEqual([true, false]);
+  });
+  it("lets go when the trigger is turned off", () => {
+    const sim = createSim({
+      seed: 1,
+      fixedState: "connected",
+      autoPress: false,
+      expAt: [60, null],
+    });
+    sim.step(50);
+    expect(sim.triggers()[0]).toBe(true);
+    const c = structuredClone(sim.config);
+    c.exp[0].trigger.mode = "off";
+    sim.setConfig(c);
+    expect(sim.triggers()[0]).toBe(false);
   });
 });
 

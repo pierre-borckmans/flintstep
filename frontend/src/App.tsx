@@ -123,6 +123,7 @@ export default function App({ backend }: { backend: Backend }) {
               <ExpressionPanel
                 config={config}
                 status={status}
+                engaged={state.expTrigger ?? []}
                 apply={apply}
                 calibrate={bridge.calibrate}
               />

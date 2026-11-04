@@ -49,8 +49,9 @@ const (
 )
 
 // ConfigVersion is the Version a Normalized Config carries. 2 added Indicators: a
-// version 1 file has none, and Normalize gives it the defaults.
-const ConfigVersion = 2
+// version 1 file has none, and Normalize gives it the defaults. 3 added the expression
+// triggers: an older file has none, and Normalize gives each input one that is off.
+const ConfigVersion = 3
 
 // Ranges and defaults. frontend/src/lib/config.ts mirrors these (LONG_PRESS, RAW_MAX).
 const (
@@ -59,6 +60,17 @@ const (
 	MaxLongPressMS     = 3000
 	DefaultBrightness  = 100
 	ExpRawMax          = 65535
+
+	// Expression triggers (ExpTrigger). Thresholds are percent of the calibrated
+	// travel. frontend/src/lib/trigger.ts mirrors these.
+	MinTriggerThreshold      = 1
+	MaxTriggerThreshold      = 99
+	DefaultEngageThreshold   = 4  // just off the heel, like an auto-engage wah
+	DefaultToeThreshold      = 96 // the last few percent before the toe stop
+	TriggerHysteresis        = 3  // percent back past the threshold before it lets go
+	DefaultTriggerOffDelayMS = 400
+	MaxTriggerOffDelayMS     = 2000
+	triggerCCBase            = 102 // exp n's trigger defaults to CC 102+n, undefined in the MIDI spec
 )
 
 // Action is one MIDI message pair: a press half and, for momentary CCs and notes, a
@@ -87,12 +99,39 @@ type Combo struct {
 
 // ExpConfig is one expression input.
 type ExpConfig struct {
-	Enabled bool `json:"enabled"`
-	Channel int  `json:"channel"`
-	CC      int  `json:"cc"`
-	Min     int  `json:"min"`    // raw value at the heel, 0..65535
-	Max     int  `json:"max"`    // raw value at the toe; may be below Min, never equal
-	Invert  bool `json:"invert"` // the user's own flip, on top of heel=0 toe=127
+	Enabled bool       `json:"enabled"`
+	Channel int        `json:"channel"`
+	CC      int        `json:"cc"`
+	Min     int        `json:"min"`     // raw value at the heel, 0..65535
+	Max     int        `json:"max"`     // raw value at the toe; may be below Min, never equal
+	Invert  bool       `json:"invert"`  // the user's own flip, on top of heel=0 toe=127
+	Trigger ExpTrigger `json:"trigger"` // a switch faked from the pedal's position
+}
+
+// TriggerMode is what makes an expression input's trigger fire.
+//
+// The Spark Control X reads one analogue value per jack, so a pedal's own toe switch
+// has nowhere to go. The trigger fakes one from the position instead.
+type TriggerMode string
+
+// Trigger modes.
+const (
+	// TriggerOff: the input only sends its CC.
+	TriggerOff TriggerMode = "off"
+	// TriggerEngage is an auto-engage wah: press when the pedal leaves the heel (rises
+	// to Threshold), release once it has been back below for OffDelayMS.
+	TriggerEngage TriggerMode = "engage"
+	// TriggerToe is a toe click: press when the pedal is pushed to Threshold, release
+	// when it comes back. With a CC toggle each push flips it.
+	TriggerToe TriggerMode = "toe"
+)
+
+// ExpTrigger is an expression input's trigger.
+type ExpTrigger struct {
+	Mode       TriggerMode `json:"mode"`
+	Action     Action      `json:"action"`     // press half on engaging, release half on letting go
+	Threshold  int         `json:"threshold"`  // percent of the calibrated travel, 1..99
+	OffDelayMS int         `json:"offDelayMs"` // engage only: 0..2000 ms back down before it lets go
 }
 
 // PedalRef is the remembered pedal. Zero means none: take the first one found.
@@ -138,7 +177,43 @@ func offAction() Action {
 }
 
 func defaultExp(n int) ExpConfig {
-	return ExpConfig{Enabled: true, Channel: 1, CC: defaultExpCC[n], Min: 0, Max: ExpRawMax}
+	return ExpConfig{Enabled: true, Channel: 1, CC: defaultExpCC[n], Min: 0, Max: ExpRawMax, Trigger: defaultTrigger(n)}
+}
+
+// defaultTrigger is off, with what auto-engage would use already filled in: CC 102+n
+// momentary on channel 1, 4 %, 400 ms.
+func defaultTrigger(n int) ExpTrigger {
+	return ExpTrigger{
+		Mode:       TriggerOff,
+		Action:     Action{Kind: KindCC, Channel: 1, Number: triggerCCBase + n, Value: 127, Mode: Momentary},
+		Threshold:  DefaultEngageThreshold,
+		OffDelayMS: DefaultTriggerOffDelayMS,
+	}
+}
+
+func defaultThreshold(m TriggerMode) int {
+	if m == TriggerToe {
+		return DefaultToeThreshold
+	}
+	return DefaultEngageThreshold
+}
+
+// normalize gives a trigger from before triggers existed (no mode at all) the
+// default, and clamps the rest. 0 ms is a real off delay, so it is never "not set".
+func (t ExpTrigger) normalize(n int) ExpTrigger {
+	if t.Mode == "" {
+		return defaultTrigger(n)
+	}
+	if t.Mode != TriggerEngage && t.Mode != TriggerToe {
+		t.Mode = TriggerOff
+	}
+	if t.Action.Kind == "" {
+		t.Action = defaultTrigger(n).Action
+	}
+	t.Action = t.Action.normalize()
+	t.Threshold = clamp(orDefault(t.Threshold, defaultThreshold(t.Mode)), MinTriggerThreshold, MaxTriggerThreshold)
+	t.OffDelayMS = clamp(t.OffDelayMS, 0, MaxTriggerOffDelayMS)
+	return t
 }
 
 // Default is the out-of-the-box mapping: switch n sends CC 80+n momentary on
@@ -216,6 +291,7 @@ func (c Config) Normalize() Config {
 		if e.Min == 0 && e.Max == 0 {
 			e.Max = ExpRawMax
 		}
+		e.Trigger = e.Trigger.normalize(n)
 	}
 
 	if c.LEDMode != LEDLocal && c.LEDMode != LEDFeedback {
@@ -279,6 +355,9 @@ func (c Config) Validate() error {
 	for n, e := range c.Exp {
 		if e.Enabled && e.Min == e.Max && e.Min != 0 {
 			return fmt.Errorf("expression %d: heel and toe were calibrated at the same point", n+1)
+		}
+		if tr := e.Trigger; (tr.Mode == TriggerEngage || tr.Mode == TriggerToe) && (tr.Action.Kind == KindOff || tr.Action.Kind == "") {
+			return fmt.Errorf("expression %d: the trigger does nothing: pick what it sends", n+1)
 		}
 	}
 	return nil
