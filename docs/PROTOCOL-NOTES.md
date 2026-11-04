@@ -46,3 +46,15 @@ in a looper profile A and B hold actions are looper commands, not profile steps:
 
 So the pedal has its own hold action (a second command after ~1 s). Whether `85DA4F4B`
 notifies on a profile change is still open: rerun the probe from a non-looper profile.
+
+## Expression inputs (2026-11-04)
+
+- The `0x0c` stream is NOT continuous. With a cable in jack 1 reading a steady value,
+  the pedal sent no `0x0c` at all for 25 s (tools/probe/exp.swift). The design doc's
+  "about 60 a second even when idle" was probably noise on an empty jack.
+- `BD066DA4-F9EC-4F0D-A53C-1CD99147A641` (switch service, read + notify) holds the same
+  payload as `0x0c`: `01 <lo> <hi> 02 <lo> <hi>`. All zeros with no cable; `01 00 00 02 00
+  00` with a cable. Readable on connect, so the app can show where a pedal rests before
+  it moves.
+- A TS (mono, one black ring) cable is detected (`0d` reports the jack plugged) but reads
+  0 at every position: the jack needs TRS (two rings) for the pedal's wiper.
