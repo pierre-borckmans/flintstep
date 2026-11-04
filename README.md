@@ -28,6 +28,21 @@ Not affiliated with Positive Grid.
 The app never sends the commands that rewrite the profiles stored in the pedal (types 03,
 07, 0a, 0e, 13). LED colours are volatile: a power cycle clears them.
 
+## Install
+
+Download `SparkX-MIDI-<version>.dmg` from the
+[Releases](https://github.com/pierre-borckmans/spark-control-x-midi/releases) page, open it and
+drag **SparkX MIDI** onto Applications.
+
+The app is signed ad hoc and not notarised, so Gatekeeper blocks the first launch. Right-click
+the app in Applications and pick Open, then confirm. Or clear the quarantine flag once:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/SparkX MIDI.app"
+```
+
+macOS asks for Bluetooth access on first run. The app lives in the menu bar, not the Dock.
+
 ## Layout
 
 | Path | What |
@@ -57,6 +72,7 @@ and golangci-lint v2.
 make install   # frontend deps
 make dev       # wails dev, live reload
 make app       # build/bin/SparkX MIDI.app
+make dmg       # build/bin/SparkX-MIDI-<version>.dmg, version from git describe
 make cli       # build/bin/sparkx-midi
 make check     # lint + tests, what CI runs
 ```
