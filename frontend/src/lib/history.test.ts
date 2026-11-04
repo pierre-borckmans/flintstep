@@ -121,6 +121,24 @@ describe("coalescing", () => {
     expect(states(h)).toEqual([0, 1, 2, 3, 4]);
   });
 
+  it("keeps one gesture (a slow scrub) in one entry across long pauses", () => {
+    let h = start(0, 0);
+    h = push(h, rules, 1, { at: 100, key: "cc", gesture: 7 });
+    h = push(h, rules, 2, { at: 5_000, key: "cc", gesture: 7 });
+    h = push(h, rules, 3, { at: 20_000, key: "cc", gesture: 7 });
+    expect(states(h)).toEqual([0, 3]);
+    // a new gesture on the same field, later, is a new entry
+    h = push(h, rules, 4, { at: 40_000, key: "cc", gesture: 8 });
+    expect(states(h)).toEqual([0, 3, 4]);
+  });
+
+  it("does not let a gesture merge across fields", () => {
+    let h = start(0, 0);
+    h = push(h, rules, 1, { at: 100, key: "a", gesture: 1 });
+    h = push(h, rules, 2, { at: 9_000, key: "b", gesture: 1 });
+    expect(states(h)).toEqual([0, 1, 2]);
+  });
+
   it("never merges into the base entry", () => {
     const h = push(start(0, 0, "x"), rules, 1, { at: 1, key: null });
     expect(states(h)).toEqual([0, 1]);

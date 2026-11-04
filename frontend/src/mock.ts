@@ -636,6 +636,9 @@ export function createMockBackend(q: URLSearchParams): Backend {
   return {
     GetState: async () => state(),
     SaveConfig: async (cfg) => {
+      // Counted for browser checks (a scrub must save once).
+      const w = window as unknown as { __mockSaves?: number };
+      w.__mockSaves = (w.__mockSaves ?? 0) + 1;
       await sleep(120);
       if (saveError) throw new Error("could not write config.json: read-only file system");
       const err = validate(cfg);

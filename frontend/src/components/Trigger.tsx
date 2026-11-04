@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { Op } from "../lib/config";
+import type { Apply } from "../lib/config";
 import {
   explainTrigger,
   explainTriggerAction,
@@ -155,7 +155,7 @@ export function TriggerBlock({
   x: ExpConfig;
   engaged: boolean;
   cable: boolean;
-  apply: (op: Op) => void;
+  apply: Apply;
 }) {
   const t = x.trigger;
   const on = t.mode !== "off";
@@ -212,7 +212,7 @@ export function TriggerBlock({
             max={TRIGGER.max}
             suffix="%"
             className="w-[118px] shrink-0"
-            onChange={(threshold) => apply({ type: "trigger", n, patch: { threshold } })}
+            onChange={(threshold, g) => apply({ type: "trigger", n, patch: { threshold } }, g)}
           />
           <span className="text-ui-xs leading-snug text-faint">or drag the marker on the bar</span>
         </div>
@@ -246,7 +246,7 @@ export function TriggerBlock({
             action={t.action}
             allowOff={false}
             describe={explainTriggerAction}
-            onChange={(action) => apply({ type: "trigger", n, patch: {}, action })}
+            onChange={(action, g) => apply({ type: "trigger", n, patch: {}, action }, g)}
           />
         </div>
       </Collapse>

@@ -14,6 +14,9 @@ export interface Entry<T> {
   /** What it changed ("tap:1:number"), so a burst of edits to one field is one entry.
    *  Null never coalesces. */
   key: string | null;
+  /** The drag that made it (a scrubbed number), so the whole drag is one entry however
+   *  slowly it goes. */
+  gesture?: number | null;
 }
 
 export interface History<T> {
@@ -47,11 +50,12 @@ export function push<T>(
   h: History<T>,
   rules: HistoryRules<T>,
   state: T,
-  meta: { at: number; key?: string | null; label?: string },
+  meta: { at: number; key?: string | null; label?: string; gesture?: number | null },
 ): History<T> {
   const now = h.entries[h.cursor];
   if (rules.same(now.state, state)) return h;
   const key = meta.key ?? null;
+  const gesture = meta.gesture ?? null;
   const kept = h.entries.slice(0, h.cursor + 1);
 
   const merge =
@@ -60,18 +64,20 @@ export function push<T>(
     h.cursor > 0 &&
     h.cursor === h.entries.length - 1 &&
     now.key === key &&
-    meta.at - now.at < rules.coalesceMs;
+    (meta.at - now.at < rules.coalesceMs || (gesture !== null && now.gesture === gesture));
   if (merge) {
     const before = kept[h.cursor - 1].state;
     // Dragged back to where it started: the burst undid itself, so drop the entry.
     if (rules.same(before, state)) {
       return { entries: kept.slice(0, -1), cursor: h.cursor - 1, open: false };
     }
-    const entry = { state, label: meta.label ?? rules.describe(before, state), at: meta.at, key };
+    const label = meta.label ?? rules.describe(before, state);
+    const entry = { state, label, at: meta.at, key, gesture };
     return { entries: [...kept.slice(0, -1), entry], cursor: h.cursor, open: true };
   }
 
-  const entry = { state, label: meta.label ?? rules.describe(now.state, state), at: meta.at, key };
+  const label = meta.label ?? rules.describe(now.state, state);
+  const entry = { state, label, at: meta.at, key, gesture };
   let entries = [...kept, entry];
   // entries[0] is the base state, so the cap counts the changes after it.
   if (entries.length > rules.cap + 1) entries = entries.slice(entries.length - rules.cap - 1);

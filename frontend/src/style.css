@@ -118,6 +118,10 @@ select:not(:disabled) {
   outline: 1px solid var(--color-key);
   outline-offset: 2px;
 }
+/* A scrub field pressed with the mouse is focused for its keys and wheel, not ringed. */
+.numfield[data-pointer]:focus-visible {
+  outline: none;
+}
 @layer base {
   :focus-visible {
     border-radius: inherit;

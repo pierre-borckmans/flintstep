@@ -1,4 +1,4 @@
-import type { Op } from "../lib/config";
+import type { Apply } from "../lib/config";
 import { INDICATOR_MODES, STOCK_USE } from "../lib/indicators";
 import type { Config, IndicatorIndex } from "../types";
 import { INDICATOR_NAMES } from "../types";
@@ -15,7 +15,7 @@ export function IndicatorEditor({
 }: {
   config: Config;
   n: IndicatorIndex;
-  apply: (op: Op) => void;
+  apply: Apply;
 }) {
   const ind = config.indicators[n];
   const name = INDICATOR_NAMES[n];

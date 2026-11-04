@@ -2,7 +2,7 @@ import { FolderOpen, Radar, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { Backend } from "../api";
 import { errorText } from "../api";
-import { LONG_PRESS, type Op } from "../lib/config";
+import { type Apply, LONG_PRESS } from "../lib/config";
 import type { Config, Device, State } from "../types";
 import { Button } from "../ui/Button";
 import { Collapse } from "../ui/Collapse";
@@ -179,7 +179,7 @@ export function SettingsPanel({
   backend: Backend;
   state: State;
   config: Config;
-  apply: (op: Op) => void;
+  apply: Apply;
   reset: () => Promise<void>;
 }) {
   const [login, setLogin] = useState(state.launchAtLogin);

@@ -1,4 +1,5 @@
 import { noteName, parseNote } from "../lib/notes";
+import type { Gesture } from "../lib/scrub";
 import type { Action, ActionKind } from "../types";
 import { Collapse } from "../ui/Collapse";
 import { NumField } from "../ui/NumField";
@@ -21,7 +22,8 @@ export function ActionEditor({
   describe = explain,
 }: {
   action: Action;
-  onChange: (patch: Partial<Action>) => void;
+  /** A scrubbed number passes its drag along (see NumField). */
+  onChange: (patch: Partial<Action>, gesture?: Gesture) => void;
   allowOff?: boolean;
   describe?: (a: Action) => string;
 }) {
@@ -41,7 +43,7 @@ export function ActionEditor({
             value={a.channel}
             min={1}
             max={16}
-            onChange={(channel) => onChange({ channel })}
+            onChange={(channel, g) => onChange({ channel }, g)}
           />
           {a.kind === "note" ? (
             <NumField
@@ -51,9 +53,8 @@ export function ActionEditor({
               min={0}
               max={127}
               parse={parseNote}
-              format={(v) => `${noteName(v)}`}
-              suffix={String(a.number)}
-              onChange={(number) => onChange({ number })}
+              suffix={noteName(a.number)}
+              onChange={(number, g) => onChange({ number }, g)}
             />
           ) : (
             <NumField
@@ -62,7 +63,7 @@ export function ActionEditor({
               value={a.number}
               min={0}
               max={127}
-              onChange={(number) => onChange({ number })}
+              onChange={(number, g) => onChange({ number }, g)}
             />
           )}
           {a.kind !== "pc" && (
@@ -71,7 +72,7 @@ export function ActionEditor({
               value={a.value}
               min={1}
               max={127}
-              onChange={(value) => onChange({ value })}
+              onChange={(value, g) => onChange({ value }, g)}
             />
           )}
         </div>

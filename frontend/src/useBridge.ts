@@ -14,6 +14,7 @@ import {
 import { diffConfigs } from "./lib/diff";
 import * as H from "./lib/history";
 import { presetLabel } from "./lib/presets";
+import type { Gesture } from "./lib/scrub";
 import type { Activity, Config, ExpEdge, PedalRef, PresetSource, State } from "./types";
 
 export const LOG_SIZE = 50;
@@ -240,15 +241,25 @@ export function useBridge(backend: Backend) {
     [setHist, sync],
   );
 
+  /** An edit. Made by a drag (`gesture`, a scrubbed number), every step shows at once
+   *  and joins one history entry, but nothing is sent to Go until the drag is done: one
+   *  entry and one save per drag, however long it takes. */
   const apply = useCallback(
-    (op: Op) => {
+    (op: Op, gesture?: Gesture) => {
       const h = hist.current;
       if (!h) return;
       const now = H.current(h);
       const next = { preset: now.preset, config: edit(now.config, op) };
-      commit(H.push(h, rules, next, { at: Date.now(), key: opKey(op) }));
+      const pushed = H.push(h, rules, next, {
+        at: Date.now(),
+        key: opKey(op),
+        gesture: gesture?.id ?? null,
+      });
+      if (!gesture) return commit(pushed);
+      if (pushed !== hist.current) setHist(pushed);
+      if (gesture.done) sync();
     },
-    [commit, rules],
+    [commit, rules, setHist, sync],
   );
 
   const undo = useCallback(() => hist.current && commit(H.undo(hist.current)), [commit]);

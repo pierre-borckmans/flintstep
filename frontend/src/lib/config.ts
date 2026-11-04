@@ -14,6 +14,7 @@ import { INDICATOR_NAMES, SWITCH_NAMES, SWITCHES } from "../types";
 import { comboName } from "./caption";
 import { RAW_MAX } from "./exp";
 import { copyIndicators, DEFAULT_INDICATORS, isIndicatorMode } from "./indicators";
+import type { Gesture } from "./scrub";
 import { defaultTrigger, pickMode, TRIGGER } from "./trigger";
 
 // CONFIG EDITING. The Go side owns the config (mapping.Normalize/Validate); this file is
@@ -176,6 +177,9 @@ export function validate(c: Config): string | null {
 }
 
 // ---- editing ------------------------------------------------------------------
+
+/** Makes an edit; a scrubbed number passes its drag (see useBridge). */
+export type Apply = (op: Op, gesture?: Gesture) => void;
 
 export type Op =
   | { type: "tap" | "long"; sw: number; patch: Partial<Action> }

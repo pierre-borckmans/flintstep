@@ -1,7 +1,7 @@
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import { comboName } from "../lib/caption";
-import type { Op } from "../lib/config";
+import type { Apply } from "../lib/config";
 import type { Config } from "../types";
 import { SWITCH_NAMES } from "../types";
 import { Button } from "../ui/Button";
@@ -54,15 +54,7 @@ export function SwitchTabs({ sw, onSelect }: { sw: number | null; onSelect: (n: 
   );
 }
 
-export function SwitchEditor({
-  config,
-  sw,
-  apply,
-}: {
-  config: Config;
-  sw: number;
-  apply: (op: Op) => void;
-}) {
+export function SwitchEditor({ config, sw, apply }: { config: Config; sw: number; apply: Apply }) {
   const s = config.switches[sw];
   const hasLong = s.long.kind !== "off";
   const combos = useListKeys(config.combos.length);
@@ -73,7 +65,10 @@ export function SwitchEditor({
   return (
     <>
       <Section title={`Switch ${SWITCH_NAMES[sw]} · tap`}>
-        <ActionEditor action={s.tap} onChange={(patch) => apply({ type: "tap", sw, patch })} />
+        <ActionEditor
+          action={s.tap}
+          onChange={(patch, g) => apply({ type: "tap", sw, patch }, g)}
+        />
       </Section>
 
       <Section
@@ -109,7 +104,7 @@ export function SwitchEditor({
           <ActionEditor
             allowOff={false}
             action={s.long}
-            onChange={(patch) => apply({ type: "long", sw, patch })}
+            onChange={(patch, g) => apply({ type: "long", sw, patch }, g)}
           />
           <p className="text-ui-xs leading-snug text-faint">
             With a hold action, the tap fires on release instead of on press.
@@ -192,7 +187,9 @@ export function SwitchEditor({
                     </div>
                     <ActionEditor
                       action={k.action}
-                      onChange={(action) => apply({ type: "combo", index: i, patch: {}, action })}
+                      onChange={(action, g) =>
+                        apply({ type: "combo", index: i, patch: {}, action }, g)
+                      }
                     />
                   </div>
                 </Collapse>

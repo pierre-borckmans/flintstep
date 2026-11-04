@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { errorText } from "../api";
-import type { Op } from "../lib/config";
+import type { Apply } from "../lib/config";
 import { expFraction, expValue, rawFraction } from "../lib/exp";
 import type { Config, ExpEdge, Status } from "../types";
 import { Button } from "../ui/Button";
@@ -132,7 +132,7 @@ function ExpCard({
   config: Config;
   status: Status | null;
   engaged: boolean;
-  apply: (op: Op) => void;
+  apply: Apply;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
 }) {
   const x = config.exp[n];
@@ -197,14 +197,14 @@ function ExpCard({
           value={x.channel}
           min={1}
           max={16}
-          onChange={(channel) => apply({ type: "exp", n, patch: { channel } })}
+          onChange={(channel, g) => apply({ type: "exp", n, patch: { channel } }, g)}
         />
         <NumField
           label="CC"
           value={x.cc}
           min={0}
           max={127}
-          onChange={(cc) => apply({ type: "exp", n, patch: { cc } })}
+          onChange={(cc, g) => apply({ type: "exp", n, patch: { cc } }, g)}
         />
       </div>
 
@@ -254,7 +254,7 @@ export function ExpressionPanel({
   status: Status | null;
   /** Each input's trigger engaged now (State.expTrigger). */
   engaged: boolean[];
-  apply: (op: Op) => void;
+  apply: Apply;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
 }) {
   return (
