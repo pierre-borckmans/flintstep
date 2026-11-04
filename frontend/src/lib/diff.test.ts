@@ -7,6 +7,19 @@ const base = () => defaultConfig();
 const edited = (...ops: Op[]): Config => ops.reduce(edit, base());
 const label = (...ops: Op[]) => diffConfigs(base(), edited(...ops));
 
+describe("diffConfigs: indicator lamps", () => {
+  it("names the lamp and its new mode", () => {
+    expect(label({ type: "indicator", n: 0, patch: { mode: "usb" } })).toBe("AMP lamp · USB power");
+    expect(label({ type: "indicator", n: 1, patch: { mode: "midiOut" } })).toBe(
+      "APP lamp · MIDI out",
+    );
+  });
+  it("says the colour changed", () =>
+    expect(label({ type: "indicator", n: 1, patch: { colour: { r: 1, g: 2, b: 3 } } })).toBe(
+      "APP lamp · colour",
+    ));
+});
+
 describe("diffConfigs: switches", () => {
   it("says nothing changed", () => expect(diffConfigs(base(), base())).toBe("No change"));
 

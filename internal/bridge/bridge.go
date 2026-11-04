@@ -7,6 +7,11 @@
 // destination goes through the same engine, so feedback mode lights the lamps from the
 // DAW's real state.
 //
+// The bridge decides all eight lamps: the six switch lamps from the engine, and the Amp
+// and App lamps from the user's indicator modes (mapping.IndicatorLamps) and what the
+// bridge knows: whether the pedal is held, whether USB powers it, and whether MIDI went
+// out or came in during the last flashFor.
+//
 // Nothing here touches Bluetooth, CoreMIDI or Wails: the three are behind small
 // interfaces, so the whole path from "switch II went down" to "CC 81 = 127 went out and
 // lamp II lit" is tested with fakes.
@@ -23,7 +28,7 @@ import (
 
 // Pedal is the BLE manager as the bridge uses it.
 type Pedal interface {
-	SetLamps(l [sparkx.Switches]sparkx.Colour)
+	SetLamps(l [sparkx.Lamps]sparkx.Colour)
 	Status() ble.Status
 }
 
@@ -44,6 +49,10 @@ type Activity struct {
 // lands within this of its threshold, which nobody can feel at 500 ms.
 const tickEvery = 10 * time.Millisecond
 
+// flashFor is how long an indicator in a MIDI mode stays lit after the last message. A
+// message while it is lit only extends it, so a burst is two lamp updates: on and off.
+const flashFor = 120 * time.Millisecond
+
 // Bridge is safe for concurrent use.
 type Bridge struct {
 	// step serialises each trip from the engine to the outputs: MIDI and lamp states
@@ -56,8 +65,14 @@ type Bridge struct {
 	cfg   mapping.Config
 	pedal Pedal
 	out   MIDIOut
-	lamps [sparkx.Switches]sparkx.Colour
+	lamps [sparkx.Lamps]sparkx.Colour
 	lit   bool // lamps were sent at least once since the last connect
+
+	// What the indicator lamps follow.
+	connected bool
+	powered   bool
+	outUntil  time.Time // a MIDI-out flash is lit until then
+	inUntil   time.Time // a MIDI-in flash is lit until then
 
 	now        func() time.Time
 	onActivity func(Activity)
@@ -169,11 +184,16 @@ func (b *Bridge) onExp(n, raw int) {
 	b.mu.Unlock()
 	if ok {
 		b.send([][]byte{msg})
+		b.syncLamps()
 	}
 }
 
 func (b *Bridge) onPedalStatus(st ble.Status) {
 	b.step.Lock()
+	b.mu.Lock()
+	b.connected = st.State == ble.StateConnected
+	b.powered = b.connected && st.Powered
+	b.mu.Unlock()
 	if st.State != ble.StateConnected {
 		b.mu.Lock()
 		releases := b.eng.Reset()
@@ -181,14 +201,10 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 		b.mu.Unlock()
 		b.send(releases)
 	} else {
-		// A fresh connection starts with lamps unknown: make sure the engine's view is
-		// written once, even if it matches what we last sent to the previous link.
-		b.mu.Lock()
-		first := !b.lit
-		b.mu.Unlock()
-		if first {
-			b.syncLamps()
-		}
+		// A fresh connection starts with lamps unknown (lit is false): syncLamps writes
+		// them once even if they match what went to the previous link. After that it
+		// only passes on changes: the USB power state, say.
+		b.syncLamps()
 	}
 	b.step.Unlock()
 	if b.onStatus != nil {
@@ -201,13 +217,12 @@ func (b *Bridge) Feedback(msg []byte) {
 	b.step.Lock()
 	defer b.step.Unlock()
 	b.mu.Lock()
-	mode := b.cfg.LEDMode
-	changed := b.eng.Feedback(msg)
+	b.eng.Feedback(msg)
+	b.inUntil = b.now().Add(flashFor)
 	b.mu.Unlock()
 	b.activity("in", msg)
-	if changed || mode == mapping.LEDFeedback {
-		b.syncLamps()
-	}
+	b.syncLamps()
+	b.startTicking()
 }
 
 // Tick runs the engine's timers once. The tick loop calls it; tests call it directly.
@@ -218,12 +233,19 @@ func (b *Bridge) Tick() {
 	msgs := b.eng.Tick(b.now())
 	b.mu.Unlock()
 	b.send(msgs)
-	if len(msgs) > 0 {
-		b.syncLamps()
-	}
+	// Also when nothing was sent: a flash may have run out. syncLamps only passes on
+	// a change.
+	b.syncLamps()
 }
 
-// startTicking runs Tick every tickEvery until the engine has nothing pending.
+// pendingLocked says whether Tick has work: the engine's timers, or a flash to end.
+func (b *Bridge) pendingLocked() bool {
+	now := b.now()
+	return b.eng.Pending() || now.Before(b.outUntil) || now.Before(b.inUntil)
+}
+
+// startTicking runs Tick every tickEvery until the engine has nothing pending and no
+// flash is lit.
 func (b *Bridge) startTicking() {
 	b.mu.Lock()
 	if b.ticking {
@@ -243,7 +265,7 @@ func (b *Bridge) startTicking() {
 			}
 			b.Tick()
 			b.mu.Lock()
-			if !b.eng.Pending() {
+			if !b.pendingLocked() {
 				b.ticking = false
 				b.mu.Unlock()
 				return
@@ -259,6 +281,7 @@ func (b *Bridge) send(msgs [][]byte) {
 	}
 	b.mu.Lock()
 	out := b.out
+	b.outUntil = b.now().Add(flashFor)
 	b.mu.Unlock()
 	for _, m := range msgs {
 		if out != nil {
@@ -266,6 +289,7 @@ func (b *Bridge) send(msgs [][]byte) {
 		}
 		b.activity("out", m)
 	}
+	b.startTicking()
 }
 
 func (b *Bridge) activity(dir string, msg []byte) {
@@ -279,11 +303,27 @@ func (b *Bridge) activity(dir string, msg []byte) {
 	b.onActivity(Activity{Dir: dir, Bytes: bs, Label: mapping.Describe(msg), At: b.now().UnixMilli()})
 }
 
-// syncLamps hands the engine's lamp state to the pedal when it changed. The pedal side
-// diffs per lamp again, so this only saves the call.
+// lampsLocked is what all eight lamps should show now.
+func (b *Bridge) lampsLocked() [sparkx.Lamps]sparkx.Colour {
+	var l [sparkx.Lamps]sparkx.Colour
+	sw := b.eng.Lamps()
+	copy(l[:], sw[:])
+	now := b.now()
+	ind := mapping.IndicatorLamps(b.cfg, mapping.IndicatorState{
+		Connected: b.connected,
+		Powered:   b.powered,
+		Out:       now.Before(b.outUntil),
+		In:        now.Before(b.inUntil),
+	})
+	l[sparkx.LampAmp], l[sparkx.LampApp] = ind[mapping.IndicatorAmp], ind[mapping.IndicatorApp]
+	return l
+}
+
+// syncLamps hands the lamp state to the pedal when it changed. The pedal side diffs
+// per lamp again, so this only saves the call.
 func (b *Bridge) syncLamps() {
 	b.mu.Lock()
-	l := b.eng.Lamps()
+	l := b.lampsLocked()
 	p := b.pedal
 	if p == nil || (b.lit && l == b.lamps) {
 		b.mu.Unlock()

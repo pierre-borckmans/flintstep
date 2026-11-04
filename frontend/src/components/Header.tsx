@@ -1,4 +1,7 @@
+import { Plug, Zap } from "lucide-react";
 import type { CSSProperties } from "react";
+import { batteryInfo } from "../lib/battery";
+import { levelColour } from "../lib/power";
 import type { State } from "../types";
 import { cx } from "../ui/cx";
 import { Lamp } from "../ui/Lamp";
@@ -34,13 +37,20 @@ function Connection({ state }: { state: State | null }) {
   );
 }
 
-/** Four cells, like the pedal's own app shows it. Mid charge is warm, low is hot. */
-function Battery({ level }: { level: number }) {
+/** Four cells, like the pedal's own app shows it, coloured like the pedal's POWER lamp
+ *  (red, yellow, green by lib/power's thresholds). On
+ *  USB a bolt says it is charging, a plug that it is full and running off the cable. */
+function Battery({ level, powered }: { level: number; powered: boolean }) {
   if (level < 0) return null;
   const cells = Math.ceil(level / 25);
-  const colour = level <= 15 ? "hot" : level <= 35 ? "warn" : "live";
+  const colour = ({ red: "hot", yellow: "warn", green: "live" } as const)[levelColour(level)];
+  const { power, tooltip } = batteryInfo(level, powered);
   return (
-    <div className="flex items-center gap-1.5" title={`Battery ${level}%`}>
+    <div className="flex items-center gap-1.5" title={tooltip}>
+      {power === "charging" && (
+        <Zap size={11} className="text-live" fill="currentColor" aria-label="Charging" />
+      )}
+      {power === "usb" && <Plug size={11} className="text-muted" aria-label="On USB power" />}
       <div className="flex items-center gap-[2px] rounded-[3px] border border-edge-strong p-[2px]">
         {[0, 1, 2, 3].map((i) => (
           <Lamp
@@ -80,7 +90,7 @@ export function Header({ state }: { state: State | null }) {
       <Connection state={state} />
       <div className="flex-1" />
       {meta && <span className="truncate text-ui-sm text-muted">{meta}</span>}
-      {live && <Battery level={p?.battery ?? -1} />}
+      {live && <Battery level={p?.battery ?? -1} powered={!!p?.powered} />}
       {midi && (
         <div
           className="flex max-w-[260px] min-w-0 items-center gap-2"

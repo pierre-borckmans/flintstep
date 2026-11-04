@@ -360,8 +360,8 @@ func (a *App) showWindow() {
 
 func (a *App) updateTray(st State) {
 	items := []tray.Item{{ID: "status", Title: statusLine(st.Pedal), Disabled: true}}
-	if st.Pedal.State == ble.StateConnected && st.Pedal.Battery >= 0 {
-		items = append(items, tray.Item{ID: "battery", Title: fmt.Sprintf("Battery %d%%", st.Pedal.Battery), Disabled: true})
+	if b := batteryLine(st.Pedal); b != "" {
+		items = append(items, tray.Item{ID: "battery", Title: b, Disabled: true})
 	}
 	if !st.MIDI.OK {
 		items = append(items, tray.Item{ID: "midi", Title: "MIDI port unavailable", Disabled: true})
@@ -375,6 +375,22 @@ func (a *App) updateTray(st State) {
 	)
 	tray.SetMenu(items)
 	tray.SetTooltip("SparkX MIDI: " + statusLine(st.Pedal))
+}
+
+// batteryLine is the menu's battery item, "" when there is no reading. The pedal does
+// not say "charging": that is USB power with the battery below 100 %.
+func batteryLine(p ble.Status) string {
+	if p.State != ble.StateConnected || p.Battery < 0 {
+		return ""
+	}
+	s := fmt.Sprintf("Battery %d%%", p.Battery)
+	switch {
+	case p.Powered && p.Battery < 100:
+		s += " · charging"
+	case p.Powered:
+		s += " · on USB power"
+	}
+	return s
 }
 
 func statusLine(p ble.Status) string {

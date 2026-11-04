@@ -67,3 +67,65 @@ func TestScanTimesOut(t *testing.T) {
 		t.Errorf("scan took %v", d)
 	}
 }
+
+// fakeGATT discovers like tinygo: a list fails whole when any service is missing, and
+// nil lists every service the pedal has, in its own order.
+type fakeGATT struct {
+	has   []string
+	calls int
+}
+
+func (g *fakeGATT) discover(ids []string) ([]string, error) {
+	g.calls++
+	if ids == nil {
+		return append([]string(nil), g.has...), nil
+	}
+	for _, id := range ids {
+		found := false
+		for _, h := range g.has {
+			found = found || h == id
+		}
+		if !found {
+			return nil, errors.New("bluetooth: did not find all requested services")
+		}
+	}
+	return append([]string(nil), ids...), nil
+}
+
+func TestFindServices(t *testing.T) {
+	id := func(s string) string { return s }
+	req, opt := []string{"sw", "cmd"}, []string{"batt", "power"}
+	for _, c := range []struct {
+		name  string
+		has   []string
+		calls int
+		want  []bool // optional found
+		fails bool
+	}{
+		{"all there", []string{"x", "power", "cmd", "batt", "sw"}, 1, []bool{true, true}, false},
+		{"no power service", []string{"batt", "sw", "cmd"}, 2, []bool{true, false}, false},
+		{"no battery service", []string{"power", "cmd", "sw"}, 2, []bool{false, true}, false},
+		{"neither", []string{"cmd", "sw"}, 2, []bool{false, false}, false},
+		{"no switch service", []string{"cmd", "batt"}, 2, nil, true},
+	} {
+		g := &fakeGATT{has: c.has}
+		r, o, err := findServices(req, opt, g.discover, id)
+		if g.calls != c.calls {
+			t.Errorf("%s: %d discoveries, want %d", c.name, g.calls, c.calls)
+		}
+		if c.fails {
+			if err == nil {
+				t.Errorf("%s: no error", c.name)
+			}
+			continue
+		}
+		if err != nil || len(r) != 2 || r[0] != "sw" || r[1] != "cmd" {
+			t.Errorf("%s: required %v %v", c.name, r, err)
+		}
+		for i, w := range c.want {
+			if (o[i] != nil) != w || (o[i] != nil && *o[i] != opt[i]) {
+				t.Errorf("%s: optional %d = %v, want found %v", c.name, i, o[i], w)
+			}
+		}
+	}
+}

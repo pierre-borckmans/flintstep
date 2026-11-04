@@ -23,7 +23,8 @@ describe("mock pedal", () => {
   it("connects, reports the battery and presses switches", () => {
     const { log, status } = run(5);
     expect(status.state).toBe("connected");
-    expect(status.battery).toBe(76);
+    expect(status.battery).toBeGreaterThan(0);
+    expect(status.battery).toBeLessThanOrEqual(100);
     expect(log.some((l) => l.includes(" out 176,8"))).toBe(true); // a CC 80..85
   });
   it("lights a held switch in its colour (local mode)", () => {
@@ -39,5 +40,50 @@ describe("mock pedal", () => {
     sim.calibrate(0, "max");
     expect(sim.config.exp[0].max).toBe(raw);
     expect(() => sim.calibrate(1, "min")).toThrow(/no cable/);
+  });
+
+  it("charges while plugged in, and the plug comes and goes", () => {
+    const sim = createSim({ seed: 1, fixedState: "connected", autoPress: false });
+    const seen = new Set<boolean>();
+    let charged = false;
+    let prev = sim.status().battery;
+    for (let i = 0; i < 1600; i++) {
+      sim.step(50);
+      const st = sim.status();
+      seen.add(st.powered);
+      if (st.powered && st.battery > prev) charged = true;
+      prev = st.battery;
+    }
+    expect([...seen].sort()).toEqual([false, true]);
+    expect(charged).toBe(true);
+  });
+  it("lights the indicator lamps by their modes", () => {
+    const sim = createSim({ seed: 1, fixedState: "connected", autoPress: false, powered: false });
+    const c = structuredClone(sim.config);
+    c.indicators = [
+      { mode: "on", colour: { r: 200, g: 0, b: 0 } },
+      { mode: "usb", colour: { r: 0, g: 0, b: 200 } },
+    ];
+    c.brightness = 50;
+    sim.setConfig(c);
+    sim.step(50);
+    expect(sim.status().lamps[6]).toEqual({ r: 100, g: 0, b: 0 });
+    expect(sim.status().lamps[7]).toEqual({ r: 0, g: 0, b: 0 });
+  });
+  it("flashes AMP with MIDI out by default", () => {
+    const sim = createSim({
+      seed: 1,
+      fixedState: "connected",
+      autoPress: false,
+      cables: [false, false],
+    });
+    sim.step(50);
+    expect(sim.status().lamps[6]).toEqual({ r: 0, g: 0, b: 0 });
+    expect(sim.status().lamps[7]).toEqual(sim.config.indicators[1].colour);
+    sim.press(0);
+    sim.step(50);
+    expect(sim.status().lamps[6]).toEqual(sim.config.indicators[0].colour);
+    sim.step(200);
+    expect(sim.status().lamps[6]).toEqual({ r: 0, g: 0, b: 0 });
   });
 });

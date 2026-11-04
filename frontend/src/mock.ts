@@ -1,6 +1,7 @@
 import type { Backend } from "./api";
 import { defaultConfig, type Op, validate } from "./lib/config";
 import { expValue, RAW_MAX } from "./lib/exp";
+import { indicatorLit } from "./lib/indicators";
 import { describeMidi } from "./lib/midi";
 import type { Action, Activity, BleState, Colour, Config, Device, State, Status } from "./types";
 import { LAMP_AMP, LAMP_APP, SWITCHES } from "./types";
@@ -33,6 +34,9 @@ export interface SimOptions {
   holdMask?: number;
   /** Whether to press switches by itself. */
   autoPress?: boolean;
+  /** Pin USB power on or off; unset, the cable goes in at 10 s and out at 30 s of
+   *  every 40 s. */
+  powered?: boolean;
   epoch?: number;
 }
 
@@ -71,10 +75,16 @@ export function createSim(opts: SimOptions = {}) {
   const echoes: { at: number; bytes: number[] }[] = [];
   let connectedAt = opts.fixedState ? 0 : 2000;
   let connState: BleState = opts.fixedState ?? "searching";
+  let powered = opts.powered ?? false;
+  let battery = 76; // percent, fractional while it moves
+  let lastOut = Number.NEGATIVE_INFINITY;
+  let lastIn = Number.NEGATIVE_INFINITY;
 
   const out: Activity[] = [];
   const emit = (dir: Activity["dir"], bytes: number[]) => {
     out.push({ dir, bytes, label: describeMidi(bytes), at: epoch + t });
+    if (dir === "out") lastOut = t;
+    else lastIn = t;
     if (dir === "out" && config.ledMode === "feedback" && bytes[0] >> 4 !== 0xc) {
       echoes.push({ at: t + 25, bytes });
     }
@@ -122,6 +132,9 @@ export function createSim(opts: SimOptions = {}) {
       if (connState === "connecting" && t > connectedAt) connState = "connected";
     }
     const live = connState === "connected";
+    // USB power: charging a percent every 1.5 s, draining one a minute on battery.
+    if (opts.powered === undefined) powered = t % 40000 >= 10000 && t % 40000 < 30000;
+    battery = powered ? Math.min(100, battery + dt / 1500) : Math.max(0, battery - dt / 60000);
     if (live && opts.autoPress !== false) {
       if (!release && t >= nextPress) {
         const sw = Math.floor(rand() * SWITCHES);
@@ -200,8 +213,12 @@ export function createSim(opts: SimOptions = {}) {
               (s.tap.kind === "cc" && s.tap.mode === "toggle" && toggled[sw]);
         lamps[sw] = on ? scale(s.colour, config.brightness) : DARK;
       }
-      lamps[LAMP_AMP] = scale({ r: 0, g: 255, b: 0 }, config.brightness);
-      lamps[LAMP_APP] = scale({ r: 0, g: 40, b: 255 }, config.brightness);
+      const inputs = { connected: true, powered, now: t, lastOut, lastIn };
+      [LAMP_AMP, LAMP_APP].forEach((lamp, n) => {
+        const ind = config.indicators[n];
+        lamps[lamp] =
+          ind && indicatorLit(ind.mode, inputs) ? scale(ind.colour, config.brightness) : DARK;
+      });
     }
     const detail: Record<BleState, string> = {
       off: "Bluetooth is off",
@@ -218,7 +235,8 @@ export function createSim(opts: SimOptions = {}) {
       firmware: live ? "4.1.23" : "",
       profile: live ? 2 : -1,
       profileName: live ? "Live Set" : "",
-      battery: live ? 76 : -1,
+      battery: live ? Math.floor(battery) : -1,
+      powered: live && powered,
       cables: live ? [...cables] : [false, false],
       exp: raw.map((r, n) => (r < 0 ? -1 : lastExpSent[n])),
       held: live ? held : 0,
@@ -233,6 +251,9 @@ export function createSim(opts: SimOptions = {}) {
     get config() {
       return config;
     },
+    /** Press and release a switch by hand (tests, screenshots). */
+    press,
+    release: unpress,
     setConfig(c: Config) {
       config = structuredClone(c);
     },
@@ -282,7 +303,8 @@ export function demoScript(name: string): (Op | "undo")[] {
 /** The Backend over a running simulator. URL parameters shape it for screenshots:
  *  ?state=off|searching|connecting|connected, ?seed=N, ?hold=I,A (switch names),
  *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
- *  (every save is refused). See also demoScript (?demo=). */
+ *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
+ *  ?lamp=amp|app (open on an indicator lamp). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
   const holdMask = (q.get("hold") ?? "")
@@ -297,6 +319,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     cables: cablesQ ? [cablesQ[0] === "1", cablesQ[1] === "1"] : undefined,
     holdMask,
     autoPress: !q.has("still"),
+    powered: q.has("power") ? q.get("power") === "usb" : undefined,
     epoch: Date.now(),
   });
   let launchAtLogin = false;

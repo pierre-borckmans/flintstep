@@ -40,6 +40,14 @@ export interface ExpConfig {
 
 export type LEDMode = "local" | "feedback";
 
+/** What lights the Amp or App lamp (mapping.IndicatorMode). */
+export type IndicatorMode = "off" | "connected" | "midiOut" | "midiIn" | "usb" | "on";
+
+export interface Indicator {
+  mode: IndicatorMode;
+  colour: Colour; // the colour when lit
+}
+
 export interface PedalRef {
   address: string;
   name: string;
@@ -54,6 +62,7 @@ export interface Config {
   ledMode: LEDMode;
   longPressMs: number;
   brightness: number; // 0..100
+  indicators: Indicator[]; // 2: Amp, App
 }
 
 export type BleState = "off" | "idle" | "searching" | "connecting" | "connected";
@@ -68,6 +77,7 @@ export interface Status {
   profile: number; // -1 until read
   profileName: string;
   battery: number; // 0..100, -1 until read
+  powered: boolean; // on USB power; charging = powered && battery < 100
   cables: boolean[]; // 2
   exp: number[]; // 0..127 per input, -1 = none
   held: number; // switch bitmask
@@ -110,3 +120,6 @@ export const SWITCH_NAMES = ["I", "II", "A", "III", "IV", "B"] as const;
 export const SWITCHES = 6;
 export const LAMP_AMP = 6;
 export const LAMP_APP = 7;
+/** Config.indicators[0] is the Amp lamp, [1] the App lamp. */
+export const INDICATOR_NAMES = ["AMP", "APP"] as const;
+export type IndicatorIndex = 0 | 1;

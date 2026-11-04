@@ -1,7 +1,17 @@
-import type { Action, Colour, Combo, Config, ExpConfig, LEDMode, SwitchConfig } from "../types";
-import { SWITCH_NAMES, SWITCHES } from "../types";
+import type {
+  Action,
+  Colour,
+  Combo,
+  Config,
+  ExpConfig,
+  Indicator,
+  LEDMode,
+  SwitchConfig,
+} from "../types";
+import { INDICATOR_NAMES, SWITCH_NAMES, SWITCHES } from "../types";
 import { comboName } from "./caption";
 import { RAW_MAX } from "./exp";
+import { copyIndicators, DEFAULT_INDICATORS, isIndicatorMode } from "./indicators";
 
 // CONFIG EDITING. The Go side owns the config (mapping.Normalize/Validate); this file is
 // the UI's copy of the same rules so a bad edit is caught before Save, and the reducer the
@@ -31,7 +41,8 @@ const DEFAULT_COLOURS: Colour[] = [
 ];
 
 /** mapping.Default(), field for field: switch n = CC 80+n momentary on channel 1,
- *  exp 1 = CC 11, exp 2 = CC 7, local LEDs. */
+ *  exp 1 = CC 11, exp 2 = CC 7, local LEDs, Amp flashing with MIDI out, App lit while
+ *  connected. */
 export function defaultConfig(): Config {
   const exp = (ccn: number): ExpConfig => ({
     enabled: true,
@@ -42,7 +53,7 @@ export function defaultConfig(): Config {
     invert: false,
   });
   return {
-    version: 1,
+    version: 2,
     pedal: { address: "", name: "" },
     switches: Array.from({ length: SWITCHES }, (_, n) => ({
       tap: cc(80 + n),
@@ -54,6 +65,7 @@ export function defaultConfig(): Config {
     ledMode: "local",
     longPressMs: 500,
     brightness: 100,
+    indicators: copyIndicators(DEFAULT_INDICATORS),
   };
 }
 
@@ -135,6 +147,11 @@ export function validate(c: Config): string | null {
     return `long-press time must be ${LONG_PRESS.min} to ${LONG_PRESS.max} ms`;
   }
   if (!inRange(c.brightness, 0, 100)) return "brightness must be 0 to 100";
+  // Go's Normalize would turn an unknown mode into the default without a word.
+  if (c.indicators?.length !== 2) return "the pedal has two indicator lamps";
+  for (const [n, x] of c.indicators.entries()) {
+    if (!isIndicatorMode(x.mode)) return `${INDICATOR_NAMES[n]} lamp: unknown mode`;
+  }
   return null;
 }
 
@@ -154,6 +171,7 @@ export type Op =
   | { type: "exp"; n: number; patch: Partial<ExpConfig> }
   | { type: "ledMode"; mode: LEDMode }
   | { type: "brightness"; value: number }
+  | { type: "indicator"; n: number; patch: Partial<Indicator> }
   | { type: "longPressMs"; value: number };
 
 /** Applies a patch to an action. Turning an "off" action on fills in a usable one
@@ -223,6 +241,15 @@ export function edit(c: Config, op: Op): Config {
       return { ...c, combos: c.combos.filter((_, i) => i !== op.index) };
     case "exp":
       return { ...c, exp: setAt(c.exp, op.n, (x) => ({ ...x, ...op.patch })) };
+    case "indicator":
+      return {
+        ...c,
+        indicators: setAt(c.indicators, op.n, (x) => ({
+          ...x,
+          ...op.patch,
+          colour: { ...(op.patch.colour ?? x.colour) },
+        })),
+      };
     case "ledMode":
       return { ...c, ledMode: op.mode };
     case "brightness":
@@ -250,6 +277,8 @@ export function opKey(op: Op): string | null {
       return `combo:${op.index}:${keys(op.patch)}:${keys(op.action)}`;
     case "exp":
       return `exp:${op.n}:${keys(op.patch)}`;
+    case "indicator":
+      return `indicator:${op.n}:${keys(op.patch)}`;
     case "ledMode":
     case "brightness":
     case "longPressMs":
