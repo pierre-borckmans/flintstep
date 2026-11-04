@@ -214,6 +214,11 @@ func (a *App) GetState() State {
 func (a *App) SaveConfig(cfg mapping.Config) error {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
+	return a.saveLocked(cfg)
+}
+
+// saveLocked is SaveConfig with cfgMu held.
+func (a *App) saveLocked(cfg mapping.Config) error {
 	cfg.Pedal = a.bridge.Config().Pedal
 	applied, err := a.bridge.Apply(cfg)
 	if err != nil {
@@ -283,7 +288,10 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	if !st.Cables[n] || raw < 0 {
 		return a.bridge.Config(), fmt.Errorf("plug an expression pedal into jack %d first", n+1)
 	}
+	// Read, change and save under one lock: a SaveConfig landing in between would
+	// otherwise be overwritten with the config read here.
 	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	cfg := a.bridge.Config()
 	switch edge {
 	case "min":
@@ -291,8 +299,7 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	case "max":
 		cfg.Exp[n].Max = raw
 	default:
-		a.cfgMu.Unlock()
-		return cfg, fmt.Errorf("unknown calibration edge %q", edge)
+		return a.bridge.Config(), fmt.Errorf("unknown calibration edge %q", edge)
 	}
 	// Heel and toe set the wrong way round is a reversed pedal, not an error.
 	if cfg.Exp[n].Min > cfg.Exp[n].Max {
@@ -300,11 +307,9 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 		cfg.Exp[n].Invert = !cfg.Exp[n].Invert
 	}
 	if cfg.Exp[n].Min == cfg.Exp[n].Max {
-		a.cfgMu.Unlock()
 		return a.bridge.Config(), errors.New("heel and toe read the same value; move the pedal and try again")
 	}
-	a.cfgMu.Unlock()
-	if err := a.SaveConfig(cfg); err != nil {
+	if err := a.saveLocked(cfg); err != nil {
 		return a.bridge.Config(), err
 	}
 	return a.bridge.Config(), nil
