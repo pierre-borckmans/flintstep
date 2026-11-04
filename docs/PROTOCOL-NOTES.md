@@ -28,3 +28,21 @@ Other values that changed during the run are counters, not power:
 
 Every connected host writes the same eight lamps. A second client disconnecting (and
 darkening its lamps) turns ours off too. The bridge rewrites all lamps every 3 s.
+
+## Profile changes (2026-11-04, inconclusive)
+
+`85DA4F4B-A2CA-4C7C-8C7D-FCD9E2DAAD56` sits in the switch service (`7BDB8DC0-…`), is
+read/write/notify, and reads the active profile number (`09`, matching the `08` reply).
+It is writable: never write it.
+
+Probed with tools/probe/profile.swift on profile 9 "Looper #1": long press A twice, then
+B twice. The profile did not change (neither `85DA4F4B` nor the `08` reply moved), because
+in a looper profile A and B hold actions are looper commands, not profile steps:
+
+| Press | Switch byte | FFCA |
+| --- | --- | --- |
+| long A | `04` | `03 00 00 00 08` |
+| long B | `20` | `03 00 00 00 45`, then `03 00 00 00 47` ~1 s later while still held |
+
+So the pedal has its own hold action (a second command after ~1 s). Whether `85DA4F4B`
+notifies on a profile change is still open: rerun the probe from a non-looper profile.
