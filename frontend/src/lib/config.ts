@@ -20,17 +20,18 @@ export const cc = (number: number, channel = 1, mode: Action["mode"] = "momentar
   mode,
 });
 
+/** mapping.defaultColours: saturated, since the pedal's LEDs wash pastels out to white. */
 const DEFAULT_COLOURS: Colour[] = [
-  { r: 255, g: 0, b: 0 },
-  { r: 0, g: 255, b: 0 },
-  { r: 0, g: 40, b: 255 },
-  { r: 255, g: 190, b: 0 },
-  { r: 150, g: 0, b: 255 },
-  { r: 0, g: 220, b: 255 },
+  { r: 255, g: 150, b: 0 }, // I: amber
+  { r: 255, g: 80, b: 0 }, // II: orange
+  { r: 255, g: 0, b: 170 }, // A: magenta
+  { r: 0, g: 220, b: 255 }, // III: cyan
+  { r: 0, g: 120, b: 255 }, // IV: azure
+  { r: 150, g: 0, b: 255 }, // B: violet
 ];
 
-/** mapping.Default(): switch n = CC 80+n momentary on channel 1, exp 1 = CC 11,
- *  exp 2 = CC 7, local LEDs. The colours are this file's guess; Go's ResetConfig wins. */
+/** mapping.Default(), field for field: switch n = CC 80+n momentary on channel 1,
+ *  exp 1 = CC 11, exp 2 = CC 7, local LEDs. */
 export function defaultConfig(): Config {
   const exp = (ccn: number): ExpConfig => ({
     enabled: true,
@@ -75,9 +76,39 @@ function actionError(a: Action, where: string): string | null {
   return null;
 }
 
-/** The first problem with a config, in words for the UI, or null. Mirrors
- *  mapping.Config.Validate. */
+/** mapping.Config.Validate, rule for rule, in the same order and the same words. */
+function goValidate(c: Config): string | null {
+  const seen = new Set<string>();
+  for (const [i, k] of c.combos.entries()) {
+    if (!inRange(k.a, 0, SWITCHES - 1) || !inRange(k.b, 0, SWITCHES - 1)) {
+      return `combo ${i + 1} uses a switch that does not exist`;
+    }
+    if (k.a === k.b) return `combo ${comboName(k)} uses the same switch twice`;
+    if (k.action.kind === "off") return `combo ${comboName(k)} does nothing: pick what it sends`;
+    const key = `${Math.min(k.a, k.b)}-${Math.max(k.a, k.b)}`;
+    if (seen.has(key)) return `two combos use ${comboName(k)}`;
+    seen.add(key);
+  }
+  for (const [n, x] of c.exp.entries()) {
+    // min is the heel and max the toe, in either order. 0/0 is "not calibrated", which
+    // Go's Normalize turns into the whole jack.
+    if (x.enabled && x.min === x.max && x.min !== 0) {
+      return `expression ${n + 1}: heel and toe were calibrated at the same point`;
+    }
+  }
+  return null;
+}
+
+/** The first problem with a config, in words for the UI, or null.
+ *
+ *  First exactly what mapping.Config.Validate rejects. Then the ranges Go's Normalize
+ *  would clamp to without a word (channel 1..16, long press MinLongPressMS..
+ *  MaxLongPressMS and so on): the UI says so instead, so what is saved is what the user
+ *  sees. */
 export function validate(c: Config): string | null {
+  const g = goValidate(c);
+  if (g) return g;
+
   if (c.switches.length !== SWITCHES) return "the pedal has six switches";
   for (let n = 0; n < SWITCHES; n++) {
     const s = c.switches[n];
@@ -85,15 +116,7 @@ export function validate(c: Config): string | null {
     const e = actionError(s.tap, name) ?? actionError(s.long, `${name} hold`);
     if (e) return e;
   }
-  const seen = new Set<string>();
   for (const k of c.combos) {
-    if (!inRange(k.a, 0, SWITCHES - 1) || !inRange(k.b, 0, SWITCHES - 1)) {
-      return "combo uses a switch that does not exist";
-    }
-    if (k.a === k.b) return "combo uses the same switch twice";
-    const key = `${Math.min(k.a, k.b)}-${Math.max(k.a, k.b)}`;
-    if (seen.has(key)) return `two combos use ${comboName(k)}`;
-    seen.add(key);
     const e = actionError(k.action, `Combo ${comboName(k)}`);
     if (e) return e;
   }
@@ -105,11 +128,6 @@ export function validate(c: Config): string | null {
     if (!inRange(x.cc, 0, 127)) return `${where}: CC number must be 0 to 127`;
     if (!inRange(x.min, 0, RAW_MAX) || !inRange(x.max, 0, RAW_MAX)) {
       return `${where}: calibration out of range`;
-    }
-    // min is the heel and max the toe, in either order. 0/0 is "not calibrated", which
-    // Go's Normalize turns into the whole jack.
-    if (x.enabled && x.min === x.max && x.min !== 0) {
-      return `expression ${n + 1}: heel and toe were calibrated at the same point`;
     }
   }
   if (c.ledMode !== "local" && c.ledMode !== "feedback") return "unknown LED mode";

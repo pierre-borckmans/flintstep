@@ -29,7 +29,7 @@ describe("mock pedal", () => {
   it("lights a held switch in its colour (local mode)", () => {
     const sim = createSim({ seed: 1, fixedState: "connected", holdMask: 1, autoPress: false });
     sim.step(50);
-    expect(sim.status().lamps[0]).toEqual({ r: 255, g: 0, b: 0 });
+    expect(sim.status().lamps[0]).toEqual(sim.config.switches[0].colour);
     expect(sim.status().lamps[1]).toEqual({ r: 0, g: 0, b: 0 });
   });
   it("calibrates from the live raw value", () => {

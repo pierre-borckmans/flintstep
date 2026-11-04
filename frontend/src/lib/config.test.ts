@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { defaultConfig, edit, mergeCalibration, nextCombo, sameConfig, validate } from "./config";
+import type { Action, Combo, Config } from "../types";
+import {
+  cc,
+  defaultConfig,
+  edit,
+  mergeCalibration,
+  nextCombo,
+  sameConfig,
+  validate,
+} from "./config";
 
 describe("defaultConfig", () => {
   it("matches the spec table", () => {
@@ -10,6 +19,62 @@ describe("defaultConfig", () => {
     expect(c.ledMode).toBe("local");
   });
   it("is valid", () => expect(validate(defaultConfig())).toBeNull());
+  // mapping.Default(), field for field: what ResetConfig would return.
+  it("is Go's Default()", () =>
+    expect(defaultConfig()).toEqual({
+      version: 1,
+      pedal: { address: "", name: "" },
+      switches: [
+        { r: 255, g: 150, b: 0 },
+        { r: 255, g: 80, b: 0 },
+        { r: 255, g: 0, b: 170 },
+        { r: 0, g: 220, b: 255 },
+        { r: 0, g: 120, b: 255 },
+        { r: 150, g: 0, b: 255 },
+      ].map((colour, n) => ({
+        tap: { kind: "cc", channel: 1, number: 80 + n, value: 127, mode: "momentary" },
+        long: { kind: "off", channel: 1, number: 0, value: 127, mode: "momentary" },
+        colour,
+      })),
+      combos: [],
+      exp: [
+        { enabled: true, channel: 1, cc: 11, min: 0, max: 65535, invert: false },
+        { enabled: true, channel: 1, cc: 7, min: 0, max: 65535, invert: false },
+      ],
+      ledMode: "local",
+      longPressMs: 500,
+      brightness: 100,
+    }));
+});
+
+// The rules of mapping.Config.Validate, in its order and its words.
+describe("validate mirrors Go", () => {
+  const withCombos = (combos: Combo[]): Config => ({ ...defaultConfig(), combos });
+  const tap = (n: number): Action => cc(80 + n);
+  const off: Action = { kind: "off", channel: 1, number: 0, value: 127, mode: "momentary" };
+  it("names a combo on a switch that does not exist by its number", () =>
+    expect(validate(withCombos([{ a: 0, b: 6, action: tap(0) }]))).toBe(
+      "combo 1 uses a switch that does not exist",
+    ));
+  it("names the switch a combo uses twice", () =>
+    expect(validate(withCombos([{ a: 2, b: 2, action: tap(0) }]))).toBe(
+      "combo A + A uses the same switch twice",
+    ));
+  it("rejects a combo that does nothing", () =>
+    expect(validate(withCombos([{ a: 0, b: 3, action: off }]))).toBe(
+      "combo I + III does nothing: pick what it sends",
+    ));
+  it("checks each combo whole before the next, like Go", () =>
+    expect(
+      validate(
+        withCombos([
+          { a: 0, b: 1, action: tap(0) },
+          { a: 1, b: 0, action: off },
+        ]),
+      ),
+    ).toBe("combo II + I does nothing: pick what it sends"));
+  it("accepts a combo pair again in a fresh config", () =>
+    expect(validate(withCombos([{ a: 0, b: 1, action: tap(0) }]))).toBeNull());
 });
 
 describe("validate", () => {
@@ -38,7 +103,7 @@ describe("validate", () => {
       index: 0,
       patch: { b: 0 },
     });
-    expect(validate(c)).toBe("combo uses the same switch twice");
+    expect(validate(c)).toBe("combo I + I uses the same switch twice");
   });
   it("rejects two combos on the same pair, either order", () => {
     let c = edit(edit(base(), { type: "addCombo" }), { type: "addCombo" });
