@@ -84,7 +84,7 @@ type Manager struct {
 	addr     string
 	cur      *session // the connected pedal, nil when none
 	target   Target
-	lamps    [sparkx.Switches]sparkx.Colour
+	lamps    [sparkx.Lamps]sparkx.Colour
 	onConn   func(Device)
 	pending  []Status // state changes not yet reported
 	run      *runner  // the reconnect loop, nil when stopped
@@ -109,7 +109,7 @@ type timing struct {
 	stopWait               time.Duration // the longest Stop waits for the loop
 	statusEvery            time.Duration // the most often Status is reported
 	darkWait               time.Duration // how long a hang-up waits for the lamps to go dark
-	batteryPoll            time.Duration
+	batteryPoll            time.Duration // the battery and USB power requests
 	lampRefresh            time.Duration // rewrite every lamp: another host may have changed them
 	idDial                 time.Duration // a remembered pedal the Mac does not hold
 	heldDial               time.Duration // a pedal the Mac holds: answers at once
@@ -124,7 +124,7 @@ var defaultTiming = timing{
 	stopWait:    3 * time.Second,
 	statusEvery: 50 * time.Millisecond,
 	darkWait:    600 * time.Millisecond,
-	batteryPoll: 60 * time.Second,
+	batteryPoll: 15 * time.Second, // the level visibly moves while charging
 	lampRefresh: 3 * time.Second,
 	idDial:      4 * time.Second,
 	heldDial:    10 * time.Second,
@@ -227,9 +227,9 @@ func (m *Manager) Stop() {
 	}
 }
 
-// SetLamps sets the six switch lamps. Only lamps that changed are written. They are
-// kept across reconnects.
-func (m *Manager) SetLamps(l [sparkx.Switches]sparkx.Colour) {
+// SetLamps sets all eight lamps: the six switches, then Amp and App. Only lamps that
+// changed are written. They are kept across reconnects, and go dark on a hang-up.
+func (m *Manager) SetLamps(l [sparkx.Lamps]sparkx.Colour) {
 	m.mu.Lock()
 	m.lamps = l
 	s := m.cur

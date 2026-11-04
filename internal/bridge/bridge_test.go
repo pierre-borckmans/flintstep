@@ -13,10 +13,10 @@ import (
 
 type fakePedal struct {
 	mu    sync.Mutex
-	lamps [][sparkx.Switches]sparkx.Colour
+	lamps [][sparkx.Lamps]sparkx.Colour
 }
 
-func (p *fakePedal) SetLamps(l [sparkx.Switches]sparkx.Colour) {
+func (p *fakePedal) SetLamps(l [sparkx.Lamps]sparkx.Colour) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.lamps = append(p.lamps, l)
@@ -24,11 +24,11 @@ func (p *fakePedal) SetLamps(l [sparkx.Switches]sparkx.Colour) {
 
 func (p *fakePedal) Status() ble.Status { return ble.Status{} }
 
-func (p *fakePedal) last() ([sparkx.Switches]sparkx.Colour, int) {
+func (p *fakePedal) last() ([sparkx.Lamps]sparkx.Colour, int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if len(p.lamps) == 0 {
-		return [sparkx.Switches]sparkx.Colour{}, 0
+		return [sparkx.Lamps]sparkx.Colour{}, 0
 	}
 	return p.lamps[len(p.lamps)-1], len(p.lamps)
 }
@@ -51,9 +51,24 @@ func (o *fakeOut) all() [][]byte {
 	return append([][]byte(nil), o.sent...)
 }
 
-type clock struct{ t time.Time }
+// clock is the bridge's injected clock. Locked: the tick loop reads it while a test
+// moves it on.
+type clock struct {
+	mu sync.Mutex
+	t  time.Time
+}
 
-func (c *clock) now() time.Time { return c.t }
+func (c *clock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *clock) advance(d time.Duration) {
+	c.mu.Lock()
+	c.t = c.t.Add(d)
+	c.mu.Unlock()
+}
 
 func setup(t *testing.T, cfg mapping.Config) (*Bridge, *fakePedal, *fakeOut, *clock, *[]Activity) {
 	t.Helper()
@@ -132,7 +147,7 @@ func TestLongPressFiresFromTick(t *testing.T) {
 	if n := len(out.all()); n != 0 {
 		t.Fatalf("a switch with a long press sent %d messages on press", n)
 	}
-	c.t = c.t.Add(time.Duration(cfg.LongPressMS+20) * time.Millisecond)
+	c.advance(time.Duration(cfg.LongPressMS+20) * time.Millisecond)
 	b.Tick()
 	sent := out.all()
 	if len(sent) != 1 || !bytes.Equal(sent[0], []byte{0xC0, 9}) {

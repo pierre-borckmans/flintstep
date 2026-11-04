@@ -44,7 +44,7 @@ type gatedPedal struct {
 	g *gate
 }
 
-func (p *gatedPedal) SetLamps(l [sparkx.Switches]sparkx.Colour) {
+func (p *gatedPedal) SetLamps(l [sparkx.Lamps]sparkx.Colour) {
 	p.g.pass()
 	p.fakePedal.SetLamps(l)
 }
@@ -63,7 +63,7 @@ func TestLongPressAndReleaseLeaveInOrder(t *testing.T) {
 	h := b.Handlers()
 
 	h.Switch(sparkx.Edge{Switch: 2, Down: true})
-	c.t = c.t.Add(time.Second)
+	c.advance(time.Second)
 
 	ticked := make(chan struct{})
 	go func() { b.Tick(); close(ticked) }() // fires CC 90 = 127, held up in Send

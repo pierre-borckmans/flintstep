@@ -18,8 +18,9 @@ React 19 + TS + Tailwind v4, bun 1.3.14, Biome, vitest, golangci-lint v2.
 ## internal/sparkx (done, pure)
 
 The pedal protocol, lifted from Beam. `Edge{Switch int; Down bool}`, `Edges(prev, cur byte)`,
-`ParseMsg`, `Msg`/`Msg*` kinds, the info requests, `LampMessages`, `LampSet`, `Colour{R,G,B}`,
-`ExpScale`, `Status`, `NewStatus()`, `NoBattery`, `Switches`=6, `SwitchNames`,
+`ParseMsg`, `Msg`/`Msg*` kinds, the info requests (`PowerRequest` is `11 00 00 00`, answered by
+`MsgPower` with Value 1 on USB power, 0 on battery), `LampMessages`, `LampSet`, `Colour{R,G,B}`,
+`ExpScale`, `Status` (with `Powered bool` json "powered"), `NewStatus()`, `NoBattery`, `Switches`=6, `SwitchNames`,
 `Lamps`=8, `LampAmp`=6, `LampApp`=7, `ExpInputs`=2, GATT UUID constants, `IsName`.
 Never add a builder for command types 03/07/0a/0e/13.
 
@@ -61,6 +62,12 @@ type ExpConfig struct {
 
 type LEDMode string // "local" | "feedback"
 
+type IndicatorMode string // "off" | "connected" | "midiOut" | "midiIn" | "usb" | "on"
+type Indicator struct {
+    Mode   IndicatorMode `json:"mode"`
+    Colour sparkx.Colour `json:"colour"` // the colour when lit
+}
+
 type Config struct {
     Version     int                 `json:"version"`
     Pedal       PedalRef            `json:"pedal"` // remembered pedal; zero = none
@@ -70,10 +77,12 @@ type Config struct {
     LEDMode     LEDMode             `json:"ledMode"`
     LongPressMS int                 `json:"longPressMs"` // 150..3000 (MinLongPressMS..MaxLongPressMS), default 500
     Brightness  int                 `json:"brightness"`  // 0..100 lamp dimming, default 100
+    Indicators  [2]Indicator        `json:"indicators"`  // 0 = Amp lamp, 1 = App lamp
 }
 type PedalRef struct { Address string `json:"address"`; Name string `json:"name"` }
 
-func Default() Config        // the spec's table: switch n = CC 80+n momentary ch1, exp1 CC11, exp2 CC7, local LEDs
+func Default() Config        // the spec's table: switch n = CC 80+n momentary ch1, exp1 CC11, exp2 CC7, local LEDs,
+                             // Amp = midiOut green (00,B0,50), App = connected indigo (40,20,FF)
 func (c Config) Normalize() Config // clamps everything into range, fills zero values with defaults
 func (c Config) Validate() error   // human-readable error for the UI (e.g. "combo I + I uses the same switch twice")
 ```
@@ -91,6 +100,9 @@ func (e *Engine) Feedback(msg []byte) bool          // MIDI from the LED destina
 func (e *Engine) Lamps() [6]sparkx.Colour           // what the six switch lamps should show now (brightness applied)
 func (e *Engine) Reset() [][]byte                   // pedal disconnected: forget held/pending, keep toggles;
                                                     // returns the release half of anything still sounding
+
+type IndicatorState struct { Connected, Powered, Out, In bool } // Out/In: a flash is lit
+func IndicatorLamps(cfg Config, st IndicatorState) [2]sparkx.Colour // Amp, App; brightness applied
 ```
 
 Behaviour:
@@ -119,6 +131,11 @@ Behaviour:
   expression input with Min == Max. The frontend's validate() checks exactly these first,
   in the same words, then the ranges Normalize would otherwise clamp silently.
   The frontend's defaultConfig() equals Default() field for field (colours included).
+- Indicators (the Amp and App lamps): "connected" is lit while the bridge holds the pedal,
+  "midiOut" flashes on each message sent, "midiIn" on each message to the LED destination,
+  "usb" is lit on USB power, "on" always, "off" never. Normalize turns an unknown mode into
+  that lamp's default mode and a black colour into its default colour. ConfigVersion is 2:
+  a version 1 file has no "indicators" and so gets the defaults.
 
 ## internal/store
 
@@ -140,7 +157,7 @@ type Status struct {
     Detail   string        `json:"detail"` // human words for the state, e.g. "Bluetooth is off"
     Name     string        `json:"name"`
     Address  string        `json:"address"`
-    sparkx.Status                          // embedded: firmware, profile, battery, cables, held, lamps...
+    sparkx.Status                          // embedded: firmware, profile, battery, powered, cables, held, lamps...
     ExpRaw   [2]int        `json:"expRaw"` // last raw value per input, -1 = none
 }
 
@@ -157,7 +174,7 @@ func (m *Manager) Start(target Target)     // keeps the pedal connected: reconne
 func (m *Manager) SetTarget(target Target) // lets go of a pedal that is not the new target and connects to it
 func (m *Manager) Stop()                         // lamps dark, disconnect, stop reconnecting
 func (m *Manager) Scan(timeout time.Duration) ([]Device, error) // Spark Control X pedals in range or held by macOS
-func (m *Manager) SetLamps(l [6]sparkx.Colour)   // only changed lamps are written
+func (m *Manager) SetLamps(l [8]sparkx.Colour)   // all eight: six switches, Amp (6), App (7); only changed lamps are written
 func (m *Manager) Status() Status
 func (m *Manager) OnConnected(fn func(Device))   // called after each successful connect to the target of the moment
                                                  // (app saves the remembered pedal); not called for a connect whose
@@ -166,8 +183,12 @@ func (m *Manager) OnConnected(fn func(Device))   // called after each successful
 
 Finding a pedal: remembered address by identifier -> a SparkX the Mac already holds
 (retrieveConnectedPeripheralsWithServices on the switch service 7BDB8DC0... or the BLE-MIDI
-service) -> scan for a name starting "SparkX". Amp and App lamps (6, 7) are lit by the
-manager while connected. Writes on FFC9 go through one writer goroutine. Trace every RX/TX
+service) -> scan for a name starting "SparkX". All eight lamps are the caller's (the bridge
+decides Amp and App too); the manager writes them on connect, rewrites them every 3 s, and
+darkens them all on a hang-up. Writes on FFC9 go through one writer goroutine. On connect it
+asks firmware, profile, battery, cables and power (0x11); battery and power again every 15 s.
+USB power also comes from characteristic 90D9A098-… (service 6FACFE71-…), subscribed when
+the pedal has it; Powered follows whichever spoke last. Trace every RX/TX
 except the exp stream to ble-trace.log (rotlog, 4 MB) when a trace path is set.
 
 ## internal/coremidi (cgo, darwin; stub elsewhere returning ErrUnsupported)
@@ -206,7 +227,7 @@ Owns one Engine, feeds it from ble.Handlers, sends to the virtual source, pipes 
 destination back, drives Manager.SetLamps, emits UI events. Interfaces so it is testable:
 
 ```go
-type Pedal interface { SetLamps([6]sparkx.Colour); Status() ble.Status } // the app owns Start/SetTarget/Stop
+type Pedal interface { SetLamps([8]sparkx.Colour); Status() ble.Status } // the app owns Start/SetTarget/Stop
 type MIDIOut interface { Send([]byte) error }
 type Activity struct { Dir string `json:"dir"`; Bytes []int `json:"bytes"`; Label string `json:"label"`; At int64 `json:"at"` } // "out" | "in"
 ```
@@ -235,5 +256,10 @@ type State = {
   version: string
 }
 ```
+
+The bridge computes the Amp and App lamps with mapping.IndicatorLamps from the config, the
+pedal's status (connected, powered) and two flash timers: a MIDI flash stays lit 120 ms after
+the last message (each message extends it), timed on the bridge's injected clock and ended by
+its tick loop, so a burst is two lamp updates (on, off), diffed like every lamp.
 
 Events (Wails `EventsOn`): `"state"` -> State (throttled ~20/s), `"activity"` -> Activity.

@@ -29,6 +29,7 @@ func TestOffThenOnConnects(t *testing.T) {
 	rec := &recorder{}
 	air := &fakeAir{off: "Bluetooth is off", answers: map[string]bool{"a": true}}
 	m := newManager(rec.handlers(), air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	var got []Device
 	var mu sync.Mutex
 	m.OnConnected(func(d Device) { mu.Lock(); got = append(got, d); mu.Unlock() })
@@ -56,6 +57,7 @@ func TestReconnectsAfterDrop(t *testing.T) {
 	rec := &recorder{}
 	air := &fakeAir{answers: map[string]bool{"a": true}}
 	m := newManager(rec.handlers(), air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{Address: "a"})
 	defer m.Stop()
 	waitFor(t, "first connect", func() bool { return air.connCount() == 1 && m.Status().State == StateConnected })
@@ -79,6 +81,7 @@ func TestRetriesWhenNotFound(t *testing.T) {
 	rec := &recorder{}
 	air := &fakeAir{}
 	m := newManager(rec.handlers(), air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{})
 	waitFor(t, "three scans", func() bool { air.mu.Lock(); defer air.mu.Unlock(); return air.scans >= 3 })
 	m.Stop()
@@ -103,10 +106,11 @@ func TestStopGoesDarkThenDisconnects(t *testing.T) {
 	rec := &recorder{}
 	air := &fakeAir{answers: map[string]bool{"a": true}}
 	m := newManager(rec.handlers(), air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{Address: "a"})
 	waitFor(t, "connect", func() bool { return m.Status().State == StateConnected })
 	c := air.conn(0)
-	waitFor(t, "first flush", func() bool { return len(c.writes()) >= sparkx.Lamps*2+4 })
+	waitFor(t, "first flush", func() bool { return len(c.writes()) >= connectWrites })
 	m.Stop()
 	if !c.isClosed() {
 		t.Fatal("not disconnected")
@@ -131,6 +135,7 @@ func TestStopGoesDarkThenDisconnects(t *testing.T) {
 func TestSetTargetSwitchesPedal(t *testing.T) {
 	air := &fakeAir{answers: map[string]bool{"a": true, "b": true}}
 	m := newManager(Handlers{}, air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{Address: "a"})
 	defer m.Stop()
 	waitFor(t, "a", func() bool { return m.Status().State == StateConnected })
@@ -150,6 +155,7 @@ func TestSetTargetSwitchesPedal(t *testing.T) {
 func TestPowerOffWhileConnected(t *testing.T) {
 	air := &fakeAir{answers: map[string]bool{"a": true}}
 	m := newManager(Handlers{}, air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{Address: "a"})
 	defer m.Stop()
 	waitFor(t, "connect", func() bool { return m.Status().State == StateConnected })
@@ -166,6 +172,7 @@ func TestPowerOffWhileConnected(t *testing.T) {
 func TestScanSerialisedWithLoop(t *testing.T) {
 	air := &fakeAir{scanTime: 20 * time.Millisecond}
 	m := newManager(Handlers{}, air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{})
 	defer m.Stop()
 	for i := 0; i < 5; i++ {
@@ -182,6 +189,7 @@ func TestScanSerialisedWithLoop(t *testing.T) {
 func TestRestart(t *testing.T) {
 	air := &fakeAir{answers: map[string]bool{"a": true}}
 	m := newManager(Handlers{}, air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	m.Start(Target{Address: "a"})
 	waitFor(t, "connect", func() bool { return m.Status().State == StateConnected })
 	m.Stop()
@@ -231,6 +239,7 @@ func TestNoOnConnectedForAnOldTarget(t *testing.T) {
 	air := &slowDial{fakeAir: &fakeAir{answers: map[string]bool{"a": true, "b": true}},
 		arrived: make(chan struct{}), open: make(chan struct{})}
 	m := newManager(Handlers{}, air, fastTiming)
+	m.SetLamps(indicatorsLit) // Amp and App lit, as the bridge sets them
 	var mu sync.Mutex
 	var got []string
 	m.OnConnected(func(d Device) { mu.Lock(); got = append(got, d.Address); mu.Unlock() })

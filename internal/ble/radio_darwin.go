@@ -34,6 +34,13 @@ const (
 	batteryLevelChar uint16 = 0x2A19
 )
 
+// powerService and powerChar push the USB power state: 01 on USB, 00 on battery
+// (docs/PROTOCOL-NOTES.md). Read + notify.
+const (
+	powerService = "6FACFE71-A4C3-4E80-BA5C-533928830727"
+	powerChar    = "90D9A098-9CD8-4A7A-B176-91FFE80909F2"
+)
+
 type cbRadio struct {
 	adapter *bluetooth.Adapter
 
@@ -190,20 +197,23 @@ func (c *cbConn) setup() error {
 		return err
 	}
 	cmdSvc := bluetooth.New16BitUUID(sparkx.CommandSvc)
+	pwrSvc, err := bluetooth.ParseUUID(powerService)
+	if err != nil {
+		return err
+	}
 	// One discovery for everything: tinygo clears its cache on each, so a second one
 	// later could cost the first its notifications. tinygo also fails the whole call
-	// when any asked-for service is missing, so without a battery service, ask again
-	// without it.
-	var battSvc *bluetooth.DeviceService
-	svcs, err := c.dev.DiscoverServices([]bluetooth.UUID{swSvc, cmdSvc, bluetooth.New16BitUUID(batteryService)})
-	if err == nil && len(svcs) == 3 {
-		battSvc = &svcs[2]
-	} else {
-		svcs, err = c.dev.DiscoverServices([]bluetooth.UUID{swSvc, cmdSvc})
-	}
-	if err != nil || len(svcs) < 2 {
+	// when any asked-for service is missing, so findServices falls back to asking for
+	// every service and picking ours out: the battery and power services are optional.
+	svcs, opt, err := findServices(
+		[]bluetooth.UUID{swSvc, cmdSvc},
+		[]bluetooth.UUID{bluetooth.New16BitUUID(batteryService), pwrSvc},
+		c.dev.DiscoverServices,
+		bluetooth.DeviceService.UUID)
+	if err != nil {
 		return fmt.Errorf("discover Spark Control X services: %w", err)
 	}
+	battSvc, powerSvc := opt[0], opt[1]
 	sw, err := svcs[0].DiscoverCharacteristics([]bluetooth.UUID{swChar})
 	if err != nil || len(sw) == 0 {
 		return fmt.Errorf("discover the switch characteristic: %w", err)
@@ -220,10 +230,47 @@ func (c *cbConn) setup() error {
 	if err := cmd[1].EnableNotifications(c.s.command); err != nil {
 		return fmt.Errorf("enable command notifications: %w", err)
 	}
-	if battSvc != nil {
-		go c.watchBattery(*battSvc)
-	}
+	// The optional characteristics one after the other: tinygo's characteristic
+	// discovery shares one channel per device, so two at once could swap answers.
+	go func() {
+		if battSvc != nil {
+			c.watchBattery(*battSvc)
+		}
+		if powerSvc != nil {
+			c.watchPower(*powerSvc)
+		}
+	}()
 	return nil
+}
+
+// watchPower reads the USB power characteristic once and subscribes to its changes
+// (~1 s after the cable goes in or out). Any failure only means no reading from it: the
+// 0x11 request on FFC9 covers that.
+func (c *cbConn) watchPower(svc bluetooth.DeviceService) {
+	id, err := bluetooth.ParseUUID(powerChar)
+	if err != nil {
+		return
+	}
+	chars, err := svc.DiscoverCharacteristics([]bluetooth.UUID{id})
+	if err != nil || len(chars) == 0 {
+		log.Printf("ble: power service without its characteristic: %v", err)
+		return
+	}
+	ch := chars[0]
+	buf := make([]byte, 8)
+	if n, err := ch.Read(buf); err != nil {
+		log.Printf("ble: power read failed: %v", err)
+	} else if on, ok := usbPower(buf[:n]); ok {
+		c.s.power(on)
+	}
+	err = ch.EnableNotifications(func(v []byte) {
+		if on, ok := usbPower(v); ok {
+			c.s.power(on)
+		}
+	})
+	if err != nil {
+		log.Printf("ble: power notifications unavailable: %v", err)
+	}
 }
 
 // watchBattery reads the Battery Level once and subscribes to its changes. Any failure

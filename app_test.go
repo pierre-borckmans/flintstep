@@ -66,3 +66,26 @@ func TestShouldRemember(t *testing.T) {
 		}
 	}
 }
+
+func TestBatteryLine(t *testing.T) {
+	st := func(level int, powered bool) ble.Status {
+		s := ble.Status{State: ble.StateConnected}
+		s.Battery, s.Powered = level, powered
+		return s
+	}
+	cases := []struct {
+		st   ble.Status
+		want string
+	}{
+		{st(30, true), "Battery 30% · charging"},
+		{st(100, true), "Battery 100% · on USB power"},
+		{st(30, false), "Battery 30%"},
+		{st(-1, true), ""},
+		{ble.Status{State: ble.StateSearching}, ""},
+	}
+	for _, c := range cases {
+		if got := batteryLine(c.st); got != c.want {
+			t.Errorf("batteryLine(%d%%, powered %v) = %q, want %q", c.st.Battery, c.st.Powered, got, c.want)
+		}
+	}
+}

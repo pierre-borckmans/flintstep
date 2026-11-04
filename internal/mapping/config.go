@@ -48,8 +48,9 @@ const (
 	LEDFeedback LEDMode = "feedback"
 )
 
-// ConfigVersion is the Version a Normalized Config carries.
-const ConfigVersion = 1
+// ConfigVersion is the Version a Normalized Config carries. 2 added Indicators: a
+// version 1 file has none, and Normalize gives it the defaults.
+const ConfigVersion = 2
 
 // Ranges and defaults. frontend/src/lib/config.ts mirrors these (LONG_PRESS, RAW_MAX).
 const (
@@ -110,6 +111,7 @@ type Config struct {
 	LEDMode     LEDMode                       `json:"ledMode"`
 	LongPressMS int                           `json:"longPressMs"`
 	Brightness  int                           `json:"brightness"` // 0..100
+	Indicators  [Indicators]Indicator         `json:"indicators"` // Amp, App
 }
 
 // defaultColours are saturated on purpose: the pedal's LEDs wash pastel colours out
@@ -148,6 +150,7 @@ func Default() Config {
 		LEDMode:     LEDLocal,
 		LongPressMS: DefaultLongPressMS,
 		Brightness:  DefaultBrightness,
+		Indicators:  defaultIndicators,
 	}
 	for n := range c.Switches {
 		c.Switches[n] = SwitchConfig{Tap: defaultTap(n), Long: offAction(), Colour: defaultColours[n]}
@@ -223,6 +226,18 @@ func (c Config) Normalize() Config {
 		c.Brightness = DefaultBrightness
 	}
 	c.Brightness = clamp(c.Brightness, 0, 100)
+
+	// A file from before the indicators (version 1) has none: an empty mode and a
+	// black colour, which the two rules below turn into the defaults.
+	for n := range c.Indicators {
+		ind := &c.Indicators[n]
+		if !validIndicatorMode(ind.Mode) {
+			ind.Mode = defaultIndicators[n].Mode
+		}
+		if ind.Colour == (sparkx.Colour{}) {
+			ind.Colour = defaultIndicators[n].Colour
+		}
+	}
 	return c
 }
 

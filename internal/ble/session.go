@@ -20,14 +20,9 @@ import (
 // the battery poll, and the lamps, which it brings to the wanted state whenever they
 // change. Only lamps that changed are written (sparkx.LampSet), so SetLamps can be
 // called as often as the caller likes.
-
-// The lamps the manager owns while connected: Amp in a soft green says the pedal is
-// linked, App in indigo says the MIDI bridge is running. Both dim enough to sit beside
-// the switch lamps without competing with them.
-var (
-	ampColour = sparkx.Colour{R: 0x00, G: 0xB0, B: 0x50}
-	appColour = sparkx.Colour{R: 0x40, G: 0x20, B: 0xFF}
-)
+//
+// All eight lamps are the caller's, the Amp and App lamps included: what they show is
+// the user's choice (mapping.Indicator). The session only darkens them on a hang-up.
 
 // session is one connected pedal. It is a sink before the dial returns (notifications
 // can arrive during setup) and gets its conn with start.
@@ -68,13 +63,11 @@ func newSession(m *Manager, dev Device) *session {
 	}
 	// Whatever the last app left lit is unknown: every lamp is written once.
 	s.lamps.Forget()
-	s.lamps.Set(sparkx.LampAmp, ampColour)
-	s.lamps.Set(sparkx.LampApp, appColour)
 	return s
 }
 
 // start runs the writer on c and asks the pedal what it is.
-func (s *session) start(c conn, lamps [sparkx.Switches]sparkx.Colour) {
+func (s *session) start(c conn, lamps [sparkx.Lamps]sparkx.Colour) {
 	s.c = c
 	s.mu.Lock()
 	for n, col := range lamps {
@@ -82,7 +75,7 @@ func (s *session) start(c conn, lamps [sparkx.Switches]sparkx.Colour) {
 	}
 	s.mu.Unlock()
 	go s.writer()
-	for _, r := range [][]byte{sparkx.FirmwareRequest(), sparkx.ProfileRequest(), sparkx.BatteryRequest(), sparkx.CablesRequest()} {
+	for _, r := range [][]byte{sparkx.FirmwareRequest(), sparkx.ProfileRequest(), sparkx.BatteryRequest(), sparkx.CablesRequest(), sparkx.PowerRequest()} {
 		s.request(r)
 	}
 	kickChan(s.lampKick)
@@ -105,7 +98,7 @@ func (s *session) snapshot() (sparkx.Status, [sparkx.ExpInputs]int) {
 	return s.st, s.expRaw
 }
 
-func (s *session) setLamps(l [sparkx.Switches]sparkx.Colour) {
+func (s *session) setLamps(l [sparkx.Lamps]sparkx.Colour) {
 	s.mu.Lock()
 	if s.gone {
 		s.mu.Unlock()
@@ -206,6 +199,7 @@ func (s *session) writer() {
 			close(reply)
 		case <-poll.C:
 			write(sparkx.BatteryRequest())
+			write(sparkx.PowerRequest())
 		case <-refresh.C:
 			s.mu.Lock()
 			gone := s.gone
@@ -276,6 +270,8 @@ func (s *session) command(buf []byte) {
 		}
 	case sparkx.MsgBattery:
 		s.st.Battery = m.Value
+	case sparkx.MsgPower:
+		s.st.Powered = m.Value == 1
 	case sparkx.MsgFirmware:
 		s.st.Firmware = m.Text
 		note = " firmware " + m.Text
@@ -302,6 +298,14 @@ func (s *session) command(buf []byte) {
 func (s *session) battery(level int) {
 	s.mu.Lock()
 	s.st.Battery = level
+	s.mu.Unlock()
+	s.m.kick()
+}
+
+// power takes a reading from the USB power characteristic.
+func (s *session) power(on bool) {
+	s.mu.Lock()
+	s.st.Powered = on
 	s.mu.Unlock()
 	s.m.kick()
 }
