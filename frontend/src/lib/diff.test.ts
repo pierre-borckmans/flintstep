@@ -126,6 +126,31 @@ describe("diffConfigs: expression and settings", () => {
     expect(label({ type: "exp", n: 0, patch: { channel: 3 } })).toBe("Exp 1 · channel 1 → 3");
   });
 
+  it("names the trigger mode, and nothing more for the defaults it fills in", () => {
+    expect(label({ type: "triggerMode", n: 0, mode: "engage" })).toBe("Exp 1 · auto-engage");
+    expect(label({ type: "triggerMode", n: 1, mode: "toe" })).toBe("Exp 2 · toe click");
+    const on = edited({ type: "triggerMode", n: 0, mode: "toe" });
+    expect(diffConfigs(on, base())).toBe("Exp 1 · trigger off");
+  });
+
+  it("names the threshold by mode, the off delay and the action", () => {
+    const toe = edited({ type: "triggerMode", n: 0, mode: "toe" });
+    const engage = edited({ type: "triggerMode", n: 0, mode: "engage" });
+    const relabel = (c: Config, op: Op) => diffConfigs(c, edit(c, op));
+    expect(relabel(toe, { type: "trigger", n: 0, patch: { threshold: 92 } })).toBe(
+      "Exp 1 · toe threshold 92%",
+    );
+    expect(relabel(engage, { type: "trigger", n: 0, patch: { threshold: 6 } })).toBe(
+      "Exp 1 · engage threshold 6%",
+    );
+    expect(relabel(engage, { type: "trigger", n: 0, patch: { offDelayMs: 600 } })).toBe(
+      "Exp 1 · off delay 600 ms",
+    );
+    expect(relabel(engage, { type: "trigger", n: 0, patch: {}, action: { number: 110 } })).toBe(
+      "Exp 1 trigger · CC 102 → CC 110",
+    );
+  });
+
   it("names the settings by their new value", () => {
     expect(label({ type: "ledMode", mode: "feedback" })).toBe("LED mode · MIDI feedback");
     expect(diffConfigs(edited({ type: "ledMode", mode: "feedback" }), base())).toBe(

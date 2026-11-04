@@ -4,14 +4,17 @@ import type {
   Combo,
   Config,
   ExpConfig,
+  ExpTrigger,
   Indicator,
   LEDMode,
   SwitchConfig,
+  TriggerMode,
 } from "../types";
 import { INDICATOR_NAMES, SWITCH_NAMES, SWITCHES } from "../types";
 import { comboName } from "./caption";
 import { RAW_MAX } from "./exp";
 import { copyIndicators, DEFAULT_INDICATORS, isIndicatorMode } from "./indicators";
+import { defaultTrigger, pickMode, TRIGGER } from "./trigger";
 
 // CONFIG EDITING. The Go side owns the config (mapping.Normalize/Validate); this file is
 // the UI's copy of the same rules so a bad edit is caught before Save, and the reducer the
@@ -44,16 +47,17 @@ const DEFAULT_COLOURS: Colour[] = [
  *  exp 1 = CC 11, exp 2 = CC 7, local LEDs, Amp flashing with MIDI out, App lit while
  *  connected. */
 export function defaultConfig(): Config {
-  const exp = (ccn: number): ExpConfig => ({
+  const exp = (ccn: number, n: number): ExpConfig => ({
     enabled: true,
     channel: 1,
     cc: ccn,
     min: 0,
     max: RAW_MAX,
     invert: false,
+    trigger: defaultTrigger(n),
   });
   return {
-    version: 2,
+    version: 3,
     pedal: { address: "", name: "" },
     switches: Array.from({ length: SWITCHES }, (_, n) => ({
       tap: cc(80 + n),
@@ -61,7 +65,7 @@ export function defaultConfig(): Config {
       colour: { ...DEFAULT_COLOURS[n] },
     })),
     combos: [],
-    exp: [exp(11), exp(7)],
+    exp: [exp(11, 0), exp(7, 1)],
     ledMode: "local",
     longPressMs: 500,
     brightness: 100,
@@ -107,9 +111,15 @@ function goValidate(c: Config): string | null {
     if (x.enabled && x.min === x.max && x.min !== 0) {
       return `expression ${n + 1}: heel and toe were calibrated at the same point`;
     }
+    const t = x.trigger;
+    if (t && (t.mode === "engage" || t.mode === "toe") && t.action.kind === "off") {
+      return `expression ${n + 1}: the trigger does nothing: pick what it sends`;
+    }
   }
   return null;
 }
+
+const TRIGGER_MODES: TriggerMode[] = ["off", "engage", "toe"];
 
 /** The first problem with a config, in words for the UI, or null.
  *
@@ -141,6 +151,16 @@ export function validate(c: Config): string | null {
     if (!inRange(x.min, 0, RAW_MAX) || !inRange(x.max, 0, RAW_MAX)) {
       return `${where}: calibration out of range`;
     }
+    const t = x.trigger;
+    if (!t || !TRIGGER_MODES.includes(t.mode)) return `${where}: unknown trigger mode`;
+    const e = actionError(t.action, `${where} trigger`);
+    if (e) return e;
+    if (!inRange(t.threshold, TRIGGER.min, TRIGGER.max)) {
+      return `${where}: trigger threshold must be ${TRIGGER.min} to ${TRIGGER.max}%`;
+    }
+    if (!inRange(t.offDelayMs, TRIGGER.offDelay.min, TRIGGER.offDelay.max)) {
+      return `${where}: off delay must be ${TRIGGER.offDelay.min} to ${TRIGGER.offDelay.max} ms`;
+    }
   }
   if (c.ledMode !== "local" && c.ledMode !== "feedback") return "unknown LED mode";
   if (!inRange(c.longPressMs, LONG_PRESS.min, LONG_PRESS.max)) {
@@ -168,7 +188,14 @@ export type Op =
       action?: Partial<Action>;
     }
   | { type: "removeCombo"; index: number }
-  | { type: "exp"; n: number; patch: Partial<ExpConfig> }
+  | { type: "exp"; n: number; patch: Partial<Omit<ExpConfig, "trigger">> }
+  | { type: "triggerMode"; n: number; mode: TriggerMode }
+  | {
+      type: "trigger";
+      n: number;
+      patch: Partial<Pick<ExpTrigger, "threshold" | "offDelayMs">>;
+      action?: Partial<Action>;
+    }
   | { type: "ledMode"; mode: LEDMode }
   | { type: "brightness"; value: number }
   | { type: "indicator"; n: number; patch: Partial<Indicator> }
@@ -241,6 +268,23 @@ export function edit(c: Config, op: Op): Config {
       return { ...c, combos: c.combos.filter((_, i) => i !== op.index) };
     case "exp":
       return { ...c, exp: setAt(c.exp, op.n, (x) => ({ ...x, ...op.patch })) };
+    case "triggerMode":
+      return {
+        ...c,
+        exp: setAt(c.exp, op.n, (x) => ({ ...x, trigger: pickMode(x.trigger, op.mode, op.n) })),
+      };
+    case "trigger":
+      return {
+        ...c,
+        exp: setAt(c.exp, op.n, (x) => ({
+          ...x,
+          trigger: {
+            ...x.trigger,
+            ...op.patch,
+            action: op.action ? patchAction(x.trigger.action, op.action) : x.trigger.action,
+          },
+        })),
+      };
     case "indicator":
       return {
         ...c,
@@ -277,6 +321,8 @@ export function opKey(op: Op): string | null {
       return `combo:${op.index}:${keys(op.patch)}:${keys(op.action)}`;
     case "exp":
       return `exp:${op.n}:${keys(op.patch)}`;
+    case "trigger":
+      return `trigger:${op.n}:${keys(op.patch)}:${keys(op.action)}`;
     case "indicator":
       return `indicator:${op.n}:${keys(op.patch)}`;
     case "ledMode":

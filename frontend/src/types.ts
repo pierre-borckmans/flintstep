@@ -36,6 +36,18 @@ export interface ExpConfig {
   min: number; // raw 0..65535 at the heel
   max: number; // raw 0..65535 at the toe; may be below min (toe reads lower), never equal
   invert: boolean; // the user's own flip, on top of heel=0 toe=127
+  trigger: ExpTrigger;
+}
+
+/** mapping.TriggerMode: "engage" is auto-engage (leave the heel), "toe" a toe click. */
+export type TriggerMode = "off" | "engage" | "toe";
+
+/** mapping.ExpTrigger: a switch faked from the pedal's position. */
+export interface ExpTrigger {
+  mode: TriggerMode;
+  action: Action; // press half on engaging, release half on letting go
+  threshold: number; // percent of the calibrated travel, 1..99
+  offDelayMs: number; // engage only, 0..2000
 }
 
 export type LEDMode = "local" | "feedback";
@@ -98,6 +110,7 @@ export interface State {
   midi: Midi;
   launchAtLogin: boolean;
   version: string;
+  expTrigger: boolean[]; // 2: each input's trigger engaged now
 }
 
 export interface Device {

@@ -1,4 +1,12 @@
-import type { Action, Combo, Config, ExpConfig, Indicator } from "../types";
+import type {
+  Action,
+  Combo,
+  Config,
+  ExpConfig,
+  ExpTrigger,
+  Indicator,
+  TriggerMode,
+} from "../types";
 import { INDICATOR_NAMES, SWITCH_NAMES } from "../types";
 import { comboName } from "./caption";
 import { defaultConfig, mappingOf, sameConfig } from "./config";
@@ -75,6 +83,27 @@ function expChanges(n: number, a: ExpConfig, b: ExpConfig): string[] {
   else if (heel) out.push(`${at} · heel set`);
   else if (toe) out.push(`${at} · toe set`);
   if (a.invert !== b.invert) out.push(`${at} · ${b.invert ? "inverted" : "not inverted"}`);
+  if (a.trigger && b.trigger) out.push(...triggerChanges(at, a.trigger, b.trigger));
+  return out;
+}
+
+const TRIGGER_WORD: Record<TriggerMode, string> = {
+  off: "trigger off",
+  engage: "auto-engage",
+  toe: "toe click",
+};
+
+/** "Exp 1 · auto-engage", "Exp 1 · toe threshold 92%", "Exp 1 · off delay 600 ms". The
+ *  defaults a mode fills in are part of picking it, so they do not show separately. */
+function triggerChanges(at: string, a: ExpTrigger, b: ExpTrigger): string[] {
+  if (a.mode !== b.mode) return [`${at} · ${TRIGGER_WORD[b.mode]}`];
+  const out: string[] = [];
+  if (a.threshold !== b.threshold) {
+    const which = b.mode === "toe" ? "toe" : b.mode === "engage" ? "engage" : "trigger";
+    out.push(`${at} · ${which} threshold ${b.threshold}%`);
+  }
+  if (a.offDelayMs !== b.offDelayMs) out.push(`${at} · off delay ${b.offDelayMs} ms`);
+  out.push(...actionChanges(`${at} trigger`, a.action, b.action));
   return out;
 }
 
