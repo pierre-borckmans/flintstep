@@ -22,6 +22,9 @@ Not affiliated with Positive Grid.
   on. In **MIDI feedback** mode the app listens on a second virtual port, **Spark Control X
   LEDs**: send the same CC back from your DAW and the LED shows the real state (plugin
   bypassed, track armed).
+- Presets: keep several named mappings (one per DAW, one per gig) and switch from the
+  editor or the menu bar. Export one as a `.sparkx.json` file and import it on another Mac;
+  an old `config.json` imports too.
 - Remembers the pedal and reconnects on its own. Battery level in the menu bar. Optional
   launch at login.
 
@@ -53,15 +56,19 @@ macOS asks for Bluetooth access on first run. The app lives in the menu bar, not
 | `internal/bridge` | Glue between the pedal, the engine and the MIDI port. Tested with fakes. |
 | `internal/coremidi` | Virtual MIDI source and LED destination (cgo). |
 | `internal/tray`, `internal/loginitem` | Menu-bar item and LaunchAgent. |
-| `internal/store`, `internal/rotlog` | Config file and capped logs. |
+| `internal/presets` | The preset library (library.json), export and import. |
+| `internal/store`, `internal/rotlog` | Atomic file writes, the old config file, capped logs. |
 | `cmd/sparkx-midi` | The bridge as a terminal command, no UI. |
 | `frontend/` | React + Tailwind UI. |
 | `tools/probe/sparkx.swift` | The CoreBluetooth probe the protocol was checked with. |
 
 `docs/CONTRACTS.md` has the interfaces between the packages.
 
-Data lives in `~/Library/Application Support/SparkX MIDI/`: `config.json`, `app.log`,
-`ble-trace.log`.
+Data lives in `~/Library/Application Support/SparkX MIDI/`: `library.json` (the presets),
+`app.log`, `ble-trace.log`. Versions before presets kept one mapping in `config.json`; the
+first launch with presets turns it into a preset called "My mapping" and leaves the file
+alone. If `library.json` is ever unreadable, the app moves it aside as
+`library.json.corrupt-<time>`, starts from the defaults and says so in the preset menu.
 
 ## Develop
 

@@ -3,12 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as H from "../lib/history";
 import { relTime } from "../lib/midi";
 import { hasOwnUndo, historyKey } from "../lib/shortcuts";
-import type { Config } from "../types";
+
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
-import type { Bridge } from "../useBridge";
+import type { Bridge, Snap } from "../useBridge";
 
 /** ⌘Z, ⇧⌘Z and ⌘Y anywhere but a text field, which keeps its own undo. */
 function useHistoryKeys(undo: () => void, redo: () => void, flush: () => void) {
@@ -50,7 +50,7 @@ function HistoryList({
   onJump,
   onClose,
 }: {
-  history: H.History<Config>;
+  history: H.History<Snap>;
   onJump: (i: number) => void;
   onClose: () => void;
 }) {

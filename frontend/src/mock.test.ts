@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createSim, rng } from "./mock";
+import { defaultConfig } from "./lib/config";
+import { createMockLibrary, createSim, rng } from "./mock";
 
 const run = (seed: number, steps = 400) => {
   const sim = createSim({ seed });
@@ -85,5 +86,48 @@ describe("mock pedal", () => {
     expect(sim.status().lamps[6]).toEqual(sim.config.indicators[0].colour);
     sim.step(200);
     expect(sim.status().lamps[6]).toEqual({ r: 0, g: 0, b: 0 });
+  });
+});
+
+describe("mock preset library", () => {
+  const first = () => {
+    const c = defaultConfig();
+    c.pedal = { address: "4F1A", name: "SparkX" };
+    c.longPressMs = 800;
+    return c;
+  };
+
+  it("keeps the pedal out of presets and saves into the active one", () => {
+    const lib = createMockLibrary(first());
+    expect(lib.active().pedal.address).toBe("");
+    const b = lib.create("", "default");
+    expect(b.name).toBe("New preset");
+    lib.select(b.id);
+    const c = lib.active();
+    c.brightness = 10;
+    lib.saveActive(c);
+    expect(lib.select(lib.list()[0].id).longPressMs).toBe(800);
+    expect(lib.select(b.id).brightness).toBe(10);
+  });
+
+  it("follows Go's rules for names, duplicates and deletes", () => {
+    const lib = createMockLibrary(first(), [{ name: "Live", config: defaultConfig() }]);
+    const [a, live] = lib.list();
+    expect(() => lib.create("live", "current")).toThrow("already exists");
+    expect(lib.duplicate(live.id).name).toBe("Live copy");
+    lib.select(live.id);
+    lib.remove(live.id);
+    expect(lib.activeId()).not.toBe(live.id);
+    lib.remove(lib.list()[1].id);
+    expect(() => lib.remove(a.id)).toThrow("last preset");
+  });
+
+  it("imports what it exports", () => {
+    const lib = createMockLibrary(first());
+    const { text, file } = lib.exported(lib.activeId());
+    expect(file).toBe("My mapping.sparkx.json");
+    const got = lib.import(text, file);
+    expect(got.name).toBe("My mapping (2)");
+    expect(lib.select(got.id).longPressMs).toBe(800);
   });
 });

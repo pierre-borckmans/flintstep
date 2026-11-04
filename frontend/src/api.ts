@@ -1,4 +1,4 @@
-import type { Activity, Config, Device, ExpEdge, State } from "./types";
+import type { Activity, Config, Device, ExpEdge, PresetInfo, PresetSource, State } from "./types";
 
 /** What the UI needs from the Go side. In the desktop app this is the Wails
  *  binding of `App` in package main; in a plain browser it is the mock. */
@@ -12,6 +12,19 @@ export interface Backend {
   CalibrateExp(n: number, edge: ExpEdge): Promise<Config>;
   SetLaunchAtLogin(on: boolean): Promise<void>;
   RevealLogs(): Promise<void>;
+  ListPresets(): Promise<PresetInfo[]>;
+  /** Makes the preset the active one and runs it; resolves to its mapping. */
+  SelectPreset(id: string): Promise<Config>;
+  /** Not activated. A blank name picks "New preset", made unique. */
+  CreatePreset(name: string, from: PresetSource): Promise<PresetInfo>;
+  RenamePreset(id: string, name: string): Promise<void>;
+  DuplicatePreset(id: string): Promise<PresetInfo>;
+  /** The last one cannot go; deleting the active one runs its neighbour. */
+  DeletePreset(id: string): Promise<void>;
+  /** Native save panel; a cancel resolves. */
+  ExportPreset(id: string): Promise<void>;
+  /** Native open panel; a cancel resolves to id "". Not activated. */
+  ImportPreset(): Promise<PresetInfo>;
   onState(cb: (s: State) => void): () => void;
   onActivity(cb: (a: Activity) => void): () => void;
 }
@@ -52,6 +65,14 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     CalibrateExp: (n, edge) => app.CalibrateExp(n, edge),
     SetLaunchAtLogin: (on) => app.SetLaunchAtLogin(on),
     RevealLogs: () => app.RevealLogs(),
+    ListPresets: () => app.ListPresets(),
+    SelectPreset: (id) => app.SelectPreset(id),
+    CreatePreset: (name, from) => app.CreatePreset(name, from),
+    RenamePreset: (id, name) => app.RenamePreset(id, name),
+    DuplicatePreset: (id) => app.DuplicatePreset(id),
+    DeletePreset: (id) => app.DeletePreset(id),
+    ExportPreset: (id) => app.ExportPreset(id),
+    ImportPreset: () => app.ImportPreset(),
     onState: on<State>("state"),
     onActivity: on<Activity>("activity"),
   };

@@ -13,7 +13,8 @@ React 19 + TS + Tailwind v4, bun 1.3.14, Biome, vitest, golangci-lint v2.
 - App / product: **SparkX MIDI** (bundle id `com.silversol.sparkxmidi`)
 - Virtual MIDI source: **Spark Control X**
 - Virtual MIDI destination (LED feedback): **Spark Control X LEDs**
-- Data dir: `~/Library/Application Support/SparkX MIDI/` (config.json, app.log, ble-trace.log)
+- Data dir: `~/Library/Application Support/SparkX MIDI/` (library.json, app.log, ble-trace.log;
+  config.json from before presets is kept as a backup and no longer written)
 
 ## internal/sparkx (done, pure)
 
@@ -143,7 +144,56 @@ Behaviour:
 func Dir() (string, error)                 // the data dir, created
 func Load(path string) (mapping.Config, error) // missing file -> Default(), no error; corrupt -> Default() + error
 func Save(path string, c mapping.Config) error // atomic (temp + rename)
+func WriteAtomic(path string, b []byte) error  // the same, for any file
 ```
+
+## internal/presets (pure, files only)
+
+Named mappings in `library.json`. A preset is a name and one whole `mapping.Config`; the
+package copies Configs whole and never names their fields (a field added to Config rides
+along in presets, exports and imports). The remembered pedal is the exception: it is
+global, stored once at the top of the library, zeroed in every stored preset and put back
+on the active one.
+
+```go
+type Info struct { ID string `json:"id"`; Name string `json:"name"`; UpdatedAt int64 `json:"updatedAt"`; Active bool `json:"active"` } // unix ms
+
+func Open(dir string) (*Library, error) // always returns a usable library; the error says what went wrong
+func (l *Library) Active() mapping.Config    // the active preset's, with the global pedal
+func (l *Library) ActiveID() string
+func (l *Library) List() []Info              // library order
+func (l *Library) Pedal() mapping.PedalRef
+func (l *Library) SetPedal(p mapping.PedalRef) error
+func (l *Library) SaveActive(c mapping.Config) error // c.Pedal ignored
+func (l *Library) Select(id string) (mapping.Config, error)
+func (l *Library) Create(name, from string) (Info, error) // from "current" | "default"; "" name = "New preset", made unique
+func (l *Library) Rename(id, name string) error
+func (l *Library) Duplicate(id string) (Info, error)      // "<name> copy", made unique
+func (l *Library) Delete(id string) error
+func (l *Library) Export(id string) (data []byte, fileName string, err error)
+func (l *Library) Import(data []byte, filename string) (Info, error)
+```
+
+File: `{ "version": 1, "active": id, "presets": [{ id, name, config, createdAt, updatedAt }],
+"pedal": PedalRef }`, written whole and atomically on every change; memory only changes once
+the write worked.
+
+- Open: no library.json but a config.json → one preset "My mapping" from it, its pedal the
+  global one, config.json left untouched. Neither → one default "My mapping". A library.json
+  that does not parse is renamed `library.json.corrupt-<yyyymmdd-hhmmss>`, replaced by the
+  default library, and reported. A parseable one is repaired: missing/duplicate ids get new
+  ones, names are trimmed/cut/made unique ("Untitled" for none), configs normalized and
+  stripped of a pedal, an empty list gets "My mapping", an unknown active falls back to the
+  first preset.
+- Names: trimmed, 1..40 characters (runes), unique ignoring case. A clash is an error for
+  Create/Rename; Duplicate and Import add " (2)", " (3)"… (cutting the base to stay ≤ 40).
+- Create, Duplicate and Import never activate. Delete refuses the last preset; deleting the
+  active one activates the next preset, or the previous one if it was last.
+- Export format: `{ "format": "sparkx-midi-preset", "version": 1, "name": ..., "config": {...} }`,
+  the config without its "pedal" key, suggested file name `<name>.sparkx.json` (`/ : \` → `-`).
+  Import takes that format (a newer version is refused) or a bare Config such as an old
+  config.json (only Config's keys allowed, named after the file); the config is normalized,
+  must Validate, and loses its pedal.
 
 ## internal/ble (macOS CoreBluetooth via tinygo.org/x/bluetooth v0.16 + cbgo)
 
@@ -245,7 +295,21 @@ CalibrateExp(n: number, edge: "min" | "max"): Promise<Config> // stores the inpu
                                                               // or toe ("max") as it is, never swapped; errors if heel == toe
 SetLaunchAtLogin(on: boolean): Promise<void>
 RevealLogs(): Promise<void>
+
+// Presets. SaveConfig, ResetConfig and CalibrateExp write into the active preset.
+ListPresets(): Promise<PresetInfo[]>
+SelectPreset(id: string): Promise<Config>          // activates and runs it (pedal re-applied)
+CreatePreset(name: string, from: "current" | "default"): Promise<PresetInfo> // not activated; "" = "New preset"
+RenamePreset(id: string, name: string): Promise<void>
+DuplicatePreset(id: string): Promise<PresetInfo>   // "<name> copy", not activated
+DeletePreset(id: string): Promise<void>            // not the last; the active one → its neighbour runs
+ExportPreset(id: string): Promise<void>            // native save panel; cancel resolves
+ImportPreset(): Promise<PresetInfo>                // native open panel (*.json); cancel → id ""; not activated
 ```
+
+The file panels sit behind `fileDialogs` (package main) so the bindings are tested without
+Wails. The frontend activates a created or imported preset itself with SelectPreset, so the
+switch is an undo step.
 
 ```ts
 type State = {
@@ -254,8 +318,20 @@ type State = {
   midi: { source: string; dest: string; ok: boolean; error: string }
   launchAtLogin: boolean
   version: string
+  presets: PresetInfo[]    // { id, name, updatedAt (unix ms), active }
+  activePreset: string     // id
+  libraryError: string     // what went wrong opening library.json, "" = nothing
 }
 ```
+
+Undo (frontend): one history of `{ preset, config }` entries. Edits are entries within the
+active preset; selecting a preset is an entry labelled "Preset · <name>", and undoing or
+jumping across it selects the other preset again (and saves the entry's mapping into it if
+Go's differs). Create, rename, duplicate, delete, import and export are not undo steps;
+deleting a preset drops its entries. A switch made from the menu bar becomes an entry too.
+
+Menu bar: with two or more presets, they are listed flat under a separator (the tray has no
+submenus), the active one checked; clicking one selects it.
 
 The bridge computes the Amp and App lamps with mapping.IndicatorLamps from the config, the
 pedal's status (connected, powered) and two flash timers: a MIDI flash stays lit 120 ms after

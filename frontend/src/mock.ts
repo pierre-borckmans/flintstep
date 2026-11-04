@@ -1,9 +1,28 @@
 import type { Backend } from "./api";
-import { defaultConfig, type Op, validate } from "./lib/config";
+import { cc, defaultConfig, mappingOf, type Op, validate } from "./lib/config";
 import { expValue, RAW_MAX } from "./lib/exp";
 import { indicatorLit } from "./lib/indicators";
 import { describeMidi } from "./lib/midi";
-import type { Action, Activity, BleState, Colour, Config, Device, State, Status } from "./types";
+import {
+  checkName,
+  copyName,
+  decodePreset,
+  encodePreset,
+  exportFileName,
+  uniqueName,
+} from "./lib/presets";
+import type {
+  Action,
+  Activity,
+  BleState,
+  Colour,
+  Config,
+  Device,
+  PresetInfo,
+  PresetSource,
+  State,
+  Status,
+} from "./types";
 import { LAMP_AMP, LAMP_APP, SWITCHES } from "./types";
 
 // A SIMULATED SPARK CONTROL X, for developing the UI in a plain browser.
@@ -282,10 +301,156 @@ export function createSim(opts: SimOptions = {}) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+interface MockPreset {
+  id: string;
+  name: string;
+  config: Config; // pedal always empty: the pedal is global, like in Go
+  updatedAt: number;
+}
+
+/** internal/presets in memory: the same rules (unique names, the last preset stays,
+ *  deleting the active one activates its neighbour), no file. */
+export function createMockLibrary(first: Config, extra: { name: string; config: Config }[] = []) {
+  let n = 0;
+  const id = () => `p${++n}`;
+  const now = () => Date.now();
+  const mk = (name: string, config: Config): MockPreset => ({
+    id: id(),
+    name,
+    config: mappingOf(structuredClone(config)),
+    updatedAt: now(),
+  });
+  let presets: MockPreset[] = [mk("My mapping", first), ...extra.map((e) => mk(e.name, e.config))];
+  let active = presets[0].id;
+
+  const find = (pid: string) => {
+    const p = presets.find((x) => x.id === pid);
+    if (!p) throw new Error("that preset no longer exists");
+    return p;
+  };
+  const info = (p: MockPreset): PresetInfo => ({
+    id: p.id,
+    name: p.name,
+    updatedAt: p.updatedAt,
+    active: p.id === active,
+  });
+  const names = () => presets.map((p) => p.name);
+  const add = (name: string, config: Config) => {
+    const p = mk(name, config);
+    presets = [...presets, p];
+    return info(p);
+  };
+  const checked = (raw: string, self?: string) => {
+    const r = checkName(raw, presets.map(info), self);
+    if ("error" in r) throw new Error(r.error);
+    return r.name;
+  };
+
+  return {
+    list: () => presets.map(info),
+    activeId: () => active,
+    active: () => structuredClone(find(active).config),
+    saveActive(c: Config) {
+      const p = find(active);
+      p.config = mappingOf(structuredClone(c));
+      p.updatedAt = now();
+    },
+    select(pid: string) {
+      find(pid);
+      active = pid;
+      return structuredClone(find(pid).config);
+    },
+    create(name: string, from: PresetSource) {
+      const config = from === "current" ? find(active).config : defaultConfig();
+      return add(name.trim() ? checked(name) : uniqueName("New preset", names()), config);
+    },
+    rename(pid: string, name: string) {
+      const p = find(pid);
+      p.name = checked(name, pid);
+      p.updatedAt = now();
+    },
+    duplicate(pid: string) {
+      const p = find(pid);
+      return add(copyName(p.name, names()), p.config);
+    },
+    remove(pid: string) {
+      const i = presets.findIndex((p) => p.id === pid);
+      if (i < 0) throw new Error("that preset no longer exists");
+      if (presets.length === 1) throw new Error("the last preset cannot be deleted");
+      presets = presets.filter((p) => p.id !== pid);
+      if (pid === active) active = presets[Math.min(i, presets.length - 1)].id;
+    },
+    exported(pid: string) {
+      const p = find(pid);
+      return { text: encodePreset(p.name, p.config), file: exportFileName(p.name) };
+    },
+    import(text: string, filename: string) {
+      const { name, config } = decodePreset(text, filename);
+      const err = validate(config);
+      if (err) throw new Error(`the preset cannot be used: ${err}`);
+      return add(uniqueName(name, names()), config);
+    },
+  };
+}
+
+/** A few presets that look like someone's, so the picker has something to show. */
+function samplePresets(): { name: string; config: Config }[] {
+  const live = defaultConfig();
+  live.ledMode = "feedback";
+  live.switches.forEach((s, i) => {
+    s.tap = { kind: "note", channel: 1, number: 36 + i, value: 127, mode: "momentary" };
+  });
+  const logic = defaultConfig();
+  logic.switches[0].tap = cc(64, 1, "toggle");
+  logic.switches[1].tap = { kind: "pc", channel: 1, number: 1, value: 127, mode: "momentary" };
+  logic.longPressMs = 700;
+  const gig = defaultConfig();
+  gig.brightness = 40;
+  gig.switches.forEach((s, i) => {
+    s.tap = { kind: "pc", channel: 2, number: i, value: 127, mode: "momentary" };
+  });
+  return [
+    { name: "Ableton live", config: live },
+    { name: "Logic · tracking", config: logic },
+    { name: "MainStage gig", config: gig },
+  ];
+}
+
+/** Browser only: hands the text to the user as a download. */
+function download(text: string, file: string) {
+  if (typeof document === "undefined") return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  a.download = file;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** Browser only: a file picker standing in for the native open panel; null = cancelled. */
+function pickFile(): Promise<{ text: string; name: string } | null> {
+  if (typeof document === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("cancel", () => resolve(null));
+    input.addEventListener("change", async () => {
+      const f = input.files?.[0];
+      resolve(f ? { text: await f.text(), name: f.name } : null);
+    });
+    input.click();
+  });
+}
+
+/** A demo step: an edit, an undo, or switching to the preset of that name. */
+export type DemoStep = Op | "undo" | { preset: string };
+
 /** Edits to replay on load (?demo=...), so the history and the save status can be
  *  screenshotted without clicking: "history" makes a few changes and undoes the last
- *  two; "invalid" ends on a config that does not validate. */
-export function demoScript(name: string): (Op | "undo")[] {
+ *  two; "invalid" ends on a config that does not validate; "presets" edits, switches to
+ *  "Ableton live", edits there, and undoes back across the switch; "presets-redo" stops
+ *  on Ableton live. */
+export function demoScript(name: string): DemoStep[] {
   const edits: Op[] = [
     { type: "tap", sw: 1, patch: { kind: "note", number: 60 } },
     { type: "colour", sw: 0, colour: { r: 0, g: 255, b: 0 } },
@@ -295,6 +460,14 @@ export function demoScript(name: string): (Op | "undo")[] {
     { type: "ledMode", mode: "feedback" },
   ];
   if (name === "history") return [...edits, "undo", "undo"];
+  const across: DemoStep[] = [
+    edits[0],
+    { preset: "Ableton live" },
+    edits[1],
+    { type: "brightness", value: 60 },
+  ];
+  if (name === "presets") return [...across, "undo", "undo", "undo"];
+  if (name === "presets-redo") return across;
   if (name === "invalid")
     return [...edits.slice(0, 2), { type: "combo", index: 0, patch: { b: 0 } }];
   return [];
@@ -304,7 +477,9 @@ export function demoScript(name: string): (Op | "undo")[] {
  *  ?state=off|searching|connecting|connected, ?seed=N, ?hold=I,A (switch names),
  *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
  *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
- *  ?lamp=amp|app (open on an indicator lamp). See also demoScript (?demo=). */
+ *  ?lamp=amp|app (open on an indicator lamp), ?presets=one (a single preset; otherwise
+ *  four samples), ?library=corrupt (the library error Go shows after a damaged file),
+ *  ?picker=open|rename|delete (App opens the preset picker). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
   const holdMask = (q.get("hold") ?? "")
@@ -323,6 +498,13 @@ export function createMockBackend(q: URLSearchParams): Backend {
     epoch: Date.now(),
   });
   let launchAtLogin = false;
+  const lib = createMockLibrary(sim.config, q.get("presets") === "one" ? [] : samplePresets());
+  const libraryError =
+    q.get("library") === "corrupt"
+      ? "preset library was damaged, using defaults; the old file is library.json.corrupt-20261104-214502: invalid character 'o'"
+      : "";
+  /** Runs the active preset's mapping, with the global pedal. */
+  const run = (c: Config) => sim.setConfig({ ...c, pedal: sim.config.pedal });
   const midiError = q.get("midi") === "error";
   const saveError = q.get("save") === "error";
   const stateCbs = new Set<(s: State) => void>();
@@ -341,6 +523,9 @@ export function createMockBackend(q: URLSearchParams): Backend {
       : { source: "Spark Control X", dest: "Spark Control X LEDs", ok: true, error: "" },
     launchAtLogin,
     version: "0.1.0-dev",
+    presets: lib.list(),
+    activePreset: lib.activeId(),
+    libraryError,
   });
 
   let last = performance.now();
@@ -361,11 +546,13 @@ export function createMockBackend(q: URLSearchParams): Backend {
       const err = validate(cfg);
       if (err) throw new Error(err);
       sim.setConfig(cfg);
+      lib.saveActive(cfg);
     },
     ResetConfig: async () => {
       const c = defaultConfig();
       c.pedal = sim.config.pedal;
       sim.setConfig(c);
+      lib.saveActive(c);
       return structuredClone(c);
     },
     Scan: async (): Promise<Device[]> => {
@@ -382,6 +569,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     ForgetPedal: async () => sim.forget(),
     CalibrateExp: async (n, edge) => {
       sim.calibrate(n, edge);
+      lib.saveActive(sim.config);
       return structuredClone(sim.config);
     },
     SetLaunchAtLogin: async (on) => {
@@ -389,6 +577,29 @@ export function createMockBackend(q: URLSearchParams): Backend {
     },
     RevealLogs: async () => {
       console.info("[mock] RevealLogs");
+    },
+    ListPresets: async () => lib.list(),
+    SelectPreset: async (id) => {
+      await sleep(60);
+      run(lib.select(id));
+      return structuredClone(sim.config);
+    },
+    CreatePreset: async (name, from) => lib.create(name, from),
+    RenamePreset: async (id, name) => lib.rename(id, name),
+    DuplicatePreset: async (id) => lib.duplicate(id),
+    DeletePreset: async (id) => {
+      const was = lib.activeId();
+      lib.remove(id);
+      if (lib.activeId() !== was) run(lib.active());
+    },
+    ExportPreset: async (id) => {
+      const { text, file } = lib.exported(id);
+      download(text, file);
+    },
+    ImportPreset: async () => {
+      const f = await pickFile();
+      if (!f) return { id: "", name: "", updatedAt: 0, active: false };
+      return lib.import(f.text, f.name);
     },
     onState: (cb) => {
       stateCbs.add(cb);

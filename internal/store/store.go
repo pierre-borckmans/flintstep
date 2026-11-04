@@ -58,18 +58,25 @@ func Save(path string, c mapping.Config) error {
 	if err != nil {
 		return fmt.Errorf("encoding settings: %w", err)
 	}
+	return WriteAtomic(path, append(b, '\n'))
+}
+
+// WriteAtomic writes b to path through a temp file in the same folder and a rename,
+// creating the folder if needed. A crash mid-write leaves the old file, not half of
+// the new one.
+func WriteAtomic(path string, b []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating %s: %w", dir, err)
 	}
-	f, err := os.CreateTemp(dir, ".config-*.json")
+	f, err := os.CreateTemp(dir, "."+filepath.Base(path)+"-*")
 	if err != nil {
 		return fmt.Errorf("saving settings: %w", err)
 	}
 	tmp := f.Name()
 	// Until the rename succeeds the temp file is litter; after it, this is a no-op.
 	defer func() { _ = os.Remove(tmp) }()
-	if _, err := f.Write(append(b, '\n')); err != nil {
+	if _, err := f.Write(b); err != nil {
 		f.Close()
 		return fmt.Errorf("saving settings: %w", err)
 	}

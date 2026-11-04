@@ -7,6 +7,7 @@ import (
 	"log"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"sparkbridge/internal/coremidi"
 	"sparkbridge/internal/loginitem"
 	"sparkbridge/internal/mapping"
+	"sparkbridge/internal/presets"
 	"sparkbridge/internal/store"
 	"sparkbridge/internal/tray"
 )
@@ -47,18 +49,25 @@ type State struct {
 	MIDI          MIDIState      `json:"midi"`
 	LaunchAtLogin bool           `json:"launchAtLogin"`
 	Version       string         `json:"version"`
+	Presets       []PresetInfo   `json:"presets"`
+	ActivePreset  string         `json:"activePreset"`
+	// LibraryError is what went wrong opening the preset library at startup ("" = nothing).
+	LibraryError string `json:"libraryError"`
 }
 
 // App is bound to the frontend: its exported methods are the UI's API.
 type App struct {
 	ctx context.Context
 
-	dir    string
-	cfgMu  sync.Mutex // serialises config writes
-	bridge *bridge.Bridge
-	pedal  *ble.Manager
-	midi   *coremidi.Virtual
-	mstate MIDIState
+	dir     string
+	cfgMu   sync.Mutex // serialises config writes: the library and the bridge move together
+	lib     *presets.Library
+	libErr  string
+	dialogs fileDialogs
+	bridge  *bridge.Bridge
+	pedal   *ble.Manager
+	midi    *coremidi.Virtual
+	mstate  MIDIState
 
 	dirty    chan struct{}
 	stopOnce sync.Once
@@ -72,6 +81,7 @@ type App struct {
 func NewApp() *App {
 	a := &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
 	a.emitTo = func(name string, data any) { runtime.EventsEmit(a.ctx, name, data) }
+	a.dialogs = wailsDialogs{app: a}
 	return a
 }
 
@@ -85,8 +95,6 @@ func (a *App) emit(name string, data any) {
 	}
 }
 
-func (a *App) cfgPath() string { return filepath.Join(a.dir, "config.json") }
-
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	dir, err := store.Dir()
@@ -96,10 +104,15 @@ func (a *App) startup(ctx context.Context) {
 	a.dir = dir
 	startLog(filepath.Join(dir, "app.log"))
 
-	cfg, err := store.Load(a.cfgPath())
+	// The mapping is the active preset's. Before presets it was config.json, which the
+	// library takes in on first open and leaves where it is as a backup.
+	lib, err := presets.Open(dir)
 	if err != nil {
-		log.Printf("config: %v (using defaults)", err)
+		log.Printf("presets: %v", err)
+		a.libErr = err.Error()
 	}
+	a.lib = lib
+	cfg := lib.Active()
 
 	a.mstate = MIDIState{Source: midiSource, Dest: midiDest}
 	a.bridge = bridge.New(cfg, nil, bridge.Options{
@@ -158,11 +171,12 @@ func (a *App) remember(d ble.Device) {
 		return
 	}
 	cfg.Pedal = mapping.PedalRef{Address: d.Address, Name: d.Name}
-	if _, err := a.bridge.Apply(cfg); err != nil {
+	applied, err := a.bridge.Apply(cfg)
+	if err != nil {
 		log.Printf("config: %v", err)
 		return
 	}
-	if err := store.Save(a.cfgPath(), cfg); err != nil {
+	if err := a.lib.SetPedal(applied.Pedal); err != nil {
 		log.Printf("config: save: %v", err)
 	}
 	a.changed()
@@ -221,11 +235,14 @@ func (a *App) GetState() State {
 		MIDI:          a.mstate,
 		LaunchAtLogin: loginitem.Enabled(),
 		Version:       version,
+		Presets:       a.lib.List(),
+		ActivePreset:  a.lib.ActiveID(),
+		LibraryError:  a.libErr,
 	}
 }
 
-// SaveConfig validates, applies and stores a mapping. The pedal it remembers is kept
-// from the current config: the UI does not own that field.
+// SaveConfig validates, applies and stores a mapping into the active preset. The pedal
+// it remembers is kept from the current config: the UI does not own that field.
 func (a *App) SaveConfig(cfg mapping.Config) error {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
@@ -240,10 +257,11 @@ func (a *App) saveLocked(cfg mapping.Config) error {
 		return err
 	}
 	defer a.changed()
-	return store.Save(a.cfgPath(), applied)
+	return a.lib.SaveActive(applied)
 }
 
-// ResetConfig puts the default mapping back, keeping the remembered pedal.
+// ResetConfig puts the default mapping back into the active preset, keeping the
+// remembered pedal.
 func (a *App) ResetConfig() (mapping.Config, error) {
 	cfg := mapping.Default()
 	if err := a.SaveConfig(cfg); err != nil {
@@ -288,7 +306,7 @@ func (a *App) setPedal(ref mapping.PedalRef) error {
 	// only records the target and nudges the loop, and the loop calls OnConnected
 	// (which takes cfgMu) outside its own lock, so this cannot deadlock.
 	a.pedal.SetTarget(target(applied.Pedal))
-	return store.Save(a.cfgPath(), applied)
+	return a.lib.SetPedal(applied.Pedal)
 }
 
 // CalibrateExp stores input n's current raw value as its heel ("min") or toe ("max").
@@ -350,6 +368,12 @@ func (a *App) onTray(id string) {
 		a.changed()
 	case "quit":
 		runtime.Quit(a.ctx)
+	default:
+		if id, ok := strings.CutPrefix(id, trayPresetPrefix); ok {
+			if _, err := a.SelectPreset(id); err != nil {
+				log.Printf("presets: %v", err)
+			}
+		}
 	}
 }
 
@@ -366,6 +390,7 @@ func (a *App) updateTray(st State) {
 	if !st.MIDI.OK {
 		items = append(items, tray.Item{ID: "midi", Title: "MIDI port unavailable", Disabled: true})
 	}
+	items = append(items, presetItems(st.Presets)...)
 	items = append(items,
 		tray.Item{Separator: true},
 		tray.Item{ID: "open", Title: "Open SparkX MIDI…"},
@@ -375,6 +400,23 @@ func (a *App) updateTray(st State) {
 	)
 	tray.SetMenu(items)
 	tray.SetTooltip("SparkX MIDI: " + statusLine(st.Pedal))
+}
+
+// trayPresetPrefix starts a preset item's id; the rest is the preset's id.
+const trayPresetPrefix = "preset:"
+
+// presetItems are the presets as checked menu items under a separator, the active one
+// checked; clicking one switches to it. The tray has no submenus, so they sit flat.
+// One preset is nothing to choose between, so then there are none.
+func presetItems(ps []PresetInfo) []tray.Item {
+	if len(ps) < 2 {
+		return nil
+	}
+	items := []tray.Item{{Separator: true}}
+	for _, p := range ps {
+		items = append(items, tray.Item{ID: trayPresetPrefix + p.ID, Title: p.Name, Checked: p.Active})
+	}
+	return items
 }
 
 // batteryLine is the menu's battery item, "" when there is no reading. The pedal does

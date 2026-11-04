@@ -98,7 +98,21 @@ export interface State {
   midi: Midi;
   launchAtLogin: boolean;
   version: string;
+  presets: PresetInfo[];
+  activePreset: string; // the id of the preset that runs
+  libraryError: string; // what went wrong opening the preset library, "" = nothing
 }
+
+/** presets.Info: a preset as the picker lists it. */
+export interface PresetInfo {
+  id: string;
+  name: string;
+  updatedAt: number; // unix milliseconds
+  active: boolean;
+}
+
+/** What a new preset starts from: a copy of the active one, or the default mapping. */
+export type PresetSource = "current" | "default";
 
 export interface Device {
   name: string;

@@ -3,6 +3,7 @@ import {
   canRedo,
   canUndo,
   current,
+  drop,
   type History,
   type HistoryRules,
   jump,
@@ -152,5 +153,42 @@ describe("undo, redo, jump", () => {
     expect(current(h)).toBe(3);
     expect(jump(h, 9).cursor).toBe(3);
     expect(jump(h, -1).cursor).toBe(3);
+  });
+});
+
+describe("drop", () => {
+  // States are "preset:value"; dropping a preset removes its entries.
+  const r: HistoryRules<string> = {
+    same: (a, b) => a === b,
+    describe: (a, b) => `${a}→${b}`,
+    coalesceMs: 0,
+    cap: 50,
+  };
+  const build = (...vs: string[]) =>
+    vs.slice(1).reduce((h, v, i) => push(h, r, v, { at: i + 1 }), start(vs[0], 0));
+  const of = (p: string) => (s: string) => s.startsWith(`${p}:`);
+
+  it("removes a preset's entries and merges what meets again", () => {
+    const h = build("a:1", "a:2", "d:1", "d:2", "a:2", "a:3");
+    const got = drop(h, of("d"), r.same)!;
+    expect(got.entries.map((e) => e.state)).toEqual(["a:1", "a:2", "a:3"]);
+    expect(got.entries.map((e) => e.label)).toEqual(["Session start", "a:1→a:2", "a:2→a:3"]);
+    expect(got.cursor).toBe(2);
+    expect(got.open).toBe(false);
+  });
+  it("keeps the cursor on the last kept entry at or before it", () => {
+    const h = jump(build("a:1", "b:1", "d:1", "d:2", "b:2"), 3); // on d:2
+    const got = drop(h, of("d"), r.same)!;
+    expect(current(got)).toBe("b:1");
+  });
+  it("a dropped first entry hands the base to the next", () => {
+    const got = drop(build("d:1", "a:1", "a:2"), of("d"), r.same)!;
+    expect(got.entries.map((e) => e.state)).toEqual(["a:1", "a:2"]);
+    expect(got.cursor).toBe(1);
+  });
+  it("returns the same history when nothing goes, null when everything does", () => {
+    const h = build("a:1", "a:2");
+    expect(drop(h, of("d"), r.same)).toBe(h);
+    expect(drop(h, of("a"), r.same)).toBeNull();
   });
 });

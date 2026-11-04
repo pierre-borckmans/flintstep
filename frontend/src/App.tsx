@@ -6,6 +6,7 @@ import { Header } from "./components/Header";
 import { HistoryBar } from "./components/HistoryBar";
 import { IndicatorEditor } from "./components/IndicatorEditor";
 import { Pedal } from "./components/Pedal";
+import { type PickerStart, PresetPicker } from "./components/PresetPicker";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SwitchEditor, SwitchTabs } from "./components/SwitchEditor";
 import type { IndicatorIndex } from "./types";
@@ -41,10 +42,16 @@ export default function App({ backend }: { backend: Backend }) {
     const demo = q.get("demo");
     if (!ready || !demo || demoed.current || !document.documentElement.dataset.mock) return;
     demoed.current = true;
-    import("./mock").then(({ demoScript }) => {
+    import("./mock").then(async ({ demoScript }) => {
+      const pause = () => new Promise((r) => setTimeout(r, 400));
       for (const s of demoScript(demo)) {
-        if (s === "undo") bridge.undo();
-        else bridge.apply(s);
+        if (s === "undo") {
+          bridge.undo();
+          await pause(); // an undo across a switch talks to Go
+        } else if ("preset" in s) {
+          const p = bridge.presets.list.find((x) => x.name === s.preset);
+          if (p) await bridge.presets.select(p.id, p.name);
+        } else bridge.apply(s);
       }
     });
   }, [ready]);
@@ -80,7 +87,8 @@ export default function App({ backend }: { backend: Backend }) {
           <ActivityLog log={bridge.log} midi={state?.midi ?? null} />
         </div>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-ui-lg border border-edge bg-panel shadow-card">
+        <aside className="relative flex min-h-0 flex-col overflow-hidden rounded-ui-lg border border-edge bg-panel shadow-card">
+          <PresetPicker presets={bridge.presets} start={(q.get("picker") as PickerStart) || null} />
           <nav className="flex h-10 shrink-0 items-center gap-1 border-b border-edge px-2">
             {TABS.map((t) => (
               <button

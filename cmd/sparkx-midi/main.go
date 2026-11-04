@@ -6,7 +6,7 @@
 //	go run ./cmd/sparkx-midi -scan      # list pedals and exit
 //	go run ./cmd/sparkx-midi -addr <id> # a specific pedal
 //
-// It reads the app's config.json (or the defaults) but never writes it.
+// It reads the app's active preset (or the defaults) but never writes anything.
 package main
 
 import (
@@ -15,7 +15,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	"sparkbridge/internal/bridge"
 	"sparkbridge/internal/coremidi"
 	"sparkbridge/internal/mapping"
+	"sparkbridge/internal/presets"
 	"sparkbridge/internal/sparkx"
 	"sparkbridge/internal/store"
 )
@@ -38,7 +38,7 @@ func main() {
 	cfg := mapping.Default()
 	if !*defaults {
 		if dir, err := store.Dir(); err == nil {
-			c, err := store.Load(filepath.Join(dir, "config.json"))
+			c, err := presets.ReadActive(dir)
 			if err != nil {
 				log.Printf("config: %v (using defaults)", err)
 			}
