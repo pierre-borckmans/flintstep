@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
+import { Popover } from "../ui/Popover";
 import type { Presets } from "../useBridge";
 
 /** What a row is doing besides being listed. */
@@ -172,22 +173,14 @@ function PresetMenu({
     return null;
   });
   const [error, setError] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
+  // Presets that arrive while the menu is open (new, duplicated, imported) open a row.
+  const known = useRef(new Set(list.map((x) => x.id)));
+  const isNew = (id: string) => !known.current.has(id);
 
   useEffect(() => {
     if (!mode) listRef.current?.focus();
   }, [mode]);
-
-  useEffect(() => {
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (ref.current?.contains(t) || (t as Element).closest?.("[data-preset-toggle]")) return;
-      onClose();
-    };
-    window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
-  }, [onClose]);
 
   useEffect(() => {
     listRef.current?.querySelector(`[data-index="${hi}"]`)?.scrollIntoView({ block: "nearest" });
@@ -237,12 +230,7 @@ function PresetMenu({
   const shownError = error ?? p.error;
 
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-label="Presets"
-      className="fade-up absolute top-[calc(100%+4px)] right-2 left-2 z-20 flex max-h-[420px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
-    >
+    <>
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-edge px-3">
         <Kicker>Presets</Kicker>
         <div className="flex-1" />
@@ -270,7 +258,7 @@ function PresetMenu({
           const isActive = x.id === p.active;
           if (mode?.kind === "rename" && mode.id === x.id) {
             return (
-              <li key={x.id}>
+              <li key={x.id} className={cx(isNew(x.id) && "row-open")}>
                 <RenameRow
                   preset={x}
                   presets={list}
@@ -305,6 +293,7 @@ function PresetMenu({
               onPointerMove={() => setHi(i)}
               onClick={() => choose(x)}
               className={cx(
+                isNew(x.id) && "row-open",
                 "group grid h-8 cursor-pointer grid-cols-[6px_1fr_auto] items-center gap-2.5 pr-1.5 pl-3 transition-[background-color] duration-(--dur-fast) ease-(--ease)",
                 i === hi &&
                   "bg-panel2 group-focus-visible/list:shadow-[inset_2px_0_0_var(--color-cold)]",
@@ -383,7 +372,7 @@ function PresetMenu({
           Import…
         </Button>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -424,9 +413,15 @@ export function PresetPicker({ presets, start = null }: { presets: Presets; star
           )}
         />
       </button>
-      {open && presets.list.length > 0 && (
+      <Popover
+        open={open && presets.list.length > 0}
+        onClose={close}
+        ignore="[data-preset-toggle]"
+        label="Presets"
+        className="absolute top-[calc(100%+4px)] right-2 left-2 z-20 flex max-h-[420px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
+      >
         <PresetMenu presets={presets} onClose={close} start={initial} />
-      )}
+      </Popover>
     </div>
   );
 }

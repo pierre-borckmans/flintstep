@@ -1,13 +1,16 @@
 import { Plus, X } from "lucide-react";
+import { useState } from "react";
 import { comboName } from "../lib/caption";
 import type { Op } from "../lib/config";
 import type { Config } from "../types";
 import { SWITCH_NAMES } from "../types";
 import { Button } from "../ui/Button";
+import { Collapse } from "../ui/Collapse";
 import { ColourPicker } from "../ui/ColourPicker";
 import { cx } from "../ui/cx";
 import { Seg } from "../ui/Seg";
 import { Toggle } from "../ui/Toggle";
+import { useListKeys, useMounted } from "../ui/useListKeys";
 import { ActionEditor } from "./ActionEditor";
 import { Section } from "./Section";
 
@@ -62,6 +65,10 @@ export function SwitchEditor({
 }) {
   const s = config.switches[sw];
   const hasLong = s.long.kind !== "off";
+  const combos = useListKeys(config.combos.length);
+  // A combo being removed closes first; the op runs when it has.
+  const [removing, setRemoving] = useState<number | null>(null);
+  const mounted = useMounted();
   // A fragment: the parent puts SwitchTabs above, and the first section keeps its rule.
   return (
     <>
@@ -98,20 +105,19 @@ export function SwitchEditor({
           </>
         }
       >
-        {hasLong ? (
-          <>
-            <ActionEditor
-              allowOff={false}
-              action={s.long}
-              onChange={(patch) => apply({ type: "long", sw, patch })}
-            />
-            <p className="text-ui-xs leading-snug text-faint">
-              With a hold action, the tap fires on release instead of on press.
-            </p>
-          </>
-        ) : (
+        <Collapse open={hasLong} className="flex flex-col gap-3">
+          <ActionEditor
+            allowOff={false}
+            action={s.long}
+            onChange={(patch) => apply({ type: "long", sw, patch })}
+          />
+          <p className="text-ui-xs leading-snug text-faint">
+            With a hold action, the tap fires on release instead of on press.
+          </p>
+        </Collapse>
+        <Collapse open={!hasLong}>
           <p className="text-ui-xs text-faint">Holding the switch does the same as tapping it.</p>
-        )}
+        </Collapse>
       </Section>
 
       <Section title="LED colour">
@@ -140,47 +146,59 @@ export function SwitchEditor({
             before acting on their own.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div role="list" className="flex flex-col gap-2">
             {config.combos.map((k, i) => {
               const mine = k.a === sw || k.b === sw;
+              const key = combos.keys[i];
               return (
-                <li
-                  key={i}
-                  className={cx(
-                    "flex flex-col gap-2 rounded-ui-md border p-2.5 transition-colors duration-(--dur)",
-                    mine ? "border-edge-strong bg-panel2" : "border-edge bg-panel",
-                  )}
+                <Collapse
+                  key={key}
+                  open={removing !== key}
+                  appear={mounted.current}
+                  onClosed={() => {
+                    combos.remove(i);
+                    setRemoving(null);
+                    apply({ type: "removeCombo", index: i });
+                  }}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <SwitchSelect
-                      label="First switch"
-                      value={k.a}
-                      onChange={(a) => apply({ type: "combo", index: i, patch: { a } })}
-                    />
-                    <span className="text-ui-sm text-muted">+</span>
-                    <SwitchSelect
-                      label="Second switch"
-                      value={k.b}
-                      onChange={(b) => apply({ type: "combo", index: i, patch: { b } })}
-                    />
-                    <div className="flex-1" />
-                    <Button
-                      size="sm"
-                      kind="ghost"
-                      aria-label={`Remove combo ${comboName(k)}`}
-                      title="Remove"
-                      onClick={() => apply({ type: "removeCombo", index: i })}
-                      icon={<X size={13} />}
+                  <div
+                    role="listitem"
+                    className={cx(
+                      "flex flex-col gap-2 rounded-ui-md border p-2.5 transition-colors duration-(--dur)",
+                      mine ? "border-edge-strong bg-panel2" : "border-edge bg-panel",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <SwitchSelect
+                        label="First switch"
+                        value={k.a}
+                        onChange={(a) => apply({ type: "combo", index: i, patch: { a } })}
+                      />
+                      <span className="text-ui-sm text-muted">+</span>
+                      <SwitchSelect
+                        label="Second switch"
+                        value={k.b}
+                        onChange={(b) => apply({ type: "combo", index: i, patch: { b } })}
+                      />
+                      <div className="flex-1" />
+                      <Button
+                        size="sm"
+                        kind="ghost"
+                        aria-label={`Remove combo ${comboName(k)}`}
+                        title="Remove"
+                        onClick={() => setRemoving(key)}
+                        icon={<X size={13} />}
+                      />
+                    </div>
+                    <ActionEditor
+                      action={k.action}
+                      onChange={(action) => apply({ type: "combo", index: i, patch: {}, action })}
                     />
                   </div>
-                  <ActionEditor
-                    action={k.action}
-                    onChange={(action) => apply({ type: "combo", index: i, patch: {}, action })}
-                  />
-                </li>
+                </Collapse>
               );
             })}
-          </ul>
+          </div>
         )}
       </Section>
     </>

@@ -1,5 +1,5 @@
 import { History as HistoryIcon, Redo2, Undo2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as H from "../lib/history";
 import { relTime } from "../lib/midi";
 import { hasOwnUndo, historyKey } from "../lib/shortcuts";
@@ -8,6 +8,7 @@ import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
+import { Popover } from "../ui/Popover";
 import type { Bridge, Snap } from "../useBridge";
 
 /** ⌘Z, ⇧⌘Z and ⌘Y anywhere but a text field, which keeps its own undo. */
@@ -48,38 +49,15 @@ function useNow(on: boolean, every = 1000) {
 function HistoryList({
   history,
   onJump,
-  onClose,
 }: {
   history: H.History<Snap>;
   onJump: (i: number) => void;
-  onClose: () => void;
 }) {
   const now = useNow(true);
   const rows = history.entries.map((e, i) => ({ ...e, i })).reverse();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onDown = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (ref.current?.contains(t) || (t as Element).closest?.("[data-history-toggle]")) return;
-      onClose();
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("pointerdown", onDown);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
 
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-label="History"
-      className="fade-up absolute right-2 bottom-[calc(100%+6px)] left-2 z-10 flex max-h-[320px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
-    >
+    <>
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-edge px-3">
         <Kicker>History</Kicker>
         <div className="flex-1" />
@@ -119,7 +97,7 @@ function HistoryList({
           );
         })}
       </ol>
-    </div>
+    </>
   );
 }
 
@@ -202,7 +180,16 @@ export function HistoryBar({
           {changes > 0 && <span className="font-mono tabular-nums">{changes}</span>}
         </Button>
       </div>
-      {open && history && <HistoryList history={history} onJump={jump} onClose={close} />}
+      <Popover
+        open={open && !!history}
+        onClose={close}
+        side="above"
+        ignore="[data-history-toggle]"
+        label="History"
+        className="absolute right-2 bottom-[calc(100%+6px)] left-2 z-10 flex max-h-[320px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
+      >
+        {history && <HistoryList history={history} onJump={jump} />}
+      </Popover>
     </div>
   );
 }

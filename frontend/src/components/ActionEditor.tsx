@@ -1,5 +1,6 @@
 import { noteName, parseNote } from "../lib/notes";
 import type { Action, ActionKind } from "../types";
+import { Collapse } from "../ui/Collapse";
 import { NumField } from "../ui/NumField";
 import { Seg } from "../ui/Seg";
 
@@ -33,7 +34,7 @@ export function ActionEditor({
         value={a.kind}
         onChange={(kind) => onChange({ kind })}
       />
-      {a.kind !== "off" && (
+      <Collapse open={a.kind !== "off"}>
         <div className={a.kind === "pc" ? "grid grid-cols-2 gap-2" : "grid grid-cols-3 gap-2"}>
           <NumField
             label="Ch"
@@ -74,8 +75,8 @@ export function ActionEditor({
             />
           )}
         </div>
-      )}
-      {a.kind === "cc" && (
+      </Collapse>
+      <Collapse open={a.kind === "cc"}>
         <Seg
           size="sm"
           label="CC mode"
@@ -86,7 +87,7 @@ export function ActionEditor({
           value={a.mode}
           onChange={(mode) => onChange({ mode })}
         />
-      )}
+      </Collapse>
       <p className="text-ui-xs leading-snug text-faint">
         {a.kind === "off"
           ? "Sends nothing. Pick CC, Note or Program to choose what this sends."

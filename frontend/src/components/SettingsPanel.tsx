@@ -5,6 +5,7 @@ import { errorText } from "../api";
 import { LONG_PRESS, type Op } from "../lib/config";
 import type { Config, Device, State } from "../types";
 import { Button } from "../ui/Button";
+import { Collapse } from "../ui/Collapse";
 import { cx } from "../ui/cx";
 import { Lamp } from "../ui/Lamp";
 import { Seg } from "../ui/Seg";
@@ -118,12 +119,12 @@ function PedalPicker({ backend, state }: { backend: Backend; state: State }) {
           </Button>
         )}
       </div>
-      {scanning && (
+      <Collapse open={scanning}>
         <div className="flex items-center gap-2 text-ui-xs text-muted">
           <Lamp on colour="beam" size={5} className="breathe" />
           Looking for pedals nearby. Wake yours by pressing a switch.
         </div>
-      )}
+      </Collapse>
       {found && !scanning && (
         <ul className="flex flex-col overflow-hidden rounded-ui-md border border-edge">
           {found.length === 0 && (
@@ -294,12 +295,12 @@ export function SettingsPanel({
             </Button>
           )}
         </Row>
-        {confirm && (
+        <Collapse open={confirm}>
           <p className="text-ui-xs leading-snug text-muted">
             Every switch goes back to CC 80 to 85, combos are removed and both expression inputs
             lose their calibration. The chosen pedal is kept, and ⌘Z brings the rest back.
           </p>
-        )}
+        </Collapse>
         {err && <p className="text-ui-xs text-hot">{err}</p>}
         <p className="pt-1 text-ui-2xs text-faint">SparkX MIDI {state.version}</p>
       </Section>

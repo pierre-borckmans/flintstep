@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { describeMidi, relTime } from "../lib/midi";
 import type { Midi } from "../types";
 import { cx } from "../ui/cx";
@@ -34,6 +34,9 @@ export function ActivityLog({ log, midi }: { log: LoggedActivity[]; midi: Midi |
   const outOn = useBlink(lastOut?.id);
   const inOn = useBlink(lastIn?.id);
   const now = useNow();
+  // Rows already there when the panel mounts just show; later ones open in at the top.
+  const first = useRef<number | null>(null);
+  if (first.current === null) first.current = log[0]?.id ?? -1;
 
   return (
     <section className="activity-panel">
@@ -62,7 +65,10 @@ export function ActivityLog({ log, midi }: { log: LoggedActivity[]; midi: Midi |
           {log.map((a) => (
             <li
               key={a.id}
-              className="activity-row row-in grid grid-cols-[30px_1fr_auto] items-center gap-2 px-4 py-2"
+              className={cx(
+                "activity-row grid grid-cols-[30px_1fr_auto] items-center gap-2 px-4 py-2",
+                a.id > first.current! ? "log-open" : "row-in",
+              )}
               title={a.bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ")}
             >
               <span

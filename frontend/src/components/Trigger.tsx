@@ -10,10 +10,12 @@ import {
   thresholdAt,
 } from "../lib/trigger";
 import type { ExpConfig, ExpTrigger, TriggerMode } from "../types";
+import { Collapse } from "../ui/Collapse";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
 import { NumField } from "../ui/NumField";
+import { Seg } from "../ui/Seg";
 import { ActionEditor } from "./ActionEditor";
 
 // THE EXPRESSION TRIGGER: a toe switch faked from the pedal's position. Two parts: the
@@ -140,57 +142,6 @@ const MODES: { value: TriggerMode; label: string; hint: string }[] = [
   { value: "toe", label: "Toe click", hint: "push the toe" },
 ];
 
-/** Off · Auto-engage · Toe click, each with a few words under it. Like Seg: the chosen
- *  one is lit, never tinted. */
-function ModePicker({
-  value,
-  onChange,
-  label,
-}: {
-  value: TriggerMode;
-  onChange: (m: TriggerMode) => void;
-  label: string;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="flex rounded-ui-md border border-edge bg-sunken p-0.5 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]"
-    >
-      {MODES.map((m) => {
-        const on = m.value === value;
-        return (
-          <button
-            key={m.value}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => onChange(m.value)}
-            className={cx(
-              "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-ui-sm px-1.5 py-1.5 transition-[color,background-color,box-shadow] duration-(--dur) ease-(--ease)",
-              on ? "lit bg-panel3" : "hover:warm",
-            )}
-          >
-            <span
-              className={cx(
-                "truncate text-ui-sm leading-none font-semibold",
-                on ? "text-bone" : "text-muted",
-              )}
-            >
-              {m.label}
-            </span>
-            <span
-              className={cx("truncate text-ui-2xs leading-none", on ? "text-muted" : "text-faint")}
-            >
-              {m.hint}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 /** The trigger's settings, under the input's own: mode, threshold, off delay, and
  *  what it sends. */
 export function TriggerBlock({
@@ -244,66 +195,61 @@ export function TriggerBlock({
         )}
       </div>
 
-      <ModePicker
+      <Seg
         label={`EXP ${n + 1} trigger`}
+        options={MODES}
         value={t.mode}
         onChange={(mode) => apply({ type: "triggerMode", n, mode })}
       />
       <p className="text-ui-xs leading-snug text-faint">{explainTrigger(t)}</p>
 
-      {on && (
-        <>
-          <div className="flex items-center gap-2">
-            <NumField
-              label={t.mode === "toe" ? "Click at" : "Engage at"}
-              value={t.threshold}
-              min={TRIGGER.min}
-              max={TRIGGER.max}
-              suffix="%"
-              className="w-[118px] shrink-0"
-              onChange={(threshold) => apply({ type: "trigger", n, patch: { threshold } })}
+      <Collapse open={on} className="flex flex-col gap-2.5">
+        <div className="flex items-center gap-2">
+          <NumField
+            label={t.mode === "toe" ? "Click at" : "Engage at"}
+            value={t.threshold}
+            min={TRIGGER.min}
+            max={TRIGGER.max}
+            suffix="%"
+            className="w-[118px] shrink-0"
+            onChange={(threshold) => apply({ type: "trigger", n, patch: { threshold } })}
+          />
+          <span className="text-ui-xs leading-snug text-faint">or drag the marker on the bar</span>
+        </div>
+
+        <Collapse open={t.mode === "engage"} className="flex flex-col gap-1">
+          <span className="text-ui-xs text-muted">{offDelayText(t.offDelayMs)}</span>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              aria-label={`EXP ${n + 1} off delay`}
+              min={TRIGGER.offDelay.min}
+              max={TRIGGER.offDelay.max}
+              step={TRIGGER.offDelay.step}
+              value={t.offDelayMs}
+              onChange={(e) =>
+                apply({ type: "trigger", n, patch: { offDelayMs: Number(e.target.value) } })
+              }
+              className="min-w-0 flex-1"
+              style={{ "--fill": `${fill}%` } as React.CSSProperties}
             />
-            <span className="text-ui-xs leading-snug text-faint">
-              or drag the marker on the bar
+            <span className="w-14 text-right font-mono text-ui-sm text-bone tabular-nums">
+              {t.offDelayMs}
+              <span className="text-muted"> ms</span>
             </span>
           </div>
+        </Collapse>
 
-          {t.mode === "engage" && (
-            <div className="flex flex-col gap-1">
-              <span className="text-ui-xs text-muted">{offDelayText(t.offDelayMs)}</span>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  aria-label={`EXP ${n + 1} off delay`}
-                  min={TRIGGER.offDelay.min}
-                  max={TRIGGER.offDelay.max}
-                  step={TRIGGER.offDelay.step}
-                  value={t.offDelayMs}
-                  onChange={(e) =>
-                    apply({ type: "trigger", n, patch: { offDelayMs: Number(e.target.value) } })
-                  }
-                  className="min-w-0 flex-1"
-                  style={{ "--fill": `${fill}%` } as React.CSSProperties}
-                />
-                <span className="w-14 text-right font-mono text-ui-sm text-bone tabular-nums">
-                  {t.offDelayMs}
-                  <span className="text-muted"> ms</span>
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <Kicker className="!text-faint">Sends</Kicker>
-            <ActionEditor
-              action={t.action}
-              allowOff={false}
-              describe={explainTriggerAction}
-              onChange={(action) => apply({ type: "trigger", n, patch: {}, action })}
-            />
-          </div>
-        </>
-      )}
+        <div className="flex flex-col gap-2">
+          <Kicker className="!text-faint">Sends</Kicker>
+          <ActionEditor
+            action={t.action}
+            allowOff={false}
+            describe={explainTriggerAction}
+            onChange={(action) => apply({ type: "trigger", n, patch: {}, action })}
+          />
+        </div>
+      </Collapse>
     </div>
   );
 }
