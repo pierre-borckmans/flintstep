@@ -232,9 +232,47 @@ export function edit(c: Config, op: Op): Config {
   }
 }
 
-/** Whether the draft differs from what the Go side last reported. */
+/** What an op changes, as a key: edits with the same key in quick succession (a
+ *  slider drag, typing "127") are one step in the undo history. Null for ops that are
+ *  a step on their own, like adding a combo. */
+export function opKey(op: Op): string | null {
+  const keys = (p: object | undefined) =>
+    Object.keys(p ?? {})
+      .sort()
+      .join(",");
+  switch (op.type) {
+    case "tap":
+    case "long":
+      return `${op.type}:${op.sw}:${keys(op.patch)}`;
+    case "colour":
+      return `colour:${op.sw}`;
+    case "combo":
+      return `combo:${op.index}:${keys(op.patch)}:${keys(op.action)}`;
+    case "exp":
+      return `exp:${op.n}:${keys(op.patch)}`;
+    case "ledMode":
+    case "brightness":
+    case "longPressMs":
+      return op.type;
+    default:
+      return null;
+  }
+}
+
+/** Whether two configs are the same, field for field. */
 export function sameConfig(a: Config, b: Config): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** The config without the remembered pedal: what the user edits, undoes and redoes.
+ *  The pedal is Go's (Choose / Forget) and goes back in at save time. */
+export function mappingOf(c: Config): Config {
+  return { ...c, pedal: { address: "", name: "" } };
+}
+
+/** Whether two configs map the pedal the same way, whichever pedal each remembers. */
+export function sameMapping(a: Config, b: Config): boolean {
+  return sameConfig(mappingOf(a), mappingOf(b));
 }
 
 /** A calibration came back from Go while the user had unsaved edits: take the new

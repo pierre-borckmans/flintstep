@@ -6,7 +6,9 @@ import {
   edit,
   mergeCalibration,
   nextCombo,
+  opKey,
   sameConfig,
+  sameMapping,
   validate,
 } from "./config";
 
@@ -179,5 +181,43 @@ describe("edit", () => {
     const m = mergeCalibration(draft, fresh, 0);
     expect(m.ledMode).toBe("feedback");
     expect(m.exp[0].min).toBe(1200);
+  });
+});
+
+describe("opKey", () => {
+  it("is the same for repeated edits to one field", () => {
+    expect(opKey({ type: "tap", sw: 1, patch: { number: 1 } })).toBe(
+      opKey({ type: "tap", sw: 1, patch: { number: 127 } }),
+    );
+    expect(opKey({ type: "brightness", value: 10 })).toBe(opKey({ type: "brightness", value: 90 }));
+    expect(opKey({ type: "colour", sw: 2, colour: { r: 1, g: 1, b: 1 } })).toBe("colour:2");
+  });
+  it("differs across fields, switches and inputs", () => {
+    const keys = [
+      opKey({ type: "tap", sw: 1, patch: { number: 1 } }),
+      opKey({ type: "tap", sw: 1, patch: { value: 1 } }),
+      opKey({ type: "tap", sw: 2, patch: { number: 1 } }),
+      opKey({ type: "long", sw: 1, patch: { number: 1 } }),
+      opKey({ type: "exp", n: 0, patch: { cc: 1 } }),
+      opKey({ type: "exp", n: 1, patch: { cc: 1 } }),
+      opKey({ type: "combo", index: 0, patch: {}, action: { number: 1 } }),
+      opKey({ type: "combo", index: 0, patch: { a: 1 } }),
+      opKey({ type: "longPressMs", value: 500 }),
+    ];
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+  it("is null for steps of their own", () => {
+    expect(opKey({ type: "addCombo" })).toBeNull();
+    expect(opKey({ type: "removeCombo", index: 0 })).toBeNull();
+  });
+});
+
+describe("sameMapping", () => {
+  it("ignores the remembered pedal", () => {
+    const a = defaultConfig();
+    const b = { ...defaultConfig(), pedal: { address: "AA", name: "SparkX" } };
+    expect(sameConfig(a, b)).toBe(false);
+    expect(sameMapping(a, b)).toBe(true);
+    expect(sameMapping(a, edit(b, { type: "brightness", value: 5 }))).toBe(false);
   });
 });

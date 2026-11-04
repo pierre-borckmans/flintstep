@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Backend } from "./api";
 import { ActivityLog } from "./components/Activity";
 import { ExpressionPanel } from "./components/ExpressionPanel";
 import { Header } from "./components/Header";
+import { HistoryBar } from "./components/HistoryBar";
 import { Pedal } from "./components/Pedal";
-import { SaveBar } from "./components/SaveBar";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SwitchEditor } from "./components/SwitchEditor";
 import { cx } from "./ui/cx";
@@ -26,6 +26,21 @@ export default function App({ backend }: { backend: Backend }) {
   const [tab, setTab] = useState<Tab>(() => (q.get("tab") as Tab) || "switches");
   const status = state?.pedal ?? null;
   const live = status?.state === "connected";
+
+  // Browser dev only: replay ?demo=... edits once the history exists (see mock.ts).
+  const demoed = useRef(false);
+  const ready = bridge.history !== null;
+  useEffect(() => {
+    const demo = q.get("demo");
+    if (!ready || !demo || demoed.current || !document.documentElement.dataset.mock) return;
+    demoed.current = true;
+    import("./mock").then(({ demoScript }) => {
+      for (const s of demoScript(demo)) {
+        if (s === "undo") bridge.undo();
+        else bridge.apply(s);
+      }
+    });
+  }, [ready]);
 
   const select = (n: number) => {
     setSel(n);
@@ -87,7 +102,7 @@ export default function App({ backend }: { backend: Backend }) {
               />
             )}
           </div>
-          <SaveBar bridge={bridge} />
+          <HistoryBar bridge={bridge} initialOpen={q.get("history") === "open"} />
         </aside>
       </main>
     </div>

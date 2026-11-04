@@ -289,7 +289,7 @@ export function SettingsPanel({
         {confirm && (
           <p className="text-ui-xs leading-snug text-muted">
             Every switch goes back to CC 80 to 85, combos are removed and both expression inputs
-            lose their calibration. The chosen pedal is kept.
+            lose their calibration. The chosen pedal is kept, and ⌘Z brings the rest back.
           </p>
         )}
         {err && <p className="text-ui-xs text-hot">{err}</p>}

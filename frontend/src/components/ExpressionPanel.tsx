@@ -228,8 +228,8 @@ export function ExpressionPanel(props: {
       <ExpCard n={1} {...props} />
       <p className="px-1 text-ui-xs leading-snug text-faint">
         <Kicker className="mr-1">Tip</Kicker>
-        Heel and toe save straight away. The value only moves when the pedal is clearly past a step,
-        so a resting pedal does not flicker.
+        Set heel and toe with the pedal resting where you want each end. The value only moves when
+        the pedal is clearly past a step, so a resting pedal does not flicker.
       </p>
     </div>
   );
