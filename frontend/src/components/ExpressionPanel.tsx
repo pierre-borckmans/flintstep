@@ -64,19 +64,31 @@ function Meter({
         <Kicker className="w-10 !text-faint">raw</Kicker>
         <div className="relative h-3 flex-1">
           <div className="absolute top-1/2 h-px w-full -translate-y-1/2 bg-edge-strong" />
+          {/* min is the heel and max the toe, whichever reads higher: a pedal whose toe
+              reads lower has its toe mark left of its heel mark. */}
           <div
             className="absolute top-1/2 h-[3px] -translate-y-1/2 bg-muted/50"
             style={{
-              left: `${rawFraction(min) * 100}%`,
-              width: `${(rawFraction(max) - rawFraction(min)) * 100}%`,
+              left: `${Math.min(rawFraction(min), rawFraction(max)) * 100}%`,
+              width: `${Math.abs(rawFraction(max) - rawFraction(min)) * 100}%`,
             }}
           />
-          {[min, max].map((m, i) => (
+          {(
+            [
+              ["heel", min],
+              ["toe", max],
+            ] as const
+          ).map(([edge, m]) => (
             <span
-              key={i}
+              key={edge}
+              title={`${edge} ${m}`}
               className="absolute top-0 h-3 w-px bg-muted"
               style={{ left: `${rawFraction(m) * 100}%` }}
-            />
+            >
+              <span className="absolute -top-2.5 -translate-x-1/2 font-mono text-[8px] leading-none text-faint uppercase">
+                {edge[0]}
+              </span>
+            </span>
           ))}
           {raw >= 0 && (
             <span

@@ -105,7 +105,11 @@ export function validate(c: Config): string | null {
     if (!inRange(x.min, 0, RAW_MAX) || !inRange(x.max, 0, RAW_MAX)) {
       return `${where}: calibration out of range`;
     }
-    if (x.min >= x.max) return `${where}: heel must be below toe (set them again)`;
+    // min is the heel and max the toe, in either order. 0/0 is "not calibrated", which
+    // Go's Normalize turns into the whole jack.
+    if (x.enabled && x.min === x.max && x.min !== 0) {
+      return `expression ${n + 1}: heel and toe were calibrated at the same point`;
+    }
   }
   if (c.ledMode !== "local" && c.ledMode !== "feedback") return "unknown LED mode";
   if (!inRange(c.longPressMs, LONG_PRESS.min, LONG_PRESS.max)) {

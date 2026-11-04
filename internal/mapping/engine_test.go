@@ -594,6 +594,12 @@ func TestEngineExp(t *testing.T) {
 		{"calibrated and inverted", 0, ExpConfig{Enabled: true, Channel: 1, CC: 11, Min: 10000, Max: 20000, Invert: true}, []feed{
 			{10000, 127}, {20000, 0},
 		}},
+		{"toe reads lower than heel: heel is still 0, toe 127", 0, ExpConfig{Enabled: true, Channel: 1, CC: 11, Min: 50000, Max: 3000}, []feed{
+			{50000, 0}, {60000, -1}, {26500, 64}, {3000, 127}, {0, -1},
+		}},
+		{"toe lower than heel, inverted by the user", 0, ExpConfig{Enabled: true, Channel: 1, CC: 11, Min: 50000, Max: 3000, Invert: true}, []feed{
+			{50000, 127}, {3000, 0},
+		}},
 		{"hysteresis holds a value against noise", 0, defaultExp(0), []feed{
 			// one step is ~516 raw; a value only moves once clearly in the next step.
 			{32768, 64}, {33000, -1}, {32700, -1}, {33350, -1}, {33500, 65}, {33200, -1}, {32900, 64},

@@ -45,10 +45,20 @@ describe("validate", () => {
     c = edit(c, { type: "combo", index: 1, patch: { a: 1, b: 0 } });
     expect(validate(c)).toBe("two combos use II + I");
   });
-  it("wants heel below toe", () =>
+  it("rejects heel and toe at the same point", () =>
     expect(validate(edit(base(), { type: "exp", n: 1, patch: { min: 500, max: 500 } }))).toBe(
-      "EXP 2: heel must be below toe (set them again)",
+      "expression 2: heel and toe were calibrated at the same point",
     ));
+  it("accepts a toe that reads lower than the heel", () =>
+    expect(
+      validate(edit(base(), { type: "exp", n: 0, patch: { min: 50000, max: 3000 } })),
+    ).toBeNull());
+  it("ignores the calibration of a disabled input", () =>
+    expect(
+      validate(edit(base(), { type: "exp", n: 1, patch: { enabled: false, min: 500, max: 500 } })),
+    ).toBeNull());
+  it("takes an uncalibrated 0/0 input as the whole jack", () =>
+    expect(validate(edit(base(), { type: "exp", n: 0, patch: { min: 0, max: 0 } }))).toBeNull());
   it("bounds long press and brightness", () => {
     expect(validate(edit(base(), { type: "longPressMs", value: 50 }))).toMatch(/long-press/);
     expect(edit(base(), { type: "brightness", value: 140 }).brightness).toBe(100);

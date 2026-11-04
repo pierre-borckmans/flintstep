@@ -1,6 +1,6 @@
 import type { Backend } from "./api";
 import { defaultConfig, validate } from "./lib/config";
-import { RAW_MAX } from "./lib/exp";
+import { expValue, RAW_MAX } from "./lib/exp";
 import { describeMidi } from "./lib/midi";
 import type { Action, Activity, BleState, Colour, Config, Device, State, Status } from "./types";
 import { LAMP_AMP, LAMP_APP, SWITCHES } from "./types";
@@ -176,10 +176,7 @@ export function createSim(opts: SimOptions = {}) {
       raw[n] = Math.round(Math.min(RAW_MAX, Math.max(0, raw[n])));
       const x = config.exp[n];
       if (x.enabled && t - lastExpAt[n] >= 90) {
-        const span = Math.max(1, x.max - x.min);
-        let f = Math.min(1, Math.max(0, (raw[n] - x.min) / span));
-        if (x.invert) f = 1 - f;
-        const v = Math.round(f * 127);
+        const v = expValue(raw[n], x) ?? 0;
         if (Math.abs(v - lastExpSent[n]) >= 2) {
           lastExpSent[n] = v;
           lastExpAt = lastExpAt.map((a, i) => (i === n ? t : a));
@@ -251,8 +248,13 @@ export function createSim(opts: SimOptions = {}) {
     calibrate(n: number, edge: "min" | "max") {
       const r = raw[n];
       if (r < 0) throw new Error(`EXP ${n + 1} has no cable`);
-      config = structuredClone(config);
-      config.exp[n][edge] = r;
+      const next = structuredClone(config);
+      next.exp[n][edge] = r;
+      // Like App.CalibrateExp: heel and toe stay as set, in either order, but not equal.
+      if (next.exp[n].min === next.exp[n].max) {
+        throw new Error("heel and toe read the same value; move the pedal and try again");
+      }
+      config = next;
     },
   };
 }

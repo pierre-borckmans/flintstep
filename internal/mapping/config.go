@@ -89,9 +89,9 @@ type ExpConfig struct {
 	Enabled bool `json:"enabled"`
 	Channel int  `json:"channel"`
 	CC      int  `json:"cc"`
-	Min     int  `json:"min"` // raw calibration 0..65535, Min < Max
-	Max     int  `json:"max"`
-	Invert  bool `json:"invert"`
+	Min     int  `json:"min"`    // raw value at the heel, 0..65535
+	Max     int  `json:"max"`    // raw value at the toe; may be below Min, never equal
+	Invert  bool `json:"invert"` // the user's own flip, on top of heel=0 toe=127
 }
 
 // PedalRef is the remembered pedal. Zero means none: take the first one found.
@@ -208,14 +208,10 @@ func (c Config) Normalize() Config {
 		e.CC = clamp(e.CC, 0, 127)
 		e.Min = clamp(e.Min, 0, ExpRawMax)
 		e.Max = clamp(e.Max, 0, ExpRawMax)
-		switch {
-		case e.Min == 0 && e.Max == 0:
+		// Min is the heel and Max the toe, whichever reads higher: a pedal whose toe
+		// reads lower simply has Min > Max, and the engine handles both ways round.
+		if e.Min == 0 && e.Max == 0 {
 			e.Max = ExpRawMax
-		case e.Min > e.Max:
-			// Heel and toe were calibrated the wrong way round: the same travel,
-			// read backwards.
-			e.Min, e.Max = e.Max, e.Min
-			e.Invert = !e.Invert
 		}
 	}
 

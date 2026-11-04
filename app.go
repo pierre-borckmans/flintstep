@@ -301,11 +301,8 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	default:
 		return a.bridge.Config(), fmt.Errorf("unknown calibration edge %q", edge)
 	}
-	// Heel and toe set the wrong way round is a reversed pedal, not an error.
-	if cfg.Exp[n].Min > cfg.Exp[n].Max {
-		cfg.Exp[n].Min, cfg.Exp[n].Max = cfg.Exp[n].Max, cfg.Exp[n].Min
-		cfg.Exp[n].Invert = !cfg.Exp[n].Invert
-	}
+	// Min stays the heel and Max the toe even when the toe reads lower: the engine
+	// maps heel to 0 and toe to 127 either way, and Invert is the user's alone.
 	if cfg.Exp[n].Min == cfg.Exp[n].Max {
 		return a.bridge.Config(), errors.New("heel and toe read the same value; move the pedal and try again")
 	}

@@ -318,7 +318,9 @@ func (e *Engine) releaseHalf(a Action) [][]byte {
 
 func isToggle(a Action) bool { return a.Kind == KindCC && a.Mode == Toggle }
 
-// Exp turns input n's raw value into its CC. The calibrated travel is stretched to
+// Exp turns input n's raw value into its CC. Min is the heel and Max the toe, in
+// whatever order the numbers fall: heel sends 0 and toe 127 either way, and Invert
+// (the user's own choice) flips that on top. The calibrated travel is stretched to
 // the full raw range first, so ExpScale's hysteresis (half a step and a margin) is
 // measured in steps of the pedal the user actually has. false: nothing to send,
 // because the input is off or the value did not move a step.
@@ -327,13 +329,18 @@ func (e *Engine) Exp(n, raw int) ([]byte, bool) {
 		return nil, false
 	}
 	x := e.cfg.Exp[n]
-	lo, hi := x.Min, x.Max
-	if hi <= lo {
+	heel, toe := x.Min, x.Max
+	if heel == toe {
 		// Calibrated at one point: no travel to stretch, use the jack's whole range.
-		lo, hi = 0, ExpRawMax
+		heel, toe = 0, ExpRawMax
 	}
+	lo, hi := min(heel, toe), max(heel, toe)
 	r := min(max(raw, lo), hi)
-	scaled := int((int64(r-lo)*ExpRawMax + int64(hi-lo)/2) / int64(hi-lo))
+	travel := r - heel // how far from the heel, towards the toe
+	if toe < heel {
+		travel = heel - r
+	}
+	scaled := int((int64(travel)*ExpRawMax + int64(hi-lo)/2) / int64(hi-lo))
 	if x.Invert {
 		scaled = ExpRawMax - scaled
 	}

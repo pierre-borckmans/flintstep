@@ -155,10 +155,18 @@ func TestNormalize(t *testing.T) {
 				t.Fatalf("got %+v", c.Exp[1])
 			}
 		}},
-		{"exp calibrated backwards is swapped and inverted", func(c *Config) {
+		{"exp toe below heel is kept as calibrated", func(c *Config) {
 			c.Exp[0].Min, c.Exp[0].Max = 50000, 3000
 		}, func(t *testing.T, c Config) {
-			if e := c.Exp[0]; e.Min != 3000 || e.Max != 50000 || !e.Invert {
+			// Min is the heel and Max the toe, whichever reads higher.
+			if e := c.Exp[0]; e.Min != 50000 || e.Max != 3000 || e.Invert {
+				t.Fatalf("got %+v", e)
+			}
+		}},
+		{"exp invert is left alone", func(c *Config) {
+			c.Exp[1].Min, c.Exp[1].Max, c.Exp[1].Invert = 40000, 1000, true
+		}, func(t *testing.T, c Config) {
+			if e := c.Exp[1]; e.Min != 40000 || e.Max != 1000 || !e.Invert {
 				t.Fatalf("got %+v", e)
 			}
 		}},
@@ -219,6 +227,7 @@ func TestValidate(t *testing.T) {
 			c.Combos = []Combo{{A: 0, B: 1, Action: defaultTap(0)}, {A: 1, B: 0, Action: defaultTap(1)}}
 		}, "two combos use II + I"},
 		{"exp calibrated at one point", func(c *Config) { c.Exp[1].Min, c.Exp[1].Max = 3000, 3000 }, "expression 2"},
+		{"exp toe below heel is fine", func(c *Config) { c.Exp[0].Min, c.Exp[0].Max = 50000, 3000 }, ""},
 		{"exp at one point but disabled is fine", func(c *Config) {
 			c.Exp[1] = ExpConfig{Min: 3000, Max: 3000}
 		}, ""},

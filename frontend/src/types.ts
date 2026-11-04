@@ -33,9 +33,9 @@ export interface ExpConfig {
   enabled: boolean;
   channel: number;
   cc: number;
-  min: number; // raw 0..65535, min < max
-  max: number;
-  invert: boolean;
+  min: number; // raw 0..65535 at the heel
+  max: number; // raw 0..65535 at the toe; may be below min (toe reads lower), never equal
+  invert: boolean; // the user's own flip, on top of heel=0 toe=127
 }
 
 export type LEDMode = "local" | "feedback";
