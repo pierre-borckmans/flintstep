@@ -1,9 +1,11 @@
 import { memo, useId } from "react";
 import { actionCaption, longCaption } from "../lib/caption";
 import { isDark, lampLight, rgb } from "../lib/colour";
+import { degText } from "../lib/nuts";
 import type { Colour, Config, Status } from "../types";
 import { LAMP_AMP, LAMP_APP, SWITCH_NAMES } from "../types";
 import { cx } from "../ui/cx";
+import { useNutGestures, useNuts, useNutTween } from "../useNuts";
 import "./Pedal.css";
 
 // THE PEDAL, TOP-DOWN, drawn as the Spark Control X looks: a black brushed-metal face in a
@@ -116,6 +118,23 @@ const pct = (v: number, of: number) => `${(v / of) * 100}%`;
 /** The EXP jacks sit on the back edge, in the gaps between the top row's captions. */
 const JACK_X = [0.323, 0.683];
 
+/** The nut's nickel, lit from the top left. */
+const NUT_STOPS: [number, string][] = [
+  [0, "#f1eadb"],
+  [0.35, "#bfb6a3"],
+  [0.7, "#8e8676"],
+  [1, "#5f594f"],
+];
+
+/** A hex nut turned `deg` clockwise from points-up-and-down, round (x, cy). */
+function nutPath(x: number, cy: number, r: number, deg: number) {
+  const pts = Array.from({ length: 6 }, (_, k) => {
+    const a = ((deg - 90 + k * 60) * Math.PI) / 180;
+    return `${(x + r * Math.cos(a)).toFixed(2)} ${(cy + r * Math.sin(a)).toFixed(2)}`;
+  });
+  return `M${pts.join(" L")} Z`;
+}
+
 /** Shared gradients for the metalwork, referenced from every layer by id. */
 function Defs({ id }: { id: string }) {
   return (
@@ -132,12 +151,6 @@ function Defs({ id }: { id: string }) {
           <stop offset="0.6" stopColor="#e3dac6" />
           <stop offset="1" stopColor="#b8ae99" />
         </radialGradient>
-        <linearGradient id={`${id}-nut`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f1eadb" />
-          <stop offset="0.35" stopColor="#bfb6a3" />
-          <stop offset="0.7" stopColor="#8e8676" />
-          <stop offset="1" stopColor="#5f594f" />
-        </linearGradient>
         <linearGradient id={`${id}-gold`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#ecd39d" />
           <stop offset="0.5" stopColor="#c9a96b" />
@@ -450,6 +463,9 @@ function FootSwitch({
   selected,
   label,
   onSelect,
+  nutAngle,
+  turnable,
+  peek,
 }: {
   id: string;
   index: number;
@@ -458,6 +474,12 @@ function FootSwitch({
   selected: boolean;
   label: string;
   onSelect: (n: number) => void;
+  /** The hex nut's rotation, degrees in [0, 60). */
+  nutAngle: number;
+  /** Match my pedal: the nut turns by hand. */
+  turnable: boolean;
+  /** Show the angle readout without hovering (browser dev screenshots). */
+  peek: boolean;
 }) {
   const { x, top, tile } = slot(index);
   const y = (v: number) => (top ? v : MIRROR - v);
@@ -484,11 +506,23 @@ function FootSwitch({
     `V${bb - sy * rb}`,
     `${arc(rb)} ${x + bx - rb} ${bb}`,
   ].join(" ");
-  // the hex nut, points up and down, flats left and right
+  // the hex nut: at 0° points up and down, flats left and right; it turns round the cap's
+  // centre, and its light stays put (the gradient is fixed to the 0° nut's box on screen)
   const cy = y(SW_Y);
   const nr = u(REF.nut.r);
   const nf = nr * (Math.sqrt(3) / 2);
-  const nut = `M${x} ${cy - nr} L${x + nf} ${cy - nr / 2} V${cy + nr / 2} L${x} ${cy + nr} L${x - nf} ${cy + nr / 2} V${cy - nr / 2} Z`;
+  const tween = useNutTween(nutAngle);
+  const nut = nutPath(x, cy, nr, tween.angle);
+  const gesture = useNutGestures({
+    index,
+    enabled: turnable,
+    box: { x: x - GROUP.half, y: y0, w, h },
+    centre: { x, y: cy },
+    r: nr,
+    jump: tween.jump,
+  });
+  // the readout sits in the gap between the nut's tip and the LED
+  const readoutY = y(fy((REF.nut.y + REF.nut.r + REF.led.y - REF.led.thick / 2) / 2));
   const tileY = [y(fy(REF.tile.y0)), y(fy(REF.tile.y1))];
   const letterCap = u(REF.letter.cap);
   const [ring, dome] = [u(REF.cap.ring), u(REF.cap.dome)];
@@ -498,11 +532,16 @@ function FootSwitch({
 
   return (
     <button
+      ref={gesture.ref}
       type="button"
-      onClick={() => onSelect(index)}
+      onClick={() => {
+        if (!gesture.swallowClick()) onSelect(index);
+      }}
+      {...gesture.handlers}
       aria-pressed={selected}
       aria-label={`Switch ${name}: ${label}`}
       className="pedal-switch absolute overflow-visible outline-none"
+      data-nut={turnable ? (gesture.dragging ? "drag" : gesture.over ? "over" : "on") : undefined}
       style={{ left: pct(x - GROUP.half, W), top: pct(y0, H), width: pct(w, W), height: pct(h, H) }}
     >
       {/* drawn with a margin round the hit area so the LED's light can spill past it */}
@@ -528,6 +567,19 @@ function FootSwitch({
           >
             <feGaussianBlur stdDeviation="9" />
           </filter>
+          <linearGradient
+            id={`${id}-nut-${index}`}
+            gradientUnits="userSpaceOnUse"
+            gradientTransform={`matrix(${2 * nf} 0 0 ${2 * nr} ${x - nf} ${cy - nr})`}
+            x1="0"
+            y1="0"
+            x2="1"
+            y2="1"
+          >
+            {NUT_STOPS.map(([o, c]) => (
+              <stop key={o} offset={o} stopColor={c} />
+            ))}
+          </linearGradient>
         </defs>
         <rect
           className="pedal-plate"
@@ -586,10 +638,19 @@ function FootSwitch({
         )}
 
         {/* the footswitch: hex nut, then a round nickel cap that sinks when held */}
-        <ellipse cx={x + 3} cy={cy + 6} rx={nf + 3} ry={nr + 2} fill="#000" opacity="0.45" />
+        {turnable && <circle className="pedal-nut-ring" cx={x} cy={cy} r={nr + 6} fill="none" />}
+        <ellipse
+          cx={x}
+          cy={cy}
+          rx={nf + 3}
+          ry={nr + 2}
+          transform={`translate(3 6) rotate(${tween.angle} ${x} ${cy})`}
+          fill="#000"
+          opacity="0.45"
+        />
         <path
           d={nut}
-          fill={`url(#${id}-nut)`}
+          fill={`url(#${id}-nut-${index})`}
           stroke="#4b463e"
           strokeWidth="2"
           strokeLinejoin="round"
@@ -624,6 +685,16 @@ function FootSwitch({
           />
         </g>
       </svg>
+      {turnable && (
+        <span
+          aria-hidden
+          className="pedal-nut-readout"
+          data-peek={peek || undefined}
+          style={{ top: pct(readoutY - y0, h) }}
+        >
+          {degText(nutAngle)}
+        </span>
+      )}
     </button>
   );
 }
@@ -778,6 +849,7 @@ export function Pedal({
   const live = status?.state === "connected";
   const lamps = status?.lamps ?? [];
   const held = status?.held ?? 0;
+  const nuts = useNuts();
   return (
     <div className="pedal @container flex flex-col items-center px-2 pt-1 pb-1">
       <Defs id={id} />
@@ -820,6 +892,9 @@ export function Pedal({
                 selected={selected === n}
                 label={sw ? actionCaption(sw.tap) : ""}
                 onSelect={onSelect}
+                nutAngle={nuts.angles[n]}
+                turnable={nuts.mode === "custom"}
+                peek={nuts.peek}
               />
             );
           })}
