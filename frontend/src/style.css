@@ -443,9 +443,23 @@ input[type="range"]::-webkit-slider-thumb {
   position: absolute;
   inset: 0;
   overflow: hidden;
+}
+/* What zooms: the fitted layout, scaled and moved from its top-left corner. */
+.viewer-zoom {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
   padding: 32px;
+  transform-origin: 0 0;
+}
+.pedal-viewer[data-zoomed] .viewer-stage {
+  cursor: grab;
+  touch-action: none;
+}
+.pedal-viewer[data-panning],
+.pedal-viewer[data-panning] * {
+  cursor: grabbing !important;
 }
 .viewer-object {
   min-width: 0;

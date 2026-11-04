@@ -182,6 +182,8 @@ export function useNutGestures({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       swallow.current = false;
       if (!enabled || e.button !== 0 || !onNut(e)) return;
+      // The nut has this drag: the zoomed viewer around it must not pan with it.
+      e.stopPropagation();
       const p = toView(e);
       drag.current = {
         x: e.clientX,
