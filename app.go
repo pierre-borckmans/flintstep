@@ -154,7 +154,7 @@ func (a *App) remember(d ble.Device) {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
 	cfg := a.bridge.Config()
-	if cfg.Pedal.Address == d.Address && cfg.Pedal.Name == d.Name {
+	if !shouldRemember(cfg.Pedal, d) {
 		return
 	}
 	cfg.Pedal = mapping.PedalRef{Address: d.Address, Name: d.Name}
@@ -166,6 +166,21 @@ func (a *App) remember(d ble.Device) {
 		log.Printf("config: save: %v", err)
 	}
 	a.changed()
+}
+
+// shouldRemember says whether a connect to d should replace the saved pedal. With no
+// saved pedal, the first one found becomes it. A saved pedal is only replaced by one
+// with its name: the same pedal under a new identifier, which a Bluetooth reset gives
+// it. Any other pedal connecting means the user chose a different one after this
+// connect was already on its way, and their choice wins.
+func shouldRemember(saved mapping.PedalRef, d ble.Device) bool {
+	if saved.Address == d.Address && saved.Name == d.Name {
+		return false
+	}
+	if saved.Address == "" {
+		return true
+	}
+	return saved.Address == d.Address || (saved.Name != "" && saved.Name == d.Name)
 }
 
 // changed asks for a State to be sent to the UI soon.

@@ -6,6 +6,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"sparkbridge/internal/ble"
+	"sparkbridge/internal/mapping"
 )
 
 // Wails calls OnShutdown after it has released the window. Bridge activity (the
@@ -40,5 +43,26 @@ func TestNoEventsAfterShutdown(t *testing.T) {
 	wg.Wait()
 	if late := n.Load() - after; late != 0 {
 		t.Errorf("%d events emitted after shutdown", late)
+	}
+}
+
+func TestShouldRemember(t *testing.T) {
+	a := ble.Device{Address: "aaaa", Name: "SparkX v4.1.23 fbfc"}
+	cases := []struct {
+		name  string
+		saved mapping.PedalRef
+		d     ble.Device
+		want  bool
+	}{
+		{"nothing saved: first found", mapping.PedalRef{}, a, true},
+		{"already saved", mapping.PedalRef{Address: "aaaa", Name: a.Name}, a, false},
+		{"same pedal, new identifier", mapping.PedalRef{Address: "old", Name: a.Name}, a, true},
+		{"same identifier, name changed", mapping.PedalRef{Address: "aaaa", Name: "SparkX v4.1.22 fbfc"}, a, true},
+		{"user chose another pedal mid-dial", mapping.PedalRef{Address: "bbbb", Name: "SparkX v4.1.23 0001"}, a, false},
+	}
+	for _, c := range cases {
+		if got := shouldRemember(c.saved, c.d); got != c.want {
+			t.Errorf("%s: shouldRemember = %v, want %v", c.name, got, c.want)
+		}
 	}
 }
