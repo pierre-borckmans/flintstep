@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest # tests use fakes; nothing here needs CoreBluetooth, CoreMIDI or the Wails desktop tag
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      # package main embeds all:frontend/dist
+      - run: make dist
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "$out"; echo "run 'make fmt'"; exit 1; fi
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15
+      - run: go test ./... -race
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: frontend/package.json # same bun as local, or the lockfile drifts
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - run: bun run lint
+        working-directory: frontend
+      - run: bun run test
+        working-directory: frontend
+      - run: bun run build
+        working-directory: frontend

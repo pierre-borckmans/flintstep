@@ -1,0 +1,49 @@
+# golangci-lint config. Run via `make lint-go`.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose    # every http.Response body must be closed
+    - errorlint    # %w and errors.Is/As over == comparisons
+    - misspell
+    - nilerr       # returning nil after a non-nil error
+    - rowserrcheck
+    - unconvert
+    - wastedassign
+
+  settings:
+    errcheck:
+      # An explicit `_ =` is a decision; an unchecked call is an oversight.
+      check-blank: false
+      exclude-functions:
+        - (*os.File).Close
+    staticcheck:
+      checks: ["all", "-ST1000", "-ST1003"] # no package comment / naming dogma
+    misspell:
+      # locale is left unset on purpose: catch real typos, leave British spellings
+      # alone (the codebase uses "serialises", "analysing" and friends deliberately).
+      # The schema only accepts US or UK, so "" fails `golangci-lint config verify`.
+      {}
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      # Test helpers legitimately ignore errors while driving fakes.
+      - path: _test\.go
+        linters: [errcheck, bodyclose]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [sparkbridge]

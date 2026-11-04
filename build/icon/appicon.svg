@@ -1,0 +1,65 @@
+<!--
+  SparkX MIDI app icon: SOURCE OF TRUTH. Edit, then run `make icon`.
+  Canvas 1024x1024 on Apple's macOS icon grid: the body is an 824x824 rounded square at
+  (100,100), corner radius 185. Keep artwork inside the body.
+  The six footswitches of a Spark Control X in their 3+3 layout, rings lit.
+-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22252b"/>
+      <stop offset="1" stop-color="#0c0d10"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".22"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".03"/>
+      <stop offset="1" stop-color="#000000" stop-opacity=".4"/>
+    </linearGradient>
+    <radialGradient id="cap" cx=".4" cy=".35">
+      <stop offset="0" stop-color="#5a6169"/>
+      <stop offset="1" stop-color="#23272c"/>
+    </radialGradient>
+    <radialGradient id="halo00"><stop offset=".5" stop-color="#ffb454" stop-opacity=".55"/><stop offset="1" stop-color="#ffb454" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo01"><stop offset=".5" stop-color="#ffb454" stop-opacity=".55"/><stop offset="1" stop-color="#ffb454" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo02"><stop offset=".5" stop-color="#7fe3a0" stop-opacity=".55"/><stop offset="1" stop-color="#7fe3a0" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo10"><stop offset=".5" stop-color="#5fd3ff" stop-opacity=".55"/><stop offset="1" stop-color="#5fd3ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo11"><stop offset=".5" stop-color="#5fd3ff" stop-opacity=".55"/><stop offset="1" stop-color="#5fd3ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="halo12"><stop offset=".5" stop-color="#ff6fae" stop-opacity=".55"/><stop offset="1" stop-color="#ff6fae" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#body)" filter="url(#shadow)"/>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <!-- MIDI DIN, small, top left -->
+  <g transform="translate(250 228)" fill="none" stroke="#e7e4dc" stroke-opacity=".8" stroke-width="7">
+    <circle r="40"/>
+    <g fill="#e7e4dc" stroke="none"><circle cx="-22" cy="-4" r="6"/><circle cx="22" cy="-4" r="6"/><circle cx="-16" cy="16" r="6"/><circle cx="16" cy="16" r="6"/><circle cx="0" cy="22" r="6"/></g>
+  </g>
+  <rect x="680" y="216" width="94" height="24" rx="12" fill="#7fe3a0" opacity=".9"/>
+  <circle cx="318" cy="400" r="112" fill="url(#halo00)"/>
+  <circle cx="318" cy="400" r="72" fill="none" stroke="#ffb454" stroke-width="10"/>
+  <circle cx="318" cy="400" r="60" fill="url(#cap)"/>
+  <circle cx="318" cy="400" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <circle cx="512" cy="400" r="112" fill="url(#halo01)"/>
+  <circle cx="512" cy="400" r="72" fill="none" stroke="#ffb454" stroke-width="10"/>
+  <circle cx="512" cy="400" r="60" fill="url(#cap)"/>
+  <circle cx="512" cy="400" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <circle cx="706" cy="400" r="112" fill="url(#halo02)"/>
+  <circle cx="706" cy="400" r="72" fill="none" stroke="#7fe3a0" stroke-width="10"/>
+  <circle cx="706" cy="400" r="60" fill="url(#cap)"/>
+  <circle cx="706" cy="400" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <circle cx="318" cy="640" r="112" fill="url(#halo10)"/>
+  <circle cx="318" cy="640" r="72" fill="none" stroke="#5fd3ff" stroke-width="10"/>
+  <circle cx="318" cy="640" r="60" fill="url(#cap)"/>
+  <circle cx="318" cy="640" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <circle cx="512" cy="640" r="112" fill="url(#halo11)"/>
+  <circle cx="512" cy="640" r="72" fill="none" stroke="#5fd3ff" stroke-width="10"/>
+  <circle cx="512" cy="640" r="60" fill="url(#cap)"/>
+  <circle cx="512" cy="640" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <circle cx="706" cy="640" r="112" fill="url(#halo12)"/>
+  <circle cx="706" cy="640" r="72" fill="none" stroke="#ff6fae" stroke-width="10"/>
+  <circle cx="706" cy="640" r="60" fill="url(#cap)"/>
+  <circle cx="706" cy="640" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <rect x="200" y="788" width="624" height="10" rx="5" fill="#ffffff" opacity=".06"/>
+</svg>

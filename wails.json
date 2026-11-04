@@ -1,0 +1,20 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "SparkX MIDI",
+  "outputfilename": "SparkX MIDI",
+  "frontend:install": "bun install",
+  "frontend:build": "bun run build",
+  "frontend:dev:watcher": "bun run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Pierre Borckmans",
+    "email": "pborckmans@gmail.com"
+  },
+  "info": {
+    "companyName": "silversol",
+    "productName": "SparkX MIDI",
+    "productVersion": "0.1.0",
+    "copyright": "© 2026 Pierre Borckmans",
+    "comments": "SparkX MIDI turns a Spark Control X into a MIDI foot controller. Not affiliated with Positive Grid."
+  }
+}
