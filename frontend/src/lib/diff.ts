@@ -1,7 +1,8 @@
-import type { Action, Combo, Config, ExpConfig } from "../types";
-import { SWITCH_NAMES } from "../types";
+import type { Action, Combo, Config, ExpConfig, Indicator } from "../types";
+import { INDICATOR_NAMES, SWITCH_NAMES } from "../types";
 import { comboName } from "./caption";
 import { defaultConfig, mappingOf, sameConfig } from "./config";
+import { modeLabel } from "./indicators";
 import { noteName } from "./notes";
 
 // HISTORY LABELS. What changed between two configs, in a few words for the undo menu:
@@ -77,6 +78,16 @@ function expChanges(n: number, a: ExpConfig, b: ExpConfig): string[] {
   return out;
 }
 
+function indicatorChanges(n: number, a: Indicator, b: Indicator): string[] {
+  const at = `${INDICATOR_NAMES[n] ?? n + 1} lamp`;
+  const out: string[] = [];
+  if (a.mode !== b.mode) out.push(`${at} · ${modeLabel(b.mode)}`);
+  if (a.colour.r !== b.colour.r || a.colour.g !== b.colour.g || a.colour.b !== b.colour.b) {
+    out.push(`${at} · colour`);
+  }
+  return out;
+}
+
 /** Every change from `before` to `after`, one phrase each, in the order the editor
  *  shows them: switches, combos, expression, then the settings. */
 export function configChanges(before: Config, after: Config): string[] {
@@ -96,6 +107,10 @@ export function configChanges(before: Config, after: Config): string[] {
   out.push(...comboChanges(before.combos, after.combos));
   for (let i = 0; i < Math.min(before.exp.length, after.exp.length); i++) {
     out.push(...expChanges(i, before.exp[i], after.exp[i]));
+  }
+  const ind = Math.min(before.indicators?.length ?? 0, after.indicators?.length ?? 0);
+  for (let i = 0; i < ind; i++) {
+    out.push(...indicatorChanges(i, before.indicators[i], after.indicators[i]));
   }
   if (before.ledMode !== after.ledMode) {
     out.push(`LED mode · ${after.ledMode === "feedback" ? "MIDI feedback" : "local"}`);

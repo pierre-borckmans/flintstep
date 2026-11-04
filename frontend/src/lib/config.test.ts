@@ -24,7 +24,7 @@ describe("defaultConfig", () => {
   // mapping.Default(), field for field: what ResetConfig would return.
   it("is Go's Default()", () =>
     expect(defaultConfig()).toEqual({
-      version: 1,
+      version: 2,
       pedal: { address: "", name: "" },
       switches: [
         { r: 255, g: 150, b: 0 },
@@ -46,7 +46,42 @@ describe("defaultConfig", () => {
       ledMode: "local",
       longPressMs: 500,
       brightness: 100,
+      indicators: [
+        { mode: "midiOut", colour: { r: 0, g: 176, b: 80 } },
+        { mode: "connected", colour: { r: 64, g: 32, b: 255 } },
+      ],
     }));
+});
+
+describe("indicators", () => {
+  it("rejects an unknown mode, naming the lamp", () => {
+    const c = defaultConfig();
+    c.indicators[1] = { ...c.indicators[1], mode: "blink" as "on" };
+    expect(validate(c)).toBe("APP lamp: unknown mode");
+  });
+  it("needs both lamps", () =>
+    expect(validate({ ...defaultConfig(), indicators: [] })).toBe(
+      "the pedal has two indicator lamps",
+    ));
+  it("edits one lamp's mode or colour", () => {
+    const c = defaultConfig();
+    const m = edit(c, { type: "indicator", n: 0, patch: { mode: "usb" } });
+    expect(m.indicators[0]).toEqual({ mode: "usb", colour: c.indicators[0].colour });
+    expect(m.indicators[1]).toEqual(c.indicators[1]);
+    expect(c.indicators[0].mode).toBe("midiOut");
+    const red = { r: 255, g: 0, b: 0 };
+    expect(
+      edit(c, { type: "indicator", n: 1, patch: { colour: red } }).indicators[1].colour,
+    ).toEqual(red);
+  });
+  it("coalesces repeated edits to one field of one lamp", () => {
+    expect(opKey({ type: "indicator", n: 0, patch: { mode: "on" } })).toBe(
+      opKey({ type: "indicator", n: 0, patch: { mode: "off" } }),
+    );
+    expect(opKey({ type: "indicator", n: 0, patch: { mode: "on" } })).not.toBe(
+      opKey({ type: "indicator", n: 1, patch: { mode: "on" } }),
+    );
+  });
 });
 
 // The rules of mapping.Config.Validate, in its order and its words.

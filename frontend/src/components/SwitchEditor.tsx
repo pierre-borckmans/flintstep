@@ -1,95 +1,15 @@
 import { Plus, X } from "lucide-react";
 import { comboName } from "../lib/caption";
-import { fromHex, rgb, SWATCHES, sameColour, toHex } from "../lib/colour";
 import type { Op } from "../lib/config";
-import type { Colour, Config } from "../types";
+import type { Config } from "../types";
 import { SWITCH_NAMES } from "../types";
 import { Button } from "../ui/Button";
+import { ColourPicker } from "../ui/ColourPicker";
 import { cx } from "../ui/cx";
 import { Seg } from "../ui/Seg";
 import { Toggle } from "../ui/Toggle";
 import { ActionEditor } from "./ActionEditor";
 import { Section } from "./Section";
-
-function Swatch({
-  colour,
-  name,
-  on,
-  onPick,
-}: {
-  colour: Colour;
-  name: string;
-  on: boolean;
-  onPick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={name}
-      aria-label={name}
-      aria-pressed={on}
-      onClick={onPick}
-      className="relative grid h-7 w-7 place-items-center rounded-full"
-    >
-      <span
-        className={cx(
-          "absolute inset-0 rounded-full border transition-colors duration-(--dur)",
-          on ? "border-key/70" : "border-transparent",
-        )}
-      />
-      <span
-        className="h-[18px] w-[18px] rounded-full"
-        style={{
-          background: `radial-gradient(circle at 38% 30%, rgb(255 255 255 / 0.75), ${rgb(colour)} 68%)`,
-          boxShadow: `0 0 6px ${rgb(colour, 0.6)}, 0 0 0 1px rgb(0 0 0 / 0.5)`,
-        }}
-      />
-    </button>
-  );
-}
-
-function ColourPicker({ colour, onChange }: { colour: Colour; onChange: (c: Colour) => void }) {
-  const curated = SWATCHES.some((s) => sameColour(s.colour, colour));
-  return (
-    <div className="flex flex-wrap items-center gap-0.5">
-      {SWATCHES.map((s) => (
-        <Swatch
-          key={s.name}
-          name={s.name}
-          colour={s.colour}
-          on={sameColour(s.colour, colour)}
-          onPick={() => onChange(s.colour)}
-        />
-      ))}
-      <label
-        title="Custom colour"
-        className={cx(
-          "relative ml-1 flex h-7 cursor-pointer items-center gap-1.5 rounded-full border px-2 text-ui-xs",
-          curated ? "border-edge text-muted hover:text-text" : "border-key/70 text-text",
-        )}
-      >
-        <span
-          className="h-3 w-3 rounded-full"
-          style={{
-            background: curated
-              ? "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)"
-              : rgb(colour),
-          }}
-        />
-        {curated ? "Custom" : toHex(colour)}
-        <input
-          type="color"
-          className="absolute inset-0 cursor-pointer opacity-0"
-          value={toHex(colour)}
-          onChange={(e) => {
-            const c = fromHex(e.target.value);
-            if (c) onChange(c);
-          }}
-        />
-      </label>
-    </div>
-  );
-}
 
 function SwitchSelect({
   value,
@@ -116,30 +36,35 @@ function SwitchSelect({
   );
 }
 
+/** The I II A III IV B row above the editor. sw null (an indicator lamp is being
+ *  edited) shows none of them chosen. */
+export function SwitchTabs({ sw, onSelect }: { sw: number | null; onSelect: (n: number) => void }) {
+  return (
+    <div className="px-4 pt-3 pb-1">
+      <Seg
+        label="Switch"
+        options={SWITCH_NAMES.map((name, i) => ({ value: String(i), label: name }))}
+        value={sw === null ? "" : String(sw)}
+        onChange={(v) => onSelect(Number(v))}
+      />
+    </div>
+  );
+}
+
 export function SwitchEditor({
   config,
   sw,
-  onSelect,
   apply,
 }: {
   config: Config;
   sw: number;
-  onSelect: (n: number) => void;
   apply: (op: Op) => void;
 }) {
   const s = config.switches[sw];
   const hasLong = s.long.kind !== "off";
+  // A fragment: the parent puts SwitchTabs above, and the first section keeps its rule.
   return (
-    <div className="flex flex-col">
-      <div className="px-4 pt-3 pb-1">
-        <Seg
-          label="Switch"
-          options={SWITCH_NAMES.map((name, i) => ({ value: String(i), label: name }))}
-          value={String(sw)}
-          onChange={(v) => onSelect(Number(v))}
-        />
-      </div>
-
+    <>
       <Section title={`Switch ${SWITCH_NAMES[sw]} · tap`}>
         <ActionEditor action={s.tap} onChange={(patch) => apply({ type: "tap", sw, patch })} />
       </Section>
@@ -258,6 +183,6 @@ export function SwitchEditor({
           </ul>
         )}
       </Section>
-    </div>
+    </>
   );
 }

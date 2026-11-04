@@ -216,6 +216,9 @@ export function SettingsPanel({
           unit="%"
           onChange={(value) => apply({ type: "brightness", value })}
         />
+        <p className="text-ui-xs leading-snug text-faint">
+          Click AMP or APP on the pedal to choose what those two lamps show.
+        </p>
       </Section>
 
       <Section title="Switches">

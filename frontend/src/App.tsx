@@ -4,9 +4,11 @@ import { ActivityLog } from "./components/Activity";
 import { ExpressionPanel } from "./components/ExpressionPanel";
 import { Header } from "./components/Header";
 import { HistoryBar } from "./components/HistoryBar";
+import { IndicatorEditor } from "./components/IndicatorEditor";
 import { Pedal } from "./components/Pedal";
 import { SettingsPanel } from "./components/SettingsPanel";
-import { SwitchEditor } from "./components/SwitchEditor";
+import { SwitchEditor, SwitchTabs } from "./components/SwitchEditor";
+import type { IndicatorIndex } from "./types";
 import { cx } from "./ui/cx";
 import { useBridge } from "./useBridge";
 
@@ -23,6 +25,11 @@ export default function App({ backend }: { backend: Backend }) {
   const bridge = useBridge(backend);
   const { state, config, apply } = bridge;
   const [sel, setSel] = useState(() => Math.max(0, Number(q.get("sel") ?? 0)) % 6);
+  // An indicator lamp (Amp 0, App 1) being edited instead of a switch: one or the
+  // other, never both. ?lamp=amp|app opens on one, for screenshots.
+  const [ind, setInd] = useState<IndicatorIndex | null>(() =>
+    q.get("lamp") === "amp" ? 0 : q.get("lamp") === "app" ? 1 : null,
+  );
   const [tab, setTab] = useState<Tab>(() => (q.get("tab") as Tab) || "switches");
   const status = state?.pedal ?? null;
   const live = status?.state === "connected";
@@ -44,6 +51,11 @@ export default function App({ backend }: { backend: Backend }) {
 
   const select = (n: number) => {
     setSel(n);
+    setInd(null);
+    setTab("switches");
+  };
+  const selectIndicator = (i: IndicatorIndex) => {
+    setInd(i);
     setTab("switches");
   };
 
@@ -52,10 +64,17 @@ export default function App({ backend }: { backend: Backend }) {
       <Header state={state} />
       <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(320px,360px)] gap-3 p-3">
         <div className="flex min-h-0 min-w-0 flex-col gap-3">
-          <Pedal status={status} config={config} selected={sel} onSelect={select} />
+          <Pedal
+            status={status}
+            config={config}
+            selected={ind === null ? sel : -1}
+            onSelect={select}
+            selectedIndicator={ind}
+            onSelectIndicator={selectIndicator}
+          />
           <p className="-mt-1 text-center text-ui-xs text-faint">
             {live
-              ? "Click a switch to edit it. Pressing it on the pedal lights it here too."
+              ? "Click a switch, or the AMP and APP lamps, to edit it. Pressing a switch lights it here too."
               : status?.detail || "Waiting for the app"}
           </p>
           <ActivityLog log={bridge.log} midi={state?.midi ?? null} />
@@ -84,7 +103,14 @@ export default function App({ backend }: { backend: Backend }) {
             {!config || !state ? (
               <p className="p-4 text-ui-sm text-faint">Loading…</p>
             ) : tab === "switches" ? (
-              <SwitchEditor config={config} sw={sel} onSelect={setSel} apply={apply} />
+              <div className="flex flex-col">
+                <SwitchTabs sw={ind === null ? sel : null} onSelect={select} />
+                {ind === null ? (
+                  <SwitchEditor config={config} sw={sel} apply={apply} />
+                ) : (
+                  <IndicatorEditor config={config} n={ind} apply={apply} />
+                )}
+              </div>
             ) : tab === "expression" ? (
               <ExpressionPanel
                 config={config}
