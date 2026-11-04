@@ -167,3 +167,18 @@ func TestNoLampsAfterGoingDark(t *testing.T) {
 		t.Errorf("lamp 2 lit again after going dark (%d writes)", n)
 	}
 }
+
+// Another host can darken our lamps without telling us, so they are rewritten on a
+// timer even when nothing changed.
+func TestLampsRewrittenPeriodically(t *testing.T) {
+	m := newManager((&recorder{}).handlers(), &fakeAir{}, fastTiming)
+	m.tm.lampRefresh = 20 * time.Millisecond
+	s := newSession(m, Device{Name: "SparkX t", Address: "a"})
+	c := &fakeConn{addr: "a", s: s}
+	m.mu.Lock()
+	m.cur = s
+	m.mu.Unlock()
+	s.start(c, [sparkx.Switches]sparkx.Colour{})
+	t.Cleanup(s.stop)
+	waitFor(t, "a refresh of the App lamp", func() bool { return c.lampWrites(sparkx.LampApp, appColour) >= 4 })
+}

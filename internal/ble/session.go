@@ -158,6 +158,13 @@ func (s *session) goDark() {
 func (s *session) writer() {
 	poll := time.NewTicker(s.m.tm.batteryPoll)
 	defer poll.Stop()
+	// LAMPS ARE THE PEDAL'S, NOT OURS. Every host connected to it (macOS, the Spark app,
+	// a second copy of this bridge) writes the same eight lamps, and any of them can
+	// darken what we lit without us hearing about it. So the lamps are rewritten in
+	// full every lampRefresh: sixteen small writes, and a lamp someone else changed is
+	// back within seconds.
+	refresh := time.NewTicker(s.m.tm.lampRefresh)
+	defer refresh.Stop()
 	failed := false
 	write := func(b []byte) {
 		s.m.trace.line("TX", "cmd", b)
@@ -199,6 +206,16 @@ func (s *session) writer() {
 			close(reply)
 		case <-poll.C:
 			write(sparkx.BatteryRequest())
+		case <-refresh.C:
+			s.mu.Lock()
+			gone := s.gone
+			if !gone {
+				s.lamps.Forget()
+			}
+			s.mu.Unlock()
+			if !gone {
+				flush()
+			}
 		}
 	}
 }

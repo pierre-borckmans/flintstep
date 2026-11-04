@@ -110,6 +110,7 @@ type timing struct {
 	statusEvery            time.Duration // the most often Status is reported
 	darkWait               time.Duration // how long a hang-up waits for the lamps to go dark
 	batteryPoll            time.Duration
+	lampRefresh            time.Duration // rewrite every lamp: another host may have changed them
 	idDial                 time.Duration // a remembered pedal the Mac does not hold
 	heldDial               time.Duration // a pedal the Mac holds: answers at once
 	scanFor                time.Duration // the connect path's scan
@@ -124,6 +125,7 @@ var defaultTiming = timing{
 	statusEvery: 50 * time.Millisecond,
 	darkWait:    600 * time.Millisecond,
 	batteryPoll: 60 * time.Second,
+	lampRefresh: 3 * time.Second,
 	idDial:      4 * time.Second,
 	heldDial:    10 * time.Second,
 	scanFor:     5 * time.Second,

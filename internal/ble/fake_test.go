@@ -191,6 +191,7 @@ var fastTiming = timing{
 	statusEvery: time.Millisecond,
 	darkWait:    500 * time.Millisecond,
 	batteryPoll: time.Hour,
+	lampRefresh: time.Hour,
 	idDial:      4 * time.Second,
 	heldDial:    10 * time.Second,
 	scanFor:     10 * time.Millisecond,
