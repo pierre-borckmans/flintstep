@@ -25,6 +25,21 @@ jobs:
           version: v2.15
       - run: go test ./... -race
 
+  # The Ubuntu job can't compile the cgo darwin files (CoreMIDI, CoreBluetooth, tray).
+  # This one only checks that they still build.
+  go-darwin:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: make dist
+      - run: go build ./...
+        env:
+          CGO_ENABLED: "1"
+
   web:
     runs-on: ubuntu-latest
     steps:

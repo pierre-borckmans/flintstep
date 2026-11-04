@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the release and upload the DMG
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # git describe needs the tags
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: frontend/package.json
+      - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
+      - run: make dmg VERSION=${{ github.ref_name }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: build/bin/SparkX-MIDI-${{ github.ref_name }}.dmg
+          fail_on_unmatched_files: true
+          generate_release_notes: true
