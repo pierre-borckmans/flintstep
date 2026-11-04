@@ -23,7 +23,7 @@ export function Button({
       type="button"
       {...rest}
       className={cx(
-        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-ui-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow,filter] duration-(--dur) ease-(--ease) disabled:cursor-default disabled:opacity-40",
+        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-ui-sm font-semibold whitespace-nowrap transition-[color,background-color,box-shadow,filter,translate] duration-(--dur-fast) ease-(--ease) enabled:active:translate-y-px enabled:active:brightness-90 disabled:cursor-default disabled:opacity-40",
         size === "sm" ? "h-6 px-2 text-ui-xs" : "h-7 px-3 text-ui-sm",
         kind === "primary" && "lit bg-panel3 text-bone enabled:hover:brightness-110",
         kind === "plain" && "rim bg-panel2 text-text enabled:hover:bg-panel3 enabled:hover:warm",

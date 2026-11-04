@@ -11,7 +11,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { SwitchEditor, SwitchTabs } from "./components/SwitchEditor";
 import { readViewPreference, saveViewPreference } from "./lib/view";
 import type { IndicatorIndex } from "./types";
-import { cx } from "./ui/cx";
+import { TabPanel, Tabs, useTabsId } from "./ui/Tabs";
 import { useBridge } from "./useBridge";
 
 type Tab = "switches" | "expression" | "settings";
@@ -32,7 +32,15 @@ export default function App({ backend }: { backend: Backend }) {
   const [ind, setInd] = useState<IndicatorIndex | null>(() =>
     q.get("lamp") === "amp" ? 0 : q.get("lamp") === "app" ? 1 : null,
   );
-  const [tab, setTab] = useState<Tab>(() => (q.get("tab") as Tab) || "switches");
+  const [tab, setTabNow] = useState<Tab>(() => (q.get("tab") as Tab) || "switches");
+  // Which way the panels slide: the previous tab's place relative to the new one.
+  const [tabFrom, setTabFrom] = useState(0);
+  const setTab = (t: Tab) => {
+    const at = (x: Tab) => TABS.findIndex((d) => d.id === x);
+    if (t !== tab) setTabFrom(at(tab) - at(t));
+    setTabNow(t);
+  };
+  const tabsId = useTabsId();
   const status = state?.pedal ?? null;
   const [split, setSplit] = useState(() => readViewPreference("sparkx.viewer.split", 72, 40, 82));
   const workspace = useRef<HTMLDivElement>(null);
@@ -140,47 +148,46 @@ export default function App({ backend }: { backend: Backend }) {
             <span className="inspector-meta">6 switches · 2 inputs</span>
           </div>
           <PresetPicker presets={bridge.presets} start={(q.get("picker") as PickerStart) || null} />
-          <nav className="inspector-tabs" aria-label="Controller sections">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                aria-current={tab === t.id ? "page" : undefined}
-                className={cx("inspector-tab", tab === t.id && "is-active")}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <Tabs
+            className="inspector-tabs"
+            label="Controller sections"
+            base={tabsId}
+            tabs={TABS}
+            value={tab}
+            onChange={setTab}
+          />
           <div className="scroll-y min-h-0 flex-1">
             {!config || !state ? (
               <p className="p-4 text-ui-sm text-faint">Loading…</p>
-            ) : tab === "switches" ? (
-              <div className="flex flex-col">
-                <SwitchTabs sw={ind === null ? sel : null} onSelect={select} />
-                {ind === null ? (
-                  <SwitchEditor config={config} sw={sel} apply={apply} />
-                ) : (
-                  <IndicatorEditor config={config} n={ind} apply={apply} />
-                )}
-              </div>
-            ) : tab === "expression" ? (
-              <ExpressionPanel
-                config={config}
-                status={status}
-                engaged={state.expTrigger ?? []}
-                apply={apply}
-                calibrate={bridge.calibrate}
-              />
             ) : (
-              <SettingsPanel
-                backend={backend}
-                state={state}
-                config={config}
-                apply={apply}
-                reset={bridge.reset}
-              />
+              <TabPanel key={tab} base={tabsId} id={tab} from={tabFrom}>
+                {tab === "switches" ? (
+                  <div className="flex flex-col">
+                    <SwitchTabs sw={ind === null ? sel : null} onSelect={select} />
+                    {ind === null ? (
+                      <SwitchEditor key={sel} config={config} sw={sel} apply={apply} />
+                    ) : (
+                      <IndicatorEditor key={ind} config={config} n={ind} apply={apply} />
+                    )}
+                  </div>
+                ) : tab === "expression" ? (
+                  <ExpressionPanel
+                    config={config}
+                    status={status}
+                    engaged={state.expTrigger ?? []}
+                    apply={apply}
+                    calibrate={bridge.calibrate}
+                  />
+                ) : (
+                  <SettingsPanel
+                    backend={backend}
+                    state={state}
+                    config={config}
+                    apply={apply}
+                    reset={bridge.reset}
+                  />
+                )}
+              </TabPanel>
             )}
           </div>
           <HistoryBar bridge={bridge} initialOpen={q.get("history") === "open"} />

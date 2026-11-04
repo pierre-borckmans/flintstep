@@ -22,7 +22,7 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={cx(
-        "relative h-[18px] w-[34px] shrink-0 rounded-full border border-edge bg-sunken shadow-[inset_0_1px_2px_rgb(0_0_0/0.6)] disabled:opacity-40",
+        "group relative h-[18px] w-[34px] shrink-0 rounded-full border border-edge bg-sunken shadow-[inset_0_1px_2px_rgb(0_0_0/0.6)] disabled:opacity-40",
       )}
     >
       <span
@@ -30,13 +30,15 @@ export function Toggle({
         style={{
           background: on ? "var(--color-beam)" : "#23272b",
           boxShadow: on ? "var(--glow-accent)" : "none",
-          transition: "all var(--dur-led) var(--ease-led)",
+          // The lamp is an LED: on at once, off with a short decay.
+          transition: on ? "none" : "all var(--dur-led) var(--ease-led)",
         }}
       />
+      {/* The cap slides; pressed, it squashes a little toward where it is going. */}
       <span
         className={cx(
-          "absolute top-[1px] h-[14px] w-[14px] rounded-full transition-[left] duration-(--dur) ease-(--ease)",
-          on ? "left-[17px]" : "left-[1px]",
+          "absolute top-[1px] left-[1px] h-[14px] w-[14px] rounded-full transition-[translate,scale] duration-(--dur) ease-(--ease) group-enabled:group-active:scale-x-115",
+          on ? "translate-x-4 origin-right" : "translate-x-0 origin-left",
         )}
         style={{
           background: "radial-gradient(circle at 38% 30%, #9aa2a9, #50585f 60%, #3a4046)",

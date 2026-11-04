@@ -1,6 +1,16 @@
+import { useRef } from "react";
 import { cx } from "./cx";
+import { useIndicator } from "./useIndicator";
 
-/** Segmented control. The chosen segment is lit, never tinted. */
+export interface SegOption<T extends string> {
+  value: T;
+  label: string;
+  /** A few words under the label (the trigger modes). */
+  hint?: string;
+}
+
+/** Segmented control. The chosen segment is lit, never tinted: one lit thumb slides
+ *  behind the options to the chosen one. ←/→ move the choice, like native radios. */
 export function Seg<T extends string>({
   options,
   value,
@@ -9,22 +19,48 @@ export function Seg<T extends string>({
   size = "md",
   label,
 }: {
-  options: { value: T; label: string }[];
+  options: SegOption<T>[];
   value: T;
   onChange: (v: T) => void;
   className?: string;
   size?: "sm" | "md";
   label?: string;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  const thumb = useIndicator(box, '[aria-checked="true"]', [value, options.length]);
+  const index = options.findIndex((o) => o.value === value);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    const d =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (!d) return;
+    e.preventDefault();
+    const next = options[(Math.max(0, index) + d + options.length) % options.length];
+    onChange(next.value);
+    box.current?.querySelector<HTMLElement>(`[data-value="${CSS.escape(next.value)}"]`)?.focus();
+  };
+
   return (
     <div
+      ref={box}
       role="radiogroup"
       aria-label={label}
+      onKeyDown={onKey}
       className={cx(
-        "flex rounded-ui-md border border-edge bg-sunken p-0.5 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]",
+        "seg relative isolate flex rounded-ui-md border border-edge bg-sunken p-0.5 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]",
         className,
       )}
     >
+      <span
+        aria-hidden
+        data-ready={thumb.ready}
+        className="seg-thumb slide-indicator lit inset-y-0.5 -z-10 rounded-ui-sm bg-panel3"
+        style={thumb.style}
+      />
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -33,14 +69,33 @@ export function Seg<T extends string>({
             type="button"
             role="radio"
             aria-checked={on}
+            data-value={o.value}
+            tabIndex={on || (index < 0 && o === options[0]) ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cx(
-              "flex-1 truncate rounded-ui-sm font-semibold transition-[color,background-color,box-shadow] duration-(--dur) ease-(--ease)",
-              size === "sm" ? "h-7 px-2 text-ui-xs" : "h-8 px-1.5 text-ui-sm",
-              on ? "lit bg-panel3 text-bone" : "text-muted hover:text-text hover:warm",
+              "flex min-w-0 flex-1 rounded-ui-sm font-semibold transition-[color,background-image] duration-(--dur) ease-(--ease) active:brightness-90",
+              o.hint
+                ? "flex-col items-center gap-0.5 px-1.5 py-1.5"
+                : cx(
+                    "items-center justify-center",
+                    size === "sm" ? "h-7 px-2 text-ui-xs" : "h-8 px-1.5 text-ui-sm",
+                  ),
+              on ? "text-bone" : "text-muted hover:text-text hover:warm",
+              // The thumb carries the light until it has been placed once.
+              on && !thumb.shown && "lit bg-panel3",
             )}
           >
-            {o.label}
+            <span className={cx("truncate", o.hint && "text-ui-sm leading-none")}>{o.label}</span>
+            {o.hint && (
+              <span
+                className={cx(
+                  "truncate text-ui-2xs leading-none font-normal",
+                  on ? "text-muted" : "text-faint",
+                )}
+              >
+                {o.hint}
+              </span>
+            )}
           </button>
         );
       })}

@@ -50,8 +50,10 @@ export function Lamp({
         height: size,
         background: on ? LIT[colour] : UNLIT,
         boxShadow: on ? GLOW[colour] : "inset 0 1px 0 rgb(255 244 228 / 0.06)",
-        transition:
-          "background var(--dur-led) var(--ease-led), box-shadow var(--dur-led) var(--ease-led)",
+        // An LED: on at once, off with the shortest decay.
+        transition: on
+          ? "none"
+          : "background var(--dur-led) var(--ease-led), box-shadow var(--dur-led) var(--ease-led)",
         ...style,
       }}
     />

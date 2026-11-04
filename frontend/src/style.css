@@ -195,6 +195,99 @@ select:not(:disabled) {
   animation: fade-up var(--dur-up) var(--ease-incand) both;
 }
 
+/* MOTION PRIMITIVES (src/ui). Panels and selection are incandescent: they rise on
+   --dur-up and die on --dur-down. Under reduced motion the override above makes every
+   one of these instant. */
+
+/* Popover: grows out of its anchor, then fades away slower than it came. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--pop-from, -4px)) scale(0.97);
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+  }
+}
+.popover {
+  transform-origin: var(--pop-origin, top center);
+}
+.popover[data-state="open"] {
+  animation: pop-in var(--dur-up) var(--ease-incand) both;
+}
+.popover[data-state="closed"] {
+  animation: pop-out var(--dur-down) var(--ease-incand) both;
+  pointer-events: none;
+}
+
+/* Collapse: the grid-rows trick animates to the content's own height, no measuring. The
+   negative margin cancels the parent's gap while closed, so nothing jumps at the end. */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  margin-top: calc(-1 * var(--collapse-gap, 0px));
+  opacity: 0;
+  transition:
+    grid-template-rows var(--dur-up) var(--ease-incand),
+    margin-top var(--dur-up) var(--ease-incand),
+    opacity var(--dur) var(--ease);
+}
+.collapsible[data-open="true"] {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  opacity: 1;
+}
+.collapsible > div {
+  min-height: 0;
+  overflow: hidden;
+}
+/* While open and settled, let focus rings and popovers spill out. */
+.collapsible[data-settled="true"] > div {
+  overflow: visible;
+}
+
+/* Tab panel arriving: a short slide from the side it came from. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--panel-from, 0px));
+  }
+}
+.tab-panel {
+  animation: panel-in var(--dur-up) var(--ease-incand) both;
+}
+
+/* A row joining a list: the list opens a row's height, then the row is there. max-height
+   (to a bound past any row, --row-max) animates without measuring the row. */
+@keyframes row-open {
+  from {
+    max-height: 0;
+    opacity: 0;
+  }
+  to {
+    max-height: var(--row-max, 48px);
+  }
+}
+@utility row-open {
+  overflow: hidden;
+  animation: row-open var(--dur) var(--ease) both;
+}
+
+/* The sliding thumb (Seg) and underline (Tabs): selection, so incandescent. */
+.slide-indicator {
+  position: absolute;
+  left: 0;
+  pointer-events: none;
+}
+.slide-indicator[data-ready="true"] {
+  transition:
+    transform var(--dur-up) var(--ease-incand),
+    width var(--dur-up) var(--ease-incand),
+    opacity var(--dur) var(--ease);
+}
+
 /* A log row arriving: an LED, so it switches on, then the warm afterglow fades. */
 @keyframes row-in {
   from {
@@ -206,6 +299,23 @@ select:not(:disabled) {
 }
 @utility row-in {
   animation: row-in 900ms var(--ease-incand) both;
+}
+/* The same row arriving at the top of the log: the rows below glide down to make room
+   while the row itself is already lit (no fade: it is data). */
+@keyframes log-open {
+  from {
+    max-height: 0;
+    padding-block: 0;
+  }
+  to {
+    max-height: 40px;
+  }
+}
+@utility log-open {
+  overflow: hidden;
+  animation:
+    log-open var(--dur) var(--ease) both,
+    row-in 900ms var(--ease-incand) both;
 }
 
 /* A slow breathing for "searching". Not a spinner: a lamp that is looking. */
@@ -352,7 +462,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 3px;
   background: var(--color-edge-strong);
   border-radius: 2px;
-  transition: background 160ms;
+  transition: background var(--dur) var(--ease);
 }
 .viewer-divider:hover > span,
 .viewer-divider:focus-visible > span {
@@ -430,27 +540,26 @@ input[type="range"]::-webkit-slider-thumb {
   border-bottom: 1px solid var(--color-edge);
   gap: 24px;
 }
-.inspector-tab {
+.inspector-tabs .tab {
   position: relative;
   height: 40px;
   color: var(--color-muted);
   font-size: 12px;
   font-weight: 500;
+  transition: color var(--dur) var(--ease);
 }
-.inspector-tab:hover {
+.inspector-tabs .tab:hover {
   color: var(--color-bone);
 }
-.inspector-tab.is-active {
+.inspector-tabs .tab.is-active {
   color: var(--color-beam);
 }
-.inspector-tab.is-active::after {
-  content: "";
-  position: absolute;
+/* One underline for the row, sliding under the chosen tab (ui/Tabs). */
+.tab-line {
   bottom: -1px;
-  left: 0;
-  right: 0;
   height: 2px;
   background: var(--color-beam);
+  border-radius: 1px;
 }
 .switch-selector [role="radiogroup"] {
   background: transparent;
@@ -468,6 +577,15 @@ input[type="range"]::-webkit-slider-thumb {
 .switch-selector [aria-checked="true"] {
   border-color: #b39d6c;
   box-shadow: none;
+}
+.switch-selector [role="radio"] {
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur-up) var(--ease-incand);
+}
+.switch-selector .seg-thumb {
+  inset-block: 0;
+  border-radius: var(--radius-ui-sm);
 }
 .editor-section > div:first-child > span:first-child {
   color: #c6cbbf;
