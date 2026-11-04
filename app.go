@@ -78,12 +78,19 @@ type App struct {
 	emitMu sync.RWMutex // emit reads quiet; shutdown sets it
 	quiet  bool
 	emitTo func(name string, data any) // Wails' EventsEmit; tests replace it
+
+	prefsMu    sync.Mutex // serialises SetTheme: the native window and prefs.json move together
+	prefs      store.Prefs
+	prefsFile  string            // "" = no data dir: the theme still applies, it just isn't kept
+	applyTheme func(store.Theme) // setNativeTheme; tests replace it
 }
 
 func NewApp() *App {
 	a := &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
 	a.emitTo = func(name string, data any) { runtime.EventsEmit(a.ctx, name, data) }
 	a.dialogs = wailsDialogs{app: a}
+	a.prefs = store.DefaultPrefs()
+	a.applyTheme = setNativeTheme
 	return a
 }
 
@@ -99,6 +106,11 @@ func (a *App) emit(name string, data any) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// The window opened in the saved theme; this also makes its background follow macOS
+	// under "system". The frontend says it again with SetTheme once it has loaded.
+	a.prefsMu.Lock()
+	a.applyTheme(a.prefs.Theme)
+	a.prefsMu.Unlock()
 	dir, err := store.Dir()
 	if err != nil {
 		log.Printf("no data dir: %v", err)

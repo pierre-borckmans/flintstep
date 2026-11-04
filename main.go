@@ -10,6 +10,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
+
+	"sparkbridge/internal/store"
 )
 
 //go:embed all:frontend/dist
@@ -22,6 +24,11 @@ func main() {
 	// --hidden is how the login item starts us: straight to the menu bar, no window.
 	hidden := slices.Contains(os.Args[1:], "--hidden")
 	app := NewApp()
+	// The theme is known before the window exists, so it opens in it.
+	if app.prefsFile = prefsPath(); app.prefsFile != "" {
+		app.prefs = store.LoadPrefs(app.prefsFile)
+	}
+	appearance, background := launchLook(app.prefs.Theme, systemIsDark())
 
 	err := wails.Run(&options.App{
 		Title:     "SparkX MIDI",
@@ -34,12 +41,12 @@ func main() {
 		HideWindowOnClose: true,
 		StartHidden:       hidden,
 		AssetServer:       &assetserver.Options{Assets: assets},
-		BackgroundColour:  &options.RGBA{R: 20, G: 21, B: 20, A: 1},
+		BackgroundColour:  background,
 		Mac: &mac.Options{
 			// No title bar; the traffic lights stay, inset over the app's own header,
 			// which declares the drag region.
 			TitleBar:   mac.TitleBarHiddenInset(),
-			Appearance: mac.NSAppearanceNameDarkAqua,
+			Appearance: appearance,
 			About: &mac.AboutInfo{
 				Title:   "SparkX MIDI",
 				Message: "Turns a Spark Control X into a MIDI foot controller.\nNot affiliated with Positive Grid.",
