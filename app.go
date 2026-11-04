@@ -248,23 +248,17 @@ func (a *App) Scan() ([]ble.Device, error) {
 
 // ChoosePedal makes the bridge connect to this pedal from now on.
 func (a *App) ChoosePedal(address, name string) error {
-	ref := mapping.PedalRef{Address: address, Name: name}
-	if err := a.setPedal(ref); err != nil {
-		return err
-	}
-	a.pedal.SetTarget(target(ref))
-	return nil
+	return a.setPedal(mapping.PedalRef{Address: address, Name: name})
 }
 
 // ForgetPedal goes back to "the first Spark Control X found".
 func (a *App) ForgetPedal() error {
-	if err := a.setPedal(mapping.PedalRef{}); err != nil {
-		return err
-	}
-	a.pedal.SetTarget(ble.Target{})
-	return nil
+	return a.setPedal(mapping.PedalRef{})
 }
 
+// setPedal remembers ref and points the manager at it, both under cfgMu: two quick
+// choices then reach the config and the manager in the same order, so the pedal saved
+// is always the one being looked for.
 func (a *App) setPedal(ref mapping.PedalRef) error {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
@@ -275,6 +269,10 @@ func (a *App) setPedal(ref mapping.PedalRef) error {
 		return err
 	}
 	defer a.changed()
+	// The bridge runs with ref now, saved or not; the manager follows it. SetTarget
+	// only records the target and nudges the loop, and the loop calls OnConnected
+	// (which takes cfgMu) outside its own lock, so this cannot deadlock.
+	a.pedal.SetTarget(target(applied.Pedal))
 	return store.Save(a.cfgPath(), applied)
 }
 
