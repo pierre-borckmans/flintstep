@@ -29,7 +29,11 @@ const GROUP = { y0: 52, y1: 274, half: 58 };
 const PAD = 40;
 const SW_Y = 118;
 const LED_Y = 197;
-const LABEL_Y = 240;
+/** The numeral sits ON the bracket's bottom edge, which breaks around it. */
+const LABEL_Y = 258;
+/** Half the gap the bracket leaves for each numeral, in viewBox units: the numeral's
+ * own half-width at 34px plus breathing room, as on the pedal. */
+const LABEL_GAP: Record<string, number> = { I: 13, II: 20, III: 27, IV: 27 };
 
 const slot = (n: number) => ({ x: COL[n % 3], top: n < 3, tile: n % 3 === 2 });
 const pct = (v: number, of: number) => `${(v / of) * 100}%`;
@@ -320,8 +324,10 @@ function FootSwitch({
   const h = GROUP.y1 - GROUP.y0;
   const w = GROUP.half * 2;
   const name = SWITCH_NAMES[index];
-  // the bracket: up the sides, round the switch, curling in at the label
-  const bracket = `M${x - 17} ${y(258)} Q${x - 42} ${y(258)} ${x - 42} ${y(236)} L${x - 42} ${y(84)} Q${x - 42} ${y(62)} ${x - 20} ${y(62)} L${x + 20} ${y(62)} Q${x + 42} ${y(62)} ${x + 42} ${y(84)} L${x + 42} ${y(236)} Q${x + 42} ${y(258)} ${x + 17} ${y(258)}`;
+  // the bracket: up the sides, round the switch, and in along the bottom edge to a gap
+  // the width of the numeral, which sits in it
+  const g = LABEL_GAP[name] ?? 20;
+  const bracket = `M${x - g} ${y(258)} L${x - 30} ${y(258)} Q${x - 42} ${y(258)} ${x - 42} ${y(246)} L${x - 42} ${y(84)} Q${x - 42} ${y(62)} ${x - 20} ${y(62)} L${x + 20} ${y(62)} Q${x + 42} ${y(62)} ${x + 42} ${y(84)} L${x + 42} ${y(246)} Q${x + 42} ${y(258)} ${x + 30} ${y(258)} L${x + g} ${y(258)}`;
   // the hex nut, flats left and right
   const cy = y(SW_Y);
   const nut = `M${x} ${cy - 47} L${x + 39} ${cy - 24} L${x + 39} ${cy + 24} L${x} ${cy + 47} L${x - 39} ${cy + 24} L${x - 39} ${cy - 24} Z`;
@@ -380,12 +386,12 @@ function FootSwitch({
         <text
           className={tile ? undefined : "pedal-label"}
           x={x}
-          y={y(LABEL_Y)}
+          y={tile ? y(240) : y(LABEL_Y)}
           textAnchor="middle"
           dominantBaseline="central"
           fontFamily={FONT}
           fontWeight={tile ? 800 : 700}
-          fontSize={tile ? 38 : 36}
+          fontSize={tile ? 38 : 34}
           letterSpacing={tile ? 0 : -1}
           fill={tile ? "#241b10" : undefined}
           transform={`scale(${tile ? 1 : 1.05} 1)`}
