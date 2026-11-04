@@ -63,10 +63,26 @@ type App struct {
 	dirty    chan struct{}
 	stopOnce sync.Once
 	stop     chan struct{}
+
+	emitMu sync.RWMutex // emit reads quiet; shutdown sets it
+	quiet  bool
+	emitTo func(name string, data any) // Wails' EventsEmit; tests replace it
 }
 
 func NewApp() *App {
-	return &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
+	a := &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
+	a.emitTo = func(name string, data any) { runtime.EventsEmit(a.ctx, name, data) }
+	return a
+}
+
+// emit sends an event to the UI, unless shutdown has begun: by then Wails has
+// released the window, and a late emit would queue JS for it on the main thread.
+func (a *App) emit(name string, data any) {
+	a.emitMu.RLock()
+	defer a.emitMu.RUnlock()
+	if !a.quiet {
+		a.emitTo(name, data)
+	}
 }
 
 func (a *App) cfgPath() string { return filepath.Join(a.dir, "config.json") }
@@ -87,7 +103,7 @@ func (a *App) startup(ctx context.Context) {
 
 	a.mstate = MIDIState{Source: midiSource, Dest: midiDest}
 	a.bridge = bridge.New(cfg, nil, bridge.Options{
-		OnActivity: func(ev bridge.Activity) { runtime.EventsEmit(a.ctx, "activity", ev) },
+		OnActivity: func(ev bridge.Activity) { a.emit("activity", ev) },
 		OnStatus:   func(ble.Status) { a.changed() },
 	})
 	v, err := coremidi.NewVirtual(midiClient, midiSource, midiDest, a.bridge.Feedback)
@@ -112,6 +128,10 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	// No events from here on: an emit in flight finishes first.
+	a.emitMu.Lock()
+	a.quiet = true
+	a.emitMu.Unlock()
 	a.stopOnce.Do(func() { close(a.stop) })
 	if a.pedal != nil {
 		a.pedal.Stop() // lamps dark first: the pedal should not keep showing our state
@@ -166,7 +186,7 @@ func (a *App) stateLoop() {
 		case <-a.dirty:
 		}
 		st := a.GetState()
-		runtime.EventsEmit(a.ctx, "state", st)
+		a.emit("state", st)
 		a.updateTray(st)
 		select {
 		case <-a.stop:
