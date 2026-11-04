@@ -42,6 +42,7 @@ type session struct {
 	held   byte
 	scale  *sparkx.ExpScale
 	lamps  sparkx.LampSet
+	gone   bool // the lamps went dark for a hang-up: no more lamp updates
 
 	reqs     chan []byte
 	lampKick chan struct{}
@@ -106,6 +107,10 @@ func (s *session) snapshot() (sparkx.Status, [sparkx.ExpInputs]int) {
 
 func (s *session) setLamps(l [sparkx.Switches]sparkx.Colour) {
 	s.mu.Lock()
+	if s.gone {
+		s.mu.Unlock()
+		return
+	}
 	for n, c := range l {
 		s.lamps.Set(n, c)
 	}
@@ -185,6 +190,7 @@ func (s *session) writer() {
 			flush()
 		case reply := <-s.dark:
 			s.mu.Lock()
+			s.gone = true
 			for n := 0; n < sparkx.Lamps; n++ {
 				s.lamps.Set(n, sparkx.Colour{})
 			}

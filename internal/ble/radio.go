@@ -2,6 +2,7 @@ package ble
 
 import (
 	"context"
+	"sync"
 	"time"
 )
 
@@ -58,4 +59,47 @@ func batteryLevel(v []byte) (int, bool) {
 		return 0, false
 	}
 	return int(v[0]), true
+}
+
+// runScan runs one adapter scan the way tinygo's Adapter wants it: start blocks until
+// stopScan is called, and stopScan hands a value to the scanning goroutine, which only
+// ever reads one: calling it twice (a match and the timeout landing together) would
+// block forever, so the first caller wins. stopScan fails until start has set the scan
+// up, so a stop that comes first (ctx already done) keeps trying until it lands or the
+// scan ends: given up, it would leave the scan running forever.
+func runScan(ctx context.Context, timeout time.Duration, start func(found func(Device)) error, stopScan func() error, visit func(Device) bool) error {
+	done := make(chan struct{})
+	var stopOnce sync.Once
+	stop := func() {
+		stopOnce.Do(func() {
+			for stopScan() != nil {
+				select {
+				case <-done:
+					return
+				case <-time.After(5 * time.Millisecond):
+				}
+			}
+		})
+	}
+	var scanErr error
+	go func() {
+		scanErr = start(func(d Device) {
+			if visit(d) {
+				stop()
+			}
+		})
+		close(done)
+	}()
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+	select {
+	case <-done:
+	case <-t.C:
+		stop()
+		<-done
+	case <-ctx.Done():
+		stop()
+		<-done
+	}
+	return scanErr
 }

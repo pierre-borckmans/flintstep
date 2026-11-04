@@ -2,6 +2,7 @@ package ble
 
 import (
 	"testing"
+	"time"
 
 	"sparkbridge/internal/sparkx"
 )
@@ -148,5 +149,21 @@ func TestBatteryLevel(t *testing.T) {
 		if v, ok := batteryLevel(c.in); v != c.want || ok != c.ok {
 			t.Errorf("batteryLevel(%v) = %d %v", c.in, v, ok)
 		}
+	}
+}
+
+// Once a hang-up has turned the lamps dark, a lamp update racing it (a switch press,
+// LED feedback) must not light them again before the link closes.
+func TestNoLampsAfterGoingDark(t *testing.T) {
+	m, s, c := startSession(t, &recorder{})
+	waitFor(t, "first flush", func() bool { return len(c.writes()) >= sparkx.Lamps*2+4 })
+	s.goDark()
+	red := sparkx.Colour{R: 255}
+	var l [sparkx.Switches]sparkx.Colour
+	l[2] = red
+	m.SetLamps(l)
+	time.Sleep(50 * time.Millisecond)
+	if n := c.lampWrites(2, red); n != 0 {
+		t.Errorf("lamp 2 lit again after going dark (%d writes)", n)
 	}
 }

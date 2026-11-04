@@ -46,6 +46,11 @@ const tickEvery = 10 * time.Millisecond
 
 // Bridge is safe for concurrent use.
 type Bridge struct {
+	// step serialises each trip from the engine to the outputs: MIDI and lamp states
+	// leave in the order the engine produced them. Edges, ticks, feedback, status and
+	// Apply arrive on different goroutines; without it a long press fired by the tick
+	// loop could reach the DAW after the release that ends it. Taken before mu.
+	step  sync.Mutex
 	mu    sync.Mutex
 	eng   *mapping.Engine
 	cfg   mapping.Config
@@ -63,8 +68,9 @@ type Bridge struct {
 	closed  sync.Once
 }
 
-// Options are the bridge's callbacks. Both may be nil. They are called without the
-// bridge's lock held.
+// Options are the bridge's callbacks. Both may be nil. OnStatus is called with no lock
+// held. OnActivity is called in message order while one step is going through, so it
+// must not call back into the bridge.
 type Options struct {
 	OnActivity func(Activity)
 	OnStatus   func(ble.Status)
@@ -122,6 +128,8 @@ func (b *Bridge) Apply(cfg mapping.Config) (mapping.Config, error) {
 	if err := cfg.Validate(); err != nil {
 		return b.Config(), err
 	}
+	b.step.Lock()
+	defer b.step.Unlock()
 	b.mu.Lock()
 	b.cfg = cfg
 	b.eng.SetConfig(cfg)
@@ -140,6 +148,8 @@ func (b *Bridge) Handlers() ble.Handlers {
 }
 
 func (b *Bridge) onSwitch(e sparkx.Edge) {
+	b.step.Lock()
+	defer b.step.Unlock()
 	b.mu.Lock()
 	msgs := b.eng.Switch(e, b.now())
 	pending := b.eng.Pending()
@@ -152,6 +162,8 @@ func (b *Bridge) onSwitch(e sparkx.Edge) {
 }
 
 func (b *Bridge) onExp(n, raw int) {
+	b.step.Lock()
+	defer b.step.Unlock()
 	b.mu.Lock()
 	msg, ok := b.eng.Exp(n, raw)
 	b.mu.Unlock()
@@ -161,6 +173,7 @@ func (b *Bridge) onExp(n, raw int) {
 }
 
 func (b *Bridge) onPedalStatus(st ble.Status) {
+	b.step.Lock()
 	if st.State != ble.StateConnected {
 		b.mu.Lock()
 		releases := b.eng.Reset()
@@ -177,6 +190,7 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 			b.syncLamps()
 		}
 	}
+	b.step.Unlock()
 	if b.onStatus != nil {
 		b.onStatus(st)
 	}
@@ -184,6 +198,8 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 
 // Feedback takes one message from the LED destination.
 func (b *Bridge) Feedback(msg []byte) {
+	b.step.Lock()
+	defer b.step.Unlock()
 	b.mu.Lock()
 	mode := b.cfg.LEDMode
 	changed := b.eng.Feedback(msg)
@@ -196,6 +212,8 @@ func (b *Bridge) Feedback(msg []byte) {
 
 // Tick runs the engine's timers once. The tick loop calls it; tests call it directly.
 func (b *Bridge) Tick() {
+	b.step.Lock()
+	defer b.step.Unlock()
 	b.mu.Lock()
 	msgs := b.eng.Tick(b.now())
 	b.mu.Unlock()

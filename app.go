@@ -63,10 +63,26 @@ type App struct {
 	dirty    chan struct{}
 	stopOnce sync.Once
 	stop     chan struct{}
+
+	emitMu sync.RWMutex // emit reads quiet; shutdown sets it
+	quiet  bool
+	emitTo func(name string, data any) // Wails' EventsEmit; tests replace it
 }
 
 func NewApp() *App {
-	return &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
+	a := &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
+	a.emitTo = func(name string, data any) { runtime.EventsEmit(a.ctx, name, data) }
+	return a
+}
+
+// emit sends an event to the UI, unless shutdown has begun: by then Wails has
+// released the window, and a late emit would queue JS for it on the main thread.
+func (a *App) emit(name string, data any) {
+	a.emitMu.RLock()
+	defer a.emitMu.RUnlock()
+	if !a.quiet {
+		a.emitTo(name, data)
+	}
 }
 
 func (a *App) cfgPath() string { return filepath.Join(a.dir, "config.json") }
@@ -87,7 +103,7 @@ func (a *App) startup(ctx context.Context) {
 
 	a.mstate = MIDIState{Source: midiSource, Dest: midiDest}
 	a.bridge = bridge.New(cfg, nil, bridge.Options{
-		OnActivity: func(ev bridge.Activity) { runtime.EventsEmit(a.ctx, "activity", ev) },
+		OnActivity: func(ev bridge.Activity) { a.emit("activity", ev) },
 		OnStatus:   func(ble.Status) { a.changed() },
 	})
 	v, err := coremidi.NewVirtual(midiClient, midiSource, midiDest, a.bridge.Feedback)
@@ -112,6 +128,10 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	// No events from here on: an emit in flight finishes first.
+	a.emitMu.Lock()
+	a.quiet = true
+	a.emitMu.Unlock()
 	a.stopOnce.Do(func() { close(a.stop) })
 	if a.pedal != nil {
 		a.pedal.Stop() // lamps dark first: the pedal should not keep showing our state
@@ -166,7 +186,7 @@ func (a *App) stateLoop() {
 		case <-a.dirty:
 		}
 		st := a.GetState()
-		runtime.EventsEmit(a.ctx, "state", st)
+		a.emit("state", st)
 		a.updateTray(st)
 		select {
 		case <-a.stop:
@@ -194,6 +214,11 @@ func (a *App) GetState() State {
 func (a *App) SaveConfig(cfg mapping.Config) error {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
+	return a.saveLocked(cfg)
+}
+
+// saveLocked is SaveConfig with cfgMu held.
+func (a *App) saveLocked(cfg mapping.Config) error {
 	cfg.Pedal = a.bridge.Config().Pedal
 	applied, err := a.bridge.Apply(cfg)
 	if err != nil {
@@ -263,7 +288,10 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	if !st.Cables[n] || raw < 0 {
 		return a.bridge.Config(), fmt.Errorf("plug an expression pedal into jack %d first", n+1)
 	}
+	// Read, change and save under one lock: a SaveConfig landing in between would
+	// otherwise be overwritten with the config read here.
 	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
 	cfg := a.bridge.Config()
 	switch edge {
 	case "min":
@@ -271,8 +299,7 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	case "max":
 		cfg.Exp[n].Max = raw
 	default:
-		a.cfgMu.Unlock()
-		return cfg, fmt.Errorf("unknown calibration edge %q", edge)
+		return a.bridge.Config(), fmt.Errorf("unknown calibration edge %q", edge)
 	}
 	// Heel and toe set the wrong way round is a reversed pedal, not an error.
 	if cfg.Exp[n].Min > cfg.Exp[n].Max {
@@ -280,11 +307,9 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 		cfg.Exp[n].Invert = !cfg.Exp[n].Invert
 	}
 	if cfg.Exp[n].Min == cfg.Exp[n].Max {
-		a.cfgMu.Unlock()
 		return a.bridge.Config(), errors.New("heel and toe read the same value; move the pedal and try again")
 	}
-	a.cfgMu.Unlock()
-	if err := a.SaveConfig(cfg); err != nil {
+	if err := a.saveLocked(cfg); err != nil {
 		return a.bridge.Config(), err
 	}
 	return a.bridge.Config(), nil

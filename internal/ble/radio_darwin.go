@@ -91,34 +91,13 @@ func (r *cbRadio) held() ([]Device, error) {
 	return systemPedals()
 }
 
-// scan runs one adapter scan. StopScan hands a value to the scanning goroutine, which
-// only ever reads one: calling it twice (a match and the timeout landing together)
-// would block forever, so the first caller wins.
+// scan runs one adapter scan (runScan has the rules).
 func (r *cbRadio) scan(ctx context.Context, timeout time.Duration, visit func(Device) bool) error {
-	done := make(chan struct{})
-	var stopOnce sync.Once
-	stop := func() { stopOnce.Do(func() { _ = r.adapter.StopScan() }) }
-	var scanErr error
-	go func() {
-		scanErr = r.adapter.Scan(func(_ *bluetooth.Adapter, res bluetooth.ScanResult) {
-			if visit(Device{Name: res.LocalName(), Address: res.Address.String(), RSSI: int(res.RSSI)}) {
-				stop()
-			}
+	return runScan(ctx, timeout, func(found func(Device)) error {
+		return r.adapter.Scan(func(_ *bluetooth.Adapter, res bluetooth.ScanResult) {
+			found(Device{Name: res.LocalName(), Address: res.Address.String(), RSSI: int(res.RSSI)})
 		})
-		close(done)
-	}()
-	t := time.NewTimer(timeout)
-	defer t.Stop()
-	select {
-	case <-done:
-	case <-t.C:
-		stop()
-		<-done
-	case <-ctx.Done():
-		stop()
-		<-done
-	}
-	return scanErr
+	}, r.adapter.StopScan, visit)
 }
 
 // defaultDialWait is tinygo's own connect timeout (gap_darwin.go), and dialGrace how
