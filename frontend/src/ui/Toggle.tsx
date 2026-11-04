@@ -22,13 +22,13 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={cx(
-        "group relative h-[18px] w-[34px] shrink-0 rounded-full border border-edge bg-sunken shadow-[inset_0_1px_2px_rgb(0_0_0/0.6)] disabled:opacity-40",
+        "group relative h-[18px] w-[34px] shrink-0 rounded-full border border-edge bg-sunken inset-shadow-deep disabled:opacity-40",
       )}
     >
       <span
         className="absolute top-1/2 left-[7px] h-[5px] w-[5px] -translate-y-1/2 rounded-full"
         style={{
-          background: on ? "var(--color-beam)" : "#23272b",
+          background: on ? "var(--lamp-beam)" : "var(--lamp-off)",
           boxShadow: on ? "var(--glow-accent)" : "none",
           // The lamp is an LED: on at once, off with a short decay.
           transition: on ? "none" : "all var(--dur-led) var(--ease-led)",
@@ -41,8 +41,8 @@ export function Toggle({
           on ? "translate-x-4 origin-right" : "translate-x-0 origin-left",
         )}
         style={{
-          background: "radial-gradient(circle at 38% 30%, #9aa2a9, #50585f 60%, #3a4046)",
-          boxShadow: "0 1px 2px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.25)",
+          background: "var(--cap)",
+          boxShadow: "var(--cap-shadow)",
         }}
       />
     </button>

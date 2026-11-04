@@ -235,7 +235,7 @@ export function NumField({
         }
       }}
       className={cx(
-        "numfield group relative flex h-9 items-center gap-1.5 overflow-hidden rounded-ui-sm border bg-sunken px-2 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]",
+        "numfield group relative flex h-9 items-center gap-1.5 overflow-hidden rounded-ui-sm border bg-sunken px-2 inset-shadow-groove",
         "transition-[border-color,background-image] duration-(--dur) ease-(--ease)",
         disabled
           ? "opacity-40"

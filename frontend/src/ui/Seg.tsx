@@ -51,7 +51,7 @@ export function Seg<T extends string>({
       aria-label={label}
       onKeyDown={onKey}
       className={cx(
-        "seg relative isolate flex rounded-ui-md border border-edge bg-sunken p-0.5 shadow-[inset_0_1px_2px_rgb(0_0_0/0.5)]",
+        "seg relative isolate flex rounded-ui-md border border-edge bg-sunken p-0.5 inset-shadow-groove",
         className,
       )}
     >

@@ -1,5 +1,7 @@
 /* The Spark Control X, drawn. Local material tokens: the hardware's own gold, nickel and
-   tolex, which the app's palette has no business owning. */
+   tolex, which the app's palette has no business owning. The pedal is black in both
+   themes, so whatever is drawn on it uses the lamps (--lamp-*), never the theme's inks;
+   only the captions and leaders round it follow the theme. */
 .pedal {
   --pedal-gold: #c8a96b;
   --pedal-gold-hi: #f3d79c;
@@ -30,8 +32,8 @@
 
 /* A fine ice-white selection outline keeps the hardware and its LEDs legible. */
 .pedal-plate {
-  fill: rgb(201 228 242 / 0.07);
-  stroke: var(--color-cold);
+  fill: color-mix(in srgb, var(--lamp-cold) 7%, transparent);
+  stroke: var(--lamp-cold);
   stroke-width: 1px;
   vector-effect: non-scaling-stroke;
   opacity: 0;
@@ -72,7 +74,7 @@
 /* AMP and APP, when they can be edited: a faint cold ring round the dot on hover; when
    selected, the same plate as a switch, round the dot and its legend. */
 .pedal-ring {
-  stroke: var(--color-cold);
+  stroke: var(--lamp-cold);
   stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
   stroke-opacity: 0;
@@ -86,9 +88,9 @@
   position: absolute;
   inset: 0;
   border-radius: 8px;
-  background: rgb(201 228 242 / 0.07);
+  background: color-mix(in srgb, var(--lamp-cold) 7%, transparent);
   box-shadow:
-    inset 0 0 0 2px var(--color-cold),
+    inset 0 0 0 2px var(--lamp-cold),
     0 0 6px rgb(201 228 242 / 0.7),
     0 0 16px rgb(201 228 242 / 0.3);
   opacity: 0;
@@ -100,7 +102,7 @@
 
 .pedal-indicator:focus-visible,
 .pedal-switch:focus-visible {
-  outline: 1px solid var(--color-key);
+  outline: 1px solid var(--lamp-key);
   outline-offset: 2px;
   border-radius: 10px;
 }
@@ -135,7 +137,7 @@
 /* Match my pedal: over a nut, a faint cold ring says it turns, a grab cursor says how,
    and a tiny readout under it says where it is. Off the nut the switch is a switch. */
 .pedal-nut-ring {
-  stroke: var(--color-cold);
+  stroke: var(--lamp-cold);
   stroke-width: 1px;
   stroke-dasharray: 3 4;
   vector-effect: non-scaling-stroke;
@@ -161,7 +163,7 @@
   padding: 0 4px;
   border-radius: 3px;
   background: rgb(8 9 11 / 0.82);
-  color: var(--color-cold);
+  color: var(--lamp-cold);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 9px;
   line-height: 13px;
@@ -191,7 +193,7 @@
   overflow: visible;
   pointer-events: none;
   fill: none;
-  stroke: #77806d;
+  stroke: var(--color-leader);
   stroke-opacity: 0.6;
   stroke-width: 1;
 }
@@ -202,7 +204,7 @@
     stroke-opacity 160ms;
 }
 .pedal-leaders circle {
-  fill: #77806d;
+  fill: var(--color-leader);
   stroke: none;
 }
 .pedal-leaders [data-selected="true"] {

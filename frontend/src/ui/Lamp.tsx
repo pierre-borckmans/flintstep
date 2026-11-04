@@ -10,20 +10,20 @@ const GLOW: Record<LampColour, string> = {
   live: "var(--glow-good)",
   hot: "var(--glow-hot)",
   cold: "var(--glow-cold)",
-  warn: "0 0 7px var(--color-warn), 0 0 16px rgb(232 163 61 / 0.4)",
-  key: "0 0 8px var(--color-key), 0 0 18px rgb(255 244 228 / 0.35)",
+  warn: "var(--glow-warn)",
+  key: "var(--glow-key)",
 };
 
 const LIT: Record<LampColour, string> = {
-  beam: "radial-gradient(circle at 38% 30%, #ffe0ae, var(--color-beam))",
-  live: "radial-gradient(circle at 38% 30%, #c3f5d5, var(--color-live))",
-  hot: "radial-gradient(circle at 38% 30%, #ffb0a6, var(--color-hot))",
-  cold: "radial-gradient(circle at 38% 30%, #ecf7fd, var(--color-cold))",
-  warn: "radial-gradient(circle at 38% 30%, #ffd79b, var(--color-warn))",
-  key: "radial-gradient(circle at 38% 30%, #fffaf1, var(--color-key))",
+  beam: "radial-gradient(circle at 38% 30%, #ffe0ae, var(--lamp-beam))",
+  live: "radial-gradient(circle at 38% 30%, #c3f5d5, var(--lamp-live))",
+  hot: "radial-gradient(circle at 38% 30%, #ffb0a6, var(--lamp-hot))",
+  cold: "radial-gradient(circle at 38% 30%, #ecf7fd, var(--lamp-cold))",
+  warn: "radial-gradient(circle at 38% 30%, #ffd79b, var(--lamp-warn))",
+  key: "radial-gradient(circle at 38% 30%, #fffaf1, var(--lamp-key))",
 };
 
-export const UNLIT = "linear-gradient(#23272b, #1a1e21)";
+export const UNLIT = "var(--lamp-unlit)";
 
 export function Lamp({
   on = false,
@@ -49,7 +49,9 @@ export function Lamp({
         width: size,
         height: size,
         background: on ? LIT[colour] : UNLIT,
-        boxShadow: on ? GLOW[colour] : "inset 0 1px 0 rgb(255 244 228 / 0.06)",
+        boxShadow: on
+          ? `${GLOW[colour]}, var(--lamp-bezel)`
+          : "inset 0 1px 0 var(--lamp-unlit-edge)",
         // An LED: on at once, off with the shortest decay.
         transition: on
           ? "none"

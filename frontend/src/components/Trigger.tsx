@@ -23,6 +23,8 @@ import { ActionEditor } from "./ActionEditor";
 // under the input's settings that picks the mode and what it sends (TriggerBlock).
 
 const pct = (v: number) => `${v}%`;
+/** The data light at a given strength, in percent. */
+const COLD = (pct: number) => `color-mix(in srgb, var(--color-cold) ${pct}%, transparent)`;
 
 /** Inside the travel bar, under its fill: the zone that counts as engaged, tinted and
  *  lit while the trigger is engaged, and the hysteresis band below the threshold
@@ -36,10 +38,10 @@ export function ThresholdZone({ trigger, engaged }: { trigger: ExpTrigger; engag
         className="pointer-events-none absolute inset-y-0 right-0"
         style={{
           left: pct(th),
-          background: engaged ? "rgb(255 180 84 / 0.2)" : "rgb(201 228 242 / 0.1)",
+          background: engaged ? "color-mix(in srgb, var(--lamp-halo) 20%, transparent)" : COLD(10),
           boxShadow: engaged
-            ? "inset 0 1px 0 rgb(255 200 130 / 0.55), inset 0 0 8px rgb(255 180 84 / 0.35)"
-            : "inset 0 1px 0 rgb(201 228 242 / 0.12)",
+            ? "inset 0 1px 0 color-mix(in srgb, var(--lamp-halo) 55%, transparent), inset 0 0 8px color-mix(in srgb, var(--lamp-halo) 35%, transparent)"
+            : `inset 0 1px 0 ${COLD(12)}`,
           transition:
             "background var(--dur-led) var(--ease-led), box-shadow var(--dur-led) var(--ease-led)",
         }}
@@ -50,8 +52,7 @@ export function ThresholdZone({ trigger, engaged }: { trigger: ExpTrigger; engag
           style={{
             left: pct(rel),
             width: pct(th - rel),
-            background:
-              "repeating-linear-gradient(135deg, rgb(201 228 242 / 0.28) 0 1px, transparent 1px 3px)",
+            background: `repeating-linear-gradient(135deg, ${COLD(28)} 0 1px, transparent 1px 3px)`,
           }}
         />
       )}
@@ -103,7 +104,7 @@ export function ThresholdOverlay({
       {/* the marker line, from the tab down through the bar */}
       <div
         className="pointer-events-none absolute top-[13px] -bottom-[3px] w-[2px] -translate-x-1/2 rounded-full bg-cold"
-        style={{ left: pct(th), boxShadow: "0 0 6px rgb(201 228 242 / 0.6)" }}
+        style={{ left: pct(th), boxShadow: `0 0 6px ${COLD(60)}` }}
       />
       <div
         ref={tab}

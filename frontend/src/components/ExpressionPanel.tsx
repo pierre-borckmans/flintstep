@@ -45,15 +45,16 @@ function Meter({
           {has ? v : "--"}
         </span>
         <div className="relative mb-[3px] flex-1">
-          <div className="relative h-2.5 overflow-hidden rounded-[3px] bg-sunken shadow-[inset_0_1px_2px_rgb(0_0_0/0.7)]">
+          <div className="relative h-2.5 overflow-hidden rounded-[3px] bg-sunken inset-shadow-deep">
             {zone}
             <div
               className="absolute inset-y-0 left-0 rounded-[3px]"
               style={{
                 width: `${f * 100}%`,
                 opacity: has ? 1 : 0,
-                background: "linear-gradient(90deg, rgb(201 228 242 / 0.35), var(--color-cold))",
-                boxShadow: "0 0 10px rgb(201 228 242 / 0.35)",
+                background:
+                  "linear-gradient(90deg, color-mix(in srgb, var(--color-cold) 35%, transparent), var(--color-cold))",
+                boxShadow: "0 0 10px color-mix(in srgb, var(--color-cold) 35%, transparent)",
                 transition: "width var(--dur-led) var(--ease-led)",
               }}
             />

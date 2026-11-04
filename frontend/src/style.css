@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
-/* Warm graphite, paper-white legends, and brass selection accents. */
+/* THE LIGHT LAW. Every surface is a neutral material; every colour is a light. Dark is
+   warm graphite with paper-white legends; light is bone and brushed aluminium with
+   graphite legends. Both share the lights: brass selection, green link, ice-blue data.
+
+   Three layers of tokens:
+   - @theme static: the dark palette, and Tailwind's utilities (bg-panel, text-muted...).
+   - :root below: values that are not utilities (lit keys, rims, grooves) and the lamps.
+   - the light blocks after it: what light changes. A lamp (a glowing dot, an LED, the
+     pedal's own light) keeps its hue in both; a light used as ink (text, a border, an
+     underline) gets a deeper shade on bone, or it would not read. */
 @theme static {
   /* materials */
   --color-bg: #141514;
@@ -16,6 +25,10 @@
   --color-bone: #e8e6dc;
   --color-text: #e7e9df;
   --color-ink: #1e1509;
+  --color-chrome: #191b18; /* the header and the activity log */
+  --color-stage: #20231f; /* where the pedal sits */
+  --color-legend: #c6cbbf; /* section titles */
+  --color-leader: #77806d; /* caption leader lines */
 
   /* lights */
   --color-key: #fff4e4;
@@ -49,10 +62,17 @@
   --shadow-contact: 2px 5px 6px -1px rgb(0 0 0 / 0.8);
   --shadow-cast: 12px 32px 36px -8px rgb(0 0 0 / 0.7);
 
-  --glow-accent: 0 0 8px var(--color-beam), 0 0 20px rgb(255 180 84 / 0.45);
-  --glow-good: 0 0 8px var(--color-live), 0 0 18px rgb(127 227 160 / 0.4);
-  --glow-cold: 0 0 8px var(--color-cold), 0 0 18px rgb(201 228 242 / 0.35);
-  --glow-hot: 0 0 8px var(--color-hot), 0 0 18px rgb(255 95 78 / 0.4);
+  /* Grooves cut into the panel: Seg, Toggle, fields, the travel bar. */
+  --inset-shadow-groove: inset 0 1px 2px rgb(0 0 0 / 0.5);
+  --inset-shadow-deep: inset 0 1px 2px rgb(0 0 0 / 0.7);
+
+  /* Lamps glow in their own hue whatever the theme. */
+  --glow-accent: 0 0 8px var(--lamp-beam), 0 0 20px rgb(255 180 84 / 0.45);
+  --glow-good: 0 0 8px var(--lamp-live), 0 0 18px rgb(127 227 160 / 0.4);
+  --glow-cold: 0 0 8px var(--lamp-cold), 0 0 18px rgb(201 228 242 / 0.35);
+  --glow-hot: 0 0 8px var(--lamp-hot), 0 0 18px rgb(255 95 78 / 0.4);
+  --glow-warn: 0 0 7px var(--lamp-warn), 0 0 16px rgb(232 163 61 / 0.4);
+  --glow-key: 0 0 8px var(--lamp-key), 0 0 18px rgb(255 244 228 / 0.35);
 
   /* Motion. Two kinds of light: incandescent (warm, spatial: selection, panels) rises
      fast and dies slow; LED (data: link lamp, MIDI traffic, the pedal's rings) switches
@@ -68,6 +88,195 @@
 
   /* A switched-off thing drains colour and light rather than turning transparent. */
   --off-dim: saturate(0.25) brightness(0.6);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* The lamps: the lights as light, never re-tinted for a theme. */
+  --lamp-beam: #d6bc83;
+  --lamp-live: #7fe3a0;
+  --lamp-hot: #ff5f4e;
+  --lamp-cold: #c9e4f2;
+  --lamp-warn: #e8a33d;
+  --lamp-key: #fff4e4;
+  --lamp-halo: #ffb454; /* the warm spill round a brass lamp, a slider's fill */
+  /* An unlit lamp: a plastic dome, a material. */
+  --lamp-unlit: linear-gradient(#23272b, #1a1e21);
+  --lamp-unlit-edge: rgb(255 244 228 / 0.06);
+  --lamp-off: #23272b;
+  /* A lit lamp's bezel: nothing on graphite, where the glow is enough; a fine dark
+     ring on bone, where a pale lamp would otherwise wash into the panel. */
+  --lamp-bezel: 0 0 0 0 transparent;
+
+  /* lit: the selected key, with a fine brass edge. */
+  --lit-bg: #35382f;
+  --lit-fg: #f0dfb8;
+  --lit-edge: rgb(214 188 131 / 0.25);
+  --lit-drop: rgb(0 0 0 / 0.18);
+  --lit-border: #b39d6c; /* a lit key with its own border (the switch tabs) */
+  /* warm: the key's warmth on hover. */
+  --warm-hi: rgb(255 244 228 / 0.14);
+  --warm-lo: rgb(255 244 228 / 0.02);
+  --warm-none: rgb(255 244 228 / 0);
+  /* rim: the key grazing a top-left edge. */
+  --rim-hi: rgb(255 244 228 / 0.22);
+  --rim-lo: rgb(0 0 0 / 0.35);
+  --rim-ring: rgb(255 244 228 / 0.07);
+  /* engraved: a legend cut into metal. */
+  --engrave-top: rgb(0 0 0 / 0.85);
+  --engrave-bottom: rgb(255 244 228 / 0.07);
+  /* The key light washing the window from the upper left. */
+  --key-wash: rgb(255 244 228 / 0.07);
+  /* Activity rows: a hairline and a faint stripe. */
+  --row-line: #ffffff04;
+  --row-stripe: #ffffff02;
+  /* The pedal viewer's own drop. */
+  --stage-drop: #00000015;
+  /* A metal cap: the slider's thumb, the toggle's slider. */
+  --cap: radial-gradient(circle at 38% 30%, #9aa2a9, #50585f 60%, #3a4046);
+  --cap-shadow: 0 1px 3px rgb(0 0 0 / 0.7), inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+
+/* LIGHT. Written twice, for a forced light theme and for System while macOS is light;
+   lib/theme.test.ts checks the two stay the same. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #d9d6cd;
+  --color-chrome: #e3e0d8;
+  --color-stage: #e8e5dd;
+  --color-panel: #ebe8e1;
+  --color-panel2: #f4f2ec;
+  --color-panel3: #faf8f3;
+  --color-sunken: #e0ddd5;
+  --color-edge: #c9c5ba;
+  --color-edge-strong: #aca799;
+  --color-muted: #55584f;
+  --color-faint: #686b62;
+  --color-metal: #8d8a80;
+  --color-bone: #1b1c18;
+  --color-text: #24251f;
+  --color-legend: #3c3f37;
+  --color-leader: #a19c8e;
+  --color-key: #2c2820;
+  --color-beam: #8a6a2a;
+  --color-live: #23824a;
+  --color-hot: #c4372a;
+  --color-cold: #2f6d8c;
+  --color-warn: #9c600c;
+  --shadow-raise: 0 1px 2px rgb(70 58 36 / 0.16);
+  --shadow-card: 0 8px 24px -12px rgb(70 58 36 / 0.32);
+  --shadow-pop: 0 16px 40px -12px rgb(60 48 28 / 0.38);
+  --shadow-contact: 2px 5px 6px -1px rgb(30 24 14 / 0.5);
+  --shadow-cast: 12px 32px 36px -8px rgb(30 24 14 / 0.4);
+  --inset-shadow-groove: inset 0 1px 2px rgb(70 58 36 / 0.2);
+  --inset-shadow-deep: inset 0 1px 2px rgb(70 58 36 / 0.3);
+  --lamp-unlit: linear-gradient(#bdb8ac, #cfcabf);
+  --lamp-unlit-edge: rgb(70 58 36 / 0.12);
+  --lamp-off: #c2bdb1;
+  --lamp-bezel: 0 0 0 0.5px rgb(40 32 20 / 0.45);
+  --lit-bg: #fdfcf8;
+  --lit-fg: #4a3a17;
+  --lit-edge: rgb(138 106 42 / 0.45);
+  --lit-drop: rgb(70 58 36 / 0.2);
+  --lit-border: #a2844a;
+  --warm-hi: rgb(255 255 255 / 0.6);
+  --warm-lo: rgb(255 255 255 / 0.12);
+  --warm-none: rgb(255 255 255 / 0);
+  --rim-hi: rgb(255 255 255 / 0.85);
+  --rim-lo: rgb(70 58 36 / 0.16);
+  --rim-ring: rgb(70 58 36 / 0.14);
+  --engrave-top: rgb(70 58 36 / 0.12);
+  --engrave-bottom: rgb(255 255 255 / 0.6);
+  --key-wash: rgb(255 255 255 / 0.45);
+  --row-line: rgb(70 58 36 / 0.07);
+  --row-stripe: rgb(70 58 36 / 0.025);
+  --stage-drop: rgb(70 58 36 / 0.08);
+  --cap: radial-gradient(circle at 38% 30%, #ffffff, #d9d6ce 60%, #b3afa5);
+  --cap-shadow: 0 1px 2px rgb(40 32 20 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.9);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --color-bg: #d9d6cd;
+    --color-chrome: #e3e0d8;
+    --color-stage: #e8e5dd;
+    --color-panel: #ebe8e1;
+    --color-panel2: #f4f2ec;
+    --color-panel3: #faf8f3;
+    --color-sunken: #e0ddd5;
+    --color-edge: #c9c5ba;
+    --color-edge-strong: #aca799;
+    --color-muted: #55584f;
+    --color-faint: #686b62;
+    --color-metal: #8d8a80;
+    --color-bone: #1b1c18;
+    --color-text: #24251f;
+    --color-legend: #3c3f37;
+    --color-leader: #a19c8e;
+    --color-key: #2c2820;
+    --color-beam: #8a6a2a;
+    --color-live: #23824a;
+    --color-hot: #c4372a;
+    --color-cold: #2f6d8c;
+    --color-warn: #9c600c;
+    --shadow-raise: 0 1px 2px rgb(70 58 36 / 0.16);
+    --shadow-card: 0 8px 24px -12px rgb(70 58 36 / 0.32);
+    --shadow-pop: 0 16px 40px -12px rgb(60 48 28 / 0.38);
+    --shadow-contact: 2px 5px 6px -1px rgb(30 24 14 / 0.5);
+    --shadow-cast: 12px 32px 36px -8px rgb(30 24 14 / 0.4);
+    --inset-shadow-groove: inset 0 1px 2px rgb(70 58 36 / 0.2);
+    --inset-shadow-deep: inset 0 1px 2px rgb(70 58 36 / 0.3);
+    --lamp-unlit: linear-gradient(#bdb8ac, #cfcabf);
+    --lamp-unlit-edge: rgb(70 58 36 / 0.12);
+    --lamp-off: #c2bdb1;
+    --lamp-bezel: 0 0 0 0.5px rgb(40 32 20 / 0.45);
+    --lit-bg: #fdfcf8;
+    --lit-fg: #4a3a17;
+    --lit-edge: rgb(138 106 42 / 0.45);
+    --lit-drop: rgb(70 58 36 / 0.2);
+    --lit-border: #a2844a;
+    --warm-hi: rgb(255 255 255 / 0.6);
+    --warm-lo: rgb(255 255 255 / 0.12);
+    --warm-none: rgb(255 255 255 / 0);
+    --rim-hi: rgb(255 255 255 / 0.85);
+    --rim-lo: rgb(70 58 36 / 0.16);
+    --rim-ring: rgb(70 58 36 / 0.14);
+    --engrave-top: rgb(70 58 36 / 0.12);
+    --engrave-bottom: rgb(255 255 255 / 0.6);
+    --key-wash: rgb(255 255 255 / 0.45);
+    --row-line: rgb(70 58 36 / 0.07);
+    --row-stripe: rgb(70 58 36 / 0.025);
+    --stage-drop: rgb(70 58 36 / 0.08);
+    --cap: radial-gradient(circle at 38% 30%, #ffffff, #d9d6ce 60%, #b3afa5);
+    --cap-shadow: 0 1px 2px rgb(40 32 20 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.9);
+  }
+}
+
+/* A theme switch crossfades: a view transition where WebKit has them, else (useTheme's
+   data-theme-fading) a brief transition on every colour. Both off under reduced motion. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-up);
+  animation-timing-function: var(--ease);
+}
+:root[data-theme-fading] *,
+:root[data-theme-fading] *::before,
+:root[data-theme-fading] *::after {
+  transition:
+    background-color var(--dur-up) var(--ease),
+    color var(--dur-up) var(--ease),
+    border-color var(--dur-up) var(--ease),
+    box-shadow var(--dur-up) var(--ease),
+    fill var(--dur-up) var(--ease),
+    stroke var(--dur-up) var(--ease) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 html,
@@ -91,8 +300,8 @@ body {
   background:
     radial-gradient(
       1100px 620px at 18% -12%,
-      rgb(255 244 228 / 0.07) 0%,
-      rgb(255 244 228 / 0) 62%
+      var(--key-wash) 0%,
+      transparent 62%
     ),
     var(--color-bg);
 }
@@ -148,36 +357,36 @@ select:not(:disabled) {
 
 /* Selection reads as a physical key, with a fine brass edge. */
 @utility lit {
-  background-color: #35382f;
-  color: #f0dfb8;
+  background-color: var(--lit-bg);
+  color: var(--lit-fg);
   box-shadow:
-    inset 0 0 0 1px rgb(214 188 131 / 0.25),
-    0 1px 3px rgb(0 0 0 / 0.18);
+    inset 0 0 0 1px var(--lit-edge),
+    0 1px 3px var(--lit-drop);
 }
 
 /* WARM: hover. Colourless, composes with lit. */
 @utility warm {
   background-image: radial-gradient(
     130% 200% at 50% 0%,
-    rgb(255 244 228 / 0.14) 0%,
-    rgb(255 244 228 / 0.02) 82%,
-    rgb(255 244 228 / 0) 100%
+    var(--warm-hi) 0%,
+    var(--warm-lo) 82%,
+    var(--warm-none) 100%
   );
 }
 
 /* RIM: the key grazing a top-left edge. */
 @utility rim {
   box-shadow:
-    inset 1px 1px 0 rgb(255 244 228 / 0.22),
-    inset -1px -1px 0 rgb(0 0 0 / 0.35),
-    0 0 0 1px rgb(255 244 228 / 0.07);
+    inset 1px 1px 0 var(--rim-hi),
+    inset -1px -1px 0 var(--rim-lo),
+    0 0 0 1px var(--rim-ring);
 }
 
 /* ENGRAVED: legend cut into metal. */
 @utility engraved {
   text-shadow:
-    0 -1px 0 rgb(0 0 0 / 0.85),
-    0 1px 0 rgb(255 244 228 / 0.07);
+    0 -1px 0 var(--engrave-top),
+    0 1px 0 var(--engrave-bottom);
 }
 
 @utility scroll-y {
@@ -295,10 +504,10 @@ select:not(:disabled) {
 /* A log row arriving: an LED, so it switches on, then the warm afterglow fades. */
 @keyframes row-in {
   from {
-    background-color: rgb(201 228 242 / 0.09);
+    background-color: color-mix(in srgb, var(--color-cold) 9%, transparent);
   }
   to {
-    background-color: rgb(201 228 242 / 0);
+    background-color: transparent;
   }
 }
 @utility row-in {
@@ -362,10 +571,10 @@ input[type="range"]::-webkit-slider-runnable-track {
   border-radius: 2px;
   background: linear-gradient(
     90deg,
-    rgb(255 180 84 / 0.75) 0 var(--fill, 0%),
+    color-mix(in srgb, var(--lamp-halo) 75%, transparent) 0 var(--fill, 0%),
     var(--color-sunken) var(--fill, 0%) 100%
   );
-  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.6);
+  box-shadow: var(--inset-shadow-deep);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -373,10 +582,8 @@ input[type="range"]::-webkit-slider-thumb {
   height: 14px;
   margin-top: -5px;
   border-radius: 50%;
-  background: radial-gradient(circle at 38% 30%, #9aa2a9, #50585f 60%, #3a4046);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.7),
-    inset 0 1px 0 rgb(255 255 255 / 0.25);
+  background: var(--cap);
+  box-shadow: var(--cap-shadow);
 }
 
 /* A continuous controller surface beside a separate mapping desk. */
@@ -393,7 +600,7 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 18px;
   padding: 0 22px 0 88px;
   border-bottom: 1px solid var(--color-edge);
-  background: #191b18;
+  background: var(--color-chrome);
 }
 .app-wordmark {
   font-size: 15px;
@@ -440,8 +647,8 @@ input[type="range"]::-webkit-slider-thumb {
   flex-direction: column;
   border: 1px solid var(--color-edge-strong);
   border-radius: 8px;
-  background: #20231f;
-  box-shadow: 0 3px 10px #00000015;
+  background: var(--color-stage);
+  box-shadow: 0 3px 10px var(--stage-drop);
 }
 .viewer-stage {
   position: absolute;
@@ -493,7 +700,7 @@ input[type="range"]::-webkit-slider-thumb {
   overflow: hidden;
   border: 1px solid var(--color-edge);
   border-radius: 7px;
-  background: #191b18;
+  background: var(--color-chrome);
 }
 .activity-heading {
   height: 43px;
@@ -509,10 +716,10 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--color-faint);
 }
 .activity-row {
-  border-bottom: 1px solid #ffffff04;
+  border-bottom: 1px solid var(--row-line);
 }
 .activity-row:nth-child(even) {
-  background-color: #ffffff02;
+  background-color: var(--row-stripe);
 }
 .activity-empty {
   display: flex;
@@ -593,7 +800,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-family: var(--font-mono);
 }
 .switch-selector [aria-checked="true"] {
-  border-color: #b39d6c;
+  border-color: var(--lit-border);
   box-shadow: none;
 }
 .switch-selector [role="radio"] {
@@ -606,7 +813,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: var(--radius-ui-sm);
 }
 .editor-section > div:first-child > span:first-child {
-  color: #c6cbbf;
+  color: var(--color-legend);
   font-size: 10px;
   letter-spacing: 1.1px;
 }
