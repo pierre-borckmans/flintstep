@@ -1,6 +1,7 @@
 import { memo, useId } from "react";
 import { actionCaption, longCaption } from "../lib/caption";
 import { isDark, lampLight, rgb } from "../lib/colour";
+import { POWER_RGB, type PowerColour, powerLamp } from "../lib/power";
 import type { Colour, Config, Status } from "../types";
 import { LAMP_AMP, LAMP_APP, SWITCH_NAMES } from "../types";
 import { cx } from "../ui/cx";
@@ -397,8 +398,17 @@ function LedBar({
   );
 }
 
-function Lamps({ id, lamps, live }: { id: string; lamps: Colour[]; live: boolean }) {
-  const power: Colour = live ? { r: 40, g: 255, b: 90 } : BLACK;
+function Lamps({
+  id,
+  lamps,
+  power: powerLed,
+}: {
+  id: string;
+  lamps: Colour[];
+  power: { colour: PowerColour; blink: boolean };
+}) {
+  // POWER mirrors the pedal's: its colour from the charge level, blinking while charging.
+  const power: Colour = POWER_RGB[powerLed.colour];
   const powerHalf = u(REF.lamp.len - REF.lamp.thick) / 2;
   return (
     <svg
@@ -418,12 +428,14 @@ function Lamps({ id, lamps, live }: { id: string; lamps: Colour[]; live: boolean
           <feGaussianBlur stdDeviation="7" />
         </filter>
       </defs>
-      <LedBar
-        d={`M${fx(REF.lamp.power) - powerHalf} ${MIRROR / 2} h${2 * powerHalf}`}
-        lamp={power}
-        glowId={`${id}-lampglow`}
-        width={u(REF.lamp.thick)}
-      />
+      <g className={cx(powerLed.blink && "pedal-power-blink")}>
+        <LedBar
+          d={`M${fx(REF.lamp.power) - powerHalf} ${MIRROR / 2} h${2 * powerHalf}`}
+          lamp={power}
+          glowId={`${id}-lampglow`}
+          width={u(REF.lamp.thick)}
+        />
+      </g>
       {(
         [
           [REF.lamp.amp, LAMP_AMP],
@@ -798,7 +810,15 @@ export function Pedal({
           }}
         >
           <Case id={id} />
-          <Lamps id={id} lamps={lamps} live={live} />
+          <Lamps
+            id={id}
+            lamps={lamps}
+            power={powerLamp({
+              connected: live,
+              level: status?.battery ?? -1,
+              powered: !!status?.powered,
+            })}
+          />
           {onSelectIndicator &&
             ([0, 1] as const).map((i) => (
               <IndicatorButton

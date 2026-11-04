@@ -1,6 +1,7 @@
 import { Plug, Zap } from "lucide-react";
 import type { CSSProperties } from "react";
 import { batteryInfo } from "../lib/battery";
+import { levelColour } from "../lib/power";
 import type { State } from "../types";
 import { cx } from "../ui/cx";
 import { Lamp } from "../ui/Lamp";
@@ -36,12 +37,13 @@ function Connection({ state }: { state: State | null }) {
   );
 }
 
-/** Four cells, like the pedal's own app shows it. Mid charge is warm, low is hot. On
+/** Four cells, like the pedal's own app shows it, coloured like the pedal's POWER lamp
+ *  (red, yellow, green by lib/power's thresholds). On
  *  USB a bolt says it is charging, a plug that it is full and running off the cable. */
 function Battery({ level, powered }: { level: number; powered: boolean }) {
   if (level < 0) return null;
   const cells = Math.ceil(level / 25);
-  const colour = level <= 15 ? "hot" : level <= 35 ? "warn" : "live";
+  const colour = ({ red: "hot", yellow: "warn", green: "live" } as const)[levelColour(level)];
   const { power, tooltip } = batteryInfo(level, powered);
   return (
     <div className="flex items-center gap-1.5" title={tooltip}>
