@@ -28,20 +28,17 @@
   filter: brightness(0.72);
 }
 
-/* Selection is UI, not hardware, so it isn't gold (the pedal is gold already): an ice-white
-   plate just outside the switch group, a crisp 2px rim with a soft cold glow and a faint
-   wash inside. The bracket, the tile and the LED stay exactly as they are. */
+/* A fine ice-white selection outline keeps the hardware and its LEDs legible. */
 .pedal-plate {
   fill: rgb(201 228 242 / 0.07);
   stroke: var(--color-cold);
-  stroke-width: 2px;
+  stroke-width: 1px;
   vector-effect: non-scaling-stroke;
   opacity: 0;
   transition: opacity var(--dur-up) var(--ease-incand);
 }
 .pedal-switch[aria-pressed="true"] .pedal-plate {
   opacity: 1;
-  filter: drop-shadow(0 0 5px rgb(201 228 242 / 0.8)) drop-shadow(0 0 14px rgb(201 228 242 / 0.35));
 }
 
 /* The gold bracket: quiet at rest, warmer on hover. */
@@ -179,4 +176,75 @@
 .pedal-switch[data-nut]:focus-visible .pedal-nut-readout,
 .pedal-nut-readout[data-peek] {
   opacity: 1;
+}
+
+/* Mapping labels are connected to the hardware, with an even rhythm across each row. */
+.pedal-captions {
+  position: relative;
+  height: 72px;
+}
+.pedal-leaders {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  fill: none;
+  stroke: #77806d;
+  stroke-opacity: 0.6;
+  stroke-width: 1;
+}
+.pedal-leaders path {
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke 160ms,
+    stroke-opacity 160ms;
+}
+.pedal-leaders circle {
+  fill: #77806d;
+  stroke: none;
+}
+.pedal-leaders [data-selected="true"] {
+  stroke: var(--color-cold);
+  stroke-opacity: 1;
+}
+.pedal-leaders [data-selected="true"] circle {
+  fill: var(--color-cold);
+}
+.pedal-caption {
+  position: absolute;
+  bottom: 0;
+  width: 33.3333%;
+  height: 32px;
+  padding-inline: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.2;
+  color: var(--color-muted);
+  text-align: center;
+}
+.pedal-captions[data-top="true"] .pedal-caption {
+  top: 0;
+  bottom: auto;
+}
+.pedal-caption-main,
+.pedal-caption-hold {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pedal-caption-main {
+  font-size: 11px;
+}
+.pedal-caption-hold {
+  font-size: 10px;
+  color: var(--color-faint);
+}
+.pedal-caption[data-selected="true"],
+.pedal-caption:hover {
+  color: var(--color-cold);
 }

@@ -36,7 +36,7 @@ export function Seg<T extends string>({
             onClick={() => onChange(o.value)}
             className={cx(
               "flex-1 truncate rounded-ui-sm font-semibold transition-[color,background-color,box-shadow] duration-(--dur) ease-(--ease)",
-              size === "sm" ? "h-6 px-2 text-ui-xs" : "h-7 px-2.5 text-ui-sm",
+              size === "sm" ? "h-7 px-2 text-ui-xs" : "h-8 px-1.5 text-ui-sm",
               on ? "lit bg-panel3 text-bone" : "text-muted hover:text-text hover:warm",
             )}
           >

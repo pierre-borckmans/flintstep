@@ -79,21 +79,18 @@ export function Header({ state }: { state: State | null }) {
     .filter(Boolean)
     .join(" · ");
   return (
-    <header
-      style={DRAG}
-      className="relative flex h-11 shrink-0 items-center gap-4 border-b border-edge pr-4 pl-[84px]"
-    >
-      <span className="text-ui-base font-semibold tracking-ui-tight text-bone engraved">
+    <header style={DRAG} className="app-header">
+      <span className="app-wordmark">
         SparkX <span className="text-muted">MIDI</span>
       </span>
       <span className="h-4 w-px bg-edge-strong" />
       <Connection state={state} />
       <div className="flex-1" />
-      {meta && <span className="truncate text-ui-sm text-muted">{meta}</span>}
+      {meta && <span className="header-meta truncate text-ui-sm text-muted">{meta}</span>}
       {live && <Battery level={p?.battery ?? -1} powered={!!p?.powered} />}
       {midi && (
         <div
-          className="flex max-w-[260px] min-w-0 items-center gap-2"
+          className="header-midi flex max-w-[260px] min-w-0 items-center gap-2"
           title={midi.ok ? `Virtual MIDI: ${midi.source} → / ← ${midi.dest}` : midi.error}
         >
           <Lamp on colour={midi.ok ? "cold" : "hot"} size={6} />
