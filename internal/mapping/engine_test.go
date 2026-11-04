@@ -615,7 +615,7 @@ func TestEngineExp(t *testing.T) {
 				}
 			}))
 			for _, f := range c.feeds {
-				msg, ok := e.Exp(c.n, f.raw)
+				msg, ok := expOne(e, c.n, f.raw)
 				if f.want < 0 {
 					if ok {
 						t.Fatalf("raw %d: sent %s, want nothing", f.raw, Describe(msg))
@@ -634,25 +634,35 @@ func TestEngineExp(t *testing.T) {
 func TestEngineExpResends(t *testing.T) {
 	cfg := Default()
 	e := NewEngine(cfg)
-	if _, ok := e.Exp(0, 0); !ok {
+	if _, ok := expOne(e, 0, 0); !ok {
 		t.Fatal("first value not sent")
 	}
 	// Unchanged config: still deduplicated.
 	e.SetConfig(cfg)
-	if _, ok := e.Exp(0, 0); ok {
+	if _, ok := expOne(e, 0, 0); ok {
 		t.Fatal("repeat sent")
 	}
 	// New CC: the controller has never heard it, so send.
 	cfg.Exp[0].CC = 1
 	e.SetConfig(cfg)
-	if msg, ok := e.Exp(0, 0); !ok || !reflect.DeepEqual(msg, cc(1, 1, 0)) {
+	if msg, ok := expOne(e, 0, 0); !ok || !reflect.DeepEqual(msg, cc(1, 1, 0)) {
 		t.Fatalf("after CC change: %s %v", Describe(msg), ok)
 	}
 	// A reconnect resends too.
 	e.Reset()
-	if _, ok := e.Exp(0, 0); !ok {
+	if _, ok := expOne(e, 0, 0); !ok {
 		t.Fatal("not resent after Reset")
 	}
+}
+
+// expOne feeds one value to an input whose trigger is off and returns the CC it sent,
+// if any.
+func expOne(e *Engine, n, raw int) ([]byte, bool) {
+	out := e.Exp(n, raw, at(0))
+	if len(out) == 0 {
+		return nil, false
+	}
+	return out[0], true
 }
 
 func TestEngineIgnoresUnknownSwitch(t *testing.T) {

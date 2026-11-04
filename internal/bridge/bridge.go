@@ -74,21 +74,27 @@ type Bridge struct {
 	outUntil  time.Time // a MIDI-out flash is lit until then
 	inUntil   time.Time // a MIDI-in flash is lit until then
 
+	trig [sparkx.ExpInputs]bool // the expression triggers engaged, as last reported
+
 	now        func() time.Time
 	onActivity func(Activity)
 	onStatus   func(ble.Status)
+	onTrigger  func([sparkx.ExpInputs]bool)
 
 	ticking bool
 	stop    chan struct{}
 	closed  sync.Once
 }
 
-// Options are the bridge's callbacks. Both may be nil. OnStatus is called with no lock
-// held. OnActivity is called in message order while one step is going through, so it
-// must not call back into the bridge.
+// Options are the bridge's callbacks. All may be nil. OnStatus is called with no lock
+// held. OnActivity and OnTrigger are called in order while one step is going through,
+// so they must not call back into the bridge.
 type Options struct {
 	OnActivity func(Activity)
 	OnStatus   func(ble.Status)
+	// OnTrigger is called when an expression trigger engages or lets go, with which
+	// are engaged now (mapping.Engine.ExpTriggers).
+	OnTrigger func([sparkx.ExpInputs]bool)
 	// Now is the clock; nil is time.Now. Tests set it.
 	Now func() time.Time
 }
@@ -107,6 +113,7 @@ func New(cfg mapping.Config, out MIDIOut, o Options) *Bridge {
 		now:        now,
 		onActivity: o.OnActivity,
 		onStatus:   o.OnStatus,
+		onTrigger:  o.OnTrigger,
 		stop:       make(chan struct{}),
 	}
 }
@@ -147,10 +154,19 @@ func (b *Bridge) Apply(cfg mapping.Config) (mapping.Config, error) {
 	defer b.step.Unlock()
 	b.mu.Lock()
 	b.cfg = cfg
-	b.eng.SetConfig(cfg)
+	releases := b.eng.SetConfig(cfg)
 	b.mu.Unlock()
+	b.send(releases)
 	b.syncLamps()
+	b.syncTriggers()
 	return cfg, nil
+}
+
+// ExpTriggers says which expression inputs' triggers are engaged now.
+func (b *Bridge) ExpTriggers() [sparkx.ExpInputs]bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.eng.ExpTriggers()
 }
 
 // Handlers are what the BLE manager calls.
@@ -171,6 +187,7 @@ func (b *Bridge) onSwitch(e sparkx.Edge) {
 	b.mu.Unlock()
 	b.send(msgs)
 	b.syncLamps()
+	b.syncTriggers() // the engine's timers ran first: an off delay may have ended
 	if pending {
 		b.startTicking()
 	}
@@ -180,11 +197,16 @@ func (b *Bridge) onExp(n, raw int) {
 	b.step.Lock()
 	defer b.step.Unlock()
 	b.mu.Lock()
-	msg, ok := b.eng.Exp(n, raw)
+	msgs := b.eng.Exp(n, raw, b.now())
+	pending := b.eng.Pending()
 	b.mu.Unlock()
-	if ok {
-		b.send([][]byte{msg})
+	if len(msgs) > 0 {
+		b.send(msgs)
 		b.syncLamps()
+	}
+	b.syncTriggers()
+	if pending {
+		b.startTicking() // an expression trigger's off delay
 	}
 }
 
@@ -201,11 +223,23 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 		b.mu.Unlock()
 		b.send(releases)
 	} else {
+		// A jack without a cable lets go of its trigger: a pedal pulled out mid-sweep
+		// must not leave the effect it engaged stuck on.
+		var releases [][]byte
+		b.mu.Lock()
+		for n, in := range st.Cables {
+			if !in {
+				releases = append(releases, b.eng.ExpRelease(n)...)
+			}
+		}
+		b.mu.Unlock()
+		b.send(releases)
 		// A fresh connection starts with lamps unknown (lit is false): syncLamps writes
 		// them once even if they match what went to the previous link. After that it
 		// only passes on changes: the USB power state, say.
 		b.syncLamps()
 	}
+	b.syncTriggers()
 	b.step.Unlock()
 	if b.onStatus != nil {
 		b.onStatus(st)
@@ -236,6 +270,19 @@ func (b *Bridge) Tick() {
 	// Also when nothing was sent: a flash may have run out. syncLamps only passes on
 	// a change.
 	b.syncLamps()
+	b.syncTriggers()
+}
+
+// syncTriggers tells OnTrigger when an expression trigger engaged or let go.
+func (b *Bridge) syncTriggers() {
+	b.mu.Lock()
+	t := b.eng.ExpTriggers()
+	changed := t != b.trig
+	b.trig = t
+	b.mu.Unlock()
+	if changed && b.onTrigger != nil {
+		b.onTrigger(t)
+	}
 }
 
 // pendingLocked says whether Tick has work: the engine's timers, or a flash to end.

@@ -58,6 +58,15 @@ type ExpConfig struct {
     Min     int  `json:"min"`    // raw value at the heel, 0..65535
     Max     int  `json:"max"`    // raw value at the toe; may be below Min, never equal to it
     Invert  bool `json:"invert"` // the user's own flip, on top of heel=0 toe=127
+    Trigger ExpTrigger `json:"trigger"`
+}
+
+type TriggerMode string // "off" | "engage" | "toe"
+type ExpTrigger struct {
+    Mode       TriggerMode `json:"mode"`
+    Action     Action      `json:"action"`     // press half on engaging, release half on letting go
+    Threshold  int         `json:"threshold"`  // percent of the calibrated travel, 1..99
+    OffDelayMS int         `json:"offDelayMs"` // engage only, 0..2000
 }
 
 type LEDMode string // "local" | "feedback"
@@ -82,7 +91,8 @@ type Config struct {
 type PedalRef struct { Address string `json:"address"`; Name string `json:"name"` }
 
 func Default() Config        // the spec's table: switch n = CC 80+n momentary ch1, exp1 CC11, exp2 CC7, local LEDs,
-                             // Amp = midiOut green (00,B0,50), App = connected indigo (40,20,FF)
+                             // Amp = midiOut green (00,B0,50), App = connected indigo (40,20,FF),
+                             // exp n trigger off with CC 102+n momentary ch1 127, 4 %, 400 ms
 func (c Config) Normalize() Config // clamps everything into range, fills zero values with defaults
 func (c Config) Validate() error   // human-readable error for the UI (e.g. "combo I + I uses the same switch twice")
 ```
@@ -91,11 +101,15 @@ Engine (not safe for concurrent use; the bridge serialises calls):
 
 ```go
 func NewEngine(cfg Config) *Engine
-func (e *Engine) SetConfig(cfg Config)              // keeps toggle states where the switch is still a toggle
+func (e *Engine) SetConfig(cfg Config) [][]byte     // keeps toggle states where the switch is still a toggle;
+                                                    // returns the release of a trigger that must let go
 func (e *Engine) Switch(ed sparkx.Edge, at time.Time) [][]byte // MIDI to send now
-func (e *Engine) Tick(at time.Time) [][]byte        // long-press / combo timers; called every ~10ms while anything is pending
+func (e *Engine) Tick(at time.Time) [][]byte        // long-press / combo / trigger off-delay timers; every ~10ms while pending
 func (e *Engine) Pending() bool                     // whether Tick has work
-func (e *Engine) Exp(n, raw int) ([]byte, bool)     // calibrated + inverted + hysteresis -> CC; false = nothing to send
+func (e *Engine) Exp(n, raw int, at time.Time) [][]byte // calibrated + inverted + hysteresis -> CC, plus the
+                                                    // trigger's press (before the CC) or release (after it)
+func (e *Engine) ExpRelease(n int) [][]byte         // input n lost its cable: its trigger lets go, next value resent
+func (e *Engine) ExpTriggers() [2]bool              // engaged now: held, or on for a CC toggle action
 func (e *Engine) Feedback(msg []byte) bool          // MIDI from the LED destination; true if Lamps() changed
 func (e *Engine) Lamps() [6]sparkx.Colour           // what the six switch lamps should show now (brightness applied)
 func (e *Engine) Reset() [][]byte                   // pedal disconnected: forget held/pending, keep toggles;
@@ -124,18 +138,33 @@ Behaviour:
   Min == Max on an enabled input is a Validate error (0/0 is "not calibrated" and
   Normalize makes it 0..65535); the engine treats one-point calibration as the whole jack.
   Scaled to 0..127 with the same hysteresis idea as sparkx.ExpScale.
+- Exp trigger (a toe switch faked from the position, since the jack reads one value):
+  measured on the same calibrated, inverted travel as the CC, in percent. "engage":
+  press on reaching Threshold (default 4), release once under Threshold - 3 for
+  OffDelayMS (default 400; rising back to Threshold inside the delay cancels it).
+  "toe": press on reaching Threshold (default 96), release under Threshold - 3. The
+  fixed 3 % (TriggerHysteresis) stops chatter; where Threshold - 3 would be at or below
+  the heel, the heel itself lets go. A CC toggle flips on each press and has no release.
+  The release always ends what the press sent. Reset, ExpRelease, and a SetConfig that
+  disables the input or changes the trigger's mode or action let go of a held trigger
+  (a new threshold or delay is read on the next value); toggle states survive like
+  switch toggles. Normalize: a trigger with no mode (files before version 3) becomes the
+  default; unknown mode -> off; threshold 0 -> the mode's default, then 1..99; off delay
+  0..2000 (0 is valid); action normalised like a switch's. Validate: an engage/toe
+  trigger with an "off" action is "expression N: the trigger does nothing: pick what it sends".
 - Long press: LongPressMS is clamped to MinLongPressMS..MaxLongPressMS (150..3000 ms); the
   frontend's slider and validate use the same range.
 - Validate runs on a Normalized config. Its rules, in order: per combo, a switch that does
   not exist, the same switch twice, an "off" action, a pair already used; then an enabled
-  expression input with Min == Max. The frontend's validate() checks exactly these first,
+  expression input with Min == Max, then (same input) a trigger that does nothing. The frontend's validate() checks exactly these first,
   in the same words, then the ranges Normalize would otherwise clamp silently.
   The frontend's defaultConfig() equals Default() field for field (colours included).
 - Indicators (the Amp and App lamps): "connected" is lit while the bridge holds the pedal,
   "midiOut" flashes on each message sent, "midiIn" on each message to the LED destination,
   "usb" is lit on USB power, "on" always, "off" never. Normalize turns an unknown mode into
-  that lamp's default mode and a black colour into its default colour. ConfigVersion is 2:
-  a version 1 file has no "indicators" and so gets the defaults.
+  that lamp's default mode and a black colour into its default colour. ConfigVersion is 3:
+  a version 1 file has no "indicators" and so gets the defaults; a version 2 file has no
+  "trigger" on its inputs and so gets them off.
 
 ## internal/store
 
@@ -230,7 +259,14 @@ destination back, drives Manager.SetLamps, emits UI events. Interfaces so it is 
 type Pedal interface { SetLamps([8]sparkx.Colour); Status() ble.Status } // the app owns Start/SetTarget/Stop
 type MIDIOut interface { Send([]byte) error }
 type Activity struct { Dir string `json:"dir"`; Bytes []int `json:"bytes"`; Label string `json:"label"`; At int64 `json:"at"` } // "out" | "in"
+type Options struct { OnActivity func(Activity); OnStatus func(ble.Status); OnTrigger func([2]bool); Now func() time.Time }
+func (b *Bridge) ExpTriggers() [2]bool // Engine.ExpTriggers under the bridge's lock
 ```
+
+OnTrigger is called (inside a step, like OnActivity) whenever ExpTriggers changes:
+an engage, a let-go, an off delay ending on the tick loop. The bridge lets go of a
+trigger on disconnect (Engine.Reset) and for each jack a connected Status reports
+without a cable (Engine.ExpRelease), and sends what SetConfig returns from Apply.
 
 ## Wails bindings (package main, `App`), what the frontend calls
 
@@ -254,6 +290,7 @@ type State = {
   midi: { source: string; dest: string; ok: boolean; error: string }
   launchAtLogin: boolean
   version: string
+  expTrigger: [boolean, boolean] // each input's trigger engaged now (Bridge.ExpTriggers)
 }
 ```
 

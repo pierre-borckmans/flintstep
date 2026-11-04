@@ -47,6 +47,8 @@ type State struct {
 	MIDI          MIDIState      `json:"midi"`
 	LaunchAtLogin bool           `json:"launchAtLogin"`
 	Version       string         `json:"version"`
+	// ExpTrigger says which expression inputs' triggers are engaged now.
+	ExpTrigger [2]bool `json:"expTrigger"`
 }
 
 // App is bound to the frontend: its exported methods are the UI's API.
@@ -105,6 +107,7 @@ func (a *App) startup(ctx context.Context) {
 	a.bridge = bridge.New(cfg, nil, bridge.Options{
 		OnActivity: func(ev bridge.Activity) { a.emit("activity", ev) },
 		OnStatus:   func(ble.Status) { a.changed() },
+		OnTrigger:  func([2]bool) { a.changed() },
 	})
 	v, err := coremidi.NewVirtual(midiClient, midiSource, midiDest, a.bridge.Feedback)
 	if err != nil {
@@ -221,6 +224,7 @@ func (a *App) GetState() State {
 		MIDI:          a.mstate,
 		LaunchAtLogin: loginitem.Enabled(),
 		Version:       version,
+		ExpTrigger:    a.bridge.ExpTriggers(),
 	}
 }
 
