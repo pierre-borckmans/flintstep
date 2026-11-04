@@ -4,3 +4,5 @@ frontend/dist
 frontend/wailsjs
 .DS_Store
 *.log
+.claude/
+frontend/package.json.md5

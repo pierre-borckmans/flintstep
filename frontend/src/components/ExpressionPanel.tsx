@@ -1,0 +1,224 @@
+import { useState } from "react";
+import { errorText } from "../api";
+import type { Op } from "../lib/config";
+import { expFraction, expValue, rawFraction } from "../lib/exp";
+import type { Config, ExpEdge, Status } from "../types";
+import { Button } from "../ui/Button";
+import { cx } from "../ui/cx";
+import { Kicker } from "../ui/Kicker";
+import { Lamp } from "../ui/Lamp";
+import { NumField } from "../ui/NumField";
+import { Toggle } from "../ui/Toggle";
+
+/** The live reading: a bar of the value the input sends (0..127), and under it the raw
+ *  jack range with the heel and toe marks, so calibrating is something you can see. */
+function Meter({
+  raw,
+  min,
+  max,
+  invert,
+}: {
+  raw: number;
+  min: number;
+  max: number;
+  invert: boolean;
+}) {
+  const v = expValue(raw, { min, max, invert });
+  const f = expFraction(raw, { min, max, invert }) ?? 0;
+  const has = v !== null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-end gap-3">
+        <span
+          className={cx(
+            "w-10 font-mono text-[22px] leading-none font-medium tabular-nums",
+            has ? "text-bone" : "text-faint",
+          )}
+        >
+          {has ? v : "--"}
+        </span>
+        <div className="mb-[3px] flex-1">
+          <div className="relative h-2.5 overflow-hidden rounded-[3px] bg-sunken shadow-[inset_0_1px_2px_rgb(0_0_0/0.7)]">
+            <div
+              className="absolute inset-y-0 left-0 rounded-[3px]"
+              style={{
+                width: `${f * 100}%`,
+                opacity: has ? 1 : 0,
+                background: "linear-gradient(90deg, rgb(201 228 242 / 0.35), var(--color-cold))",
+                boxShadow: "0 0 10px rgb(201 228 242 / 0.35)",
+                transition: "width var(--dur-led) var(--ease-led)",
+              }}
+            />
+            {/* 7-bit ticks */}
+            {[0.25, 0.5, 0.75].map((t) => (
+              <span
+                key={t}
+                className="absolute inset-y-0 w-px bg-black/50"
+                style={{ left: `${t * 100}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <Kicker className="w-10 !text-faint">raw</Kicker>
+        <div className="relative h-3 flex-1">
+          <div className="absolute top-1/2 h-px w-full -translate-y-1/2 bg-edge-strong" />
+          <div
+            className="absolute top-1/2 h-[3px] -translate-y-1/2 bg-muted/50"
+            style={{
+              left: `${rawFraction(min) * 100}%`,
+              width: `${(rawFraction(max) - rawFraction(min)) * 100}%`,
+            }}
+          />
+          {[min, max].map((m, i) => (
+            <span
+              key={i}
+              className="absolute top-0 h-3 w-px bg-muted"
+              style={{ left: `${rawFraction(m) * 100}%` }}
+            />
+          ))}
+          {raw >= 0 && (
+            <span
+              className="absolute top-1/2 h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cold"
+              style={{
+                left: `${rawFraction(raw) * 100}%`,
+                boxShadow: "var(--glow-cold)",
+                transition: "left var(--dur-led) var(--ease-led)",
+              }}
+            />
+          )}
+        </div>
+      </div>
+      <div className="flex justify-between pl-[52px] font-mono text-ui-2xs text-faint tabular-nums">
+        <span>heel {min}</span>
+        <span className={raw >= 0 ? "text-muted" : ""}>{raw >= 0 ? raw : "no reading"}</span>
+        <span>toe {max}</span>
+      </div>
+    </div>
+  );
+}
+
+function ExpCard({
+  n,
+  config,
+  status,
+  apply,
+  calibrate,
+}: {
+  n: number;
+  config: Config;
+  status: Status | null;
+  apply: (op: Op) => void;
+  calibrate: (n: number, edge: ExpEdge) => Promise<void>;
+}) {
+  const x = config.exp[n];
+  const cable = !!status?.cables?.[n] && status?.state === "connected";
+  const raw = status?.expRaw?.[n] ?? -1;
+  const [err, setErr] = useState<string | null>(null);
+  const [flash, setFlash] = useState<ExpEdge | null>(null);
+  const set = (edge: ExpEdge) =>
+    calibrate(n, edge)
+      .then(() => {
+        setErr(null);
+        setFlash(edge);
+        setTimeout(() => setFlash(null), 900);
+      })
+      .catch((e) => setErr(errorText(e)));
+
+  return (
+    <div className="flex flex-col gap-3 rounded-ui-lg border border-edge bg-panel2/60 p-3 rim">
+      <div className="flex items-center gap-2">
+        <span className="text-ui-base font-semibold text-bone engraved">EXP {n + 1}</span>
+        <Lamp on={cable} colour="live" size={6} />
+        <span className={cx("text-ui-xs", cable ? "text-muted" : "text-faint")}>
+          {cable ? "cable in" : "no cable"}
+        </span>
+        <div className="flex-1" />
+        <span className="text-ui-xs text-muted">{x.enabled ? "On" : "Off"}</span>
+        <Toggle
+          label={`EXP ${n + 1} enabled`}
+          on={x.enabled}
+          onChange={(enabled) => apply({ type: "exp", n, patch: { enabled } })}
+        />
+      </div>
+
+      <div
+        className="transition-[filter] duration-(--dur-down) ease-(--ease-incand)"
+        style={{ filter: cable && x.enabled ? "none" : "var(--off-dim)" }}
+      >
+        <Meter raw={cable ? raw : -1} min={x.min} max={x.max} invert={x.invert} />
+      </div>
+
+      <div className={cx("grid grid-cols-2 gap-2", !x.enabled && "opacity-50")}>
+        <NumField
+          label="Ch"
+          value={x.channel}
+          min={1}
+          max={16}
+          onChange={(channel) => apply({ type: "exp", n, patch: { channel } })}
+        />
+        <NumField
+          label="CC"
+          value={x.cc}
+          min={0}
+          max={127}
+          onChange={(cc) => apply({ type: "exp", n, patch: { cc } })}
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          kind={flash === "min" ? "primary" : "plain"}
+          disabled={!cable}
+          onClick={() => set("min")}
+          title="Rock the pedal fully back, then click"
+        >
+          Set heel
+        </Button>
+        <Button
+          size="sm"
+          kind={flash === "max" ? "primary" : "plain"}
+          disabled={!cable}
+          onClick={() => set("max")}
+          title="Push the pedal fully forward, then click"
+        >
+          Set toe
+        </Button>
+        <div className="flex-1" />
+        <span className="text-ui-xs text-muted">Invert</span>
+        <Toggle
+          label={`Invert EXP ${n + 1}`}
+          on={x.invert}
+          onChange={(invert) => apply({ type: "exp", n, patch: { invert } })}
+        />
+      </div>
+      {err && <p className="text-ui-xs text-hot">{err}</p>}
+      {!cable && (
+        <p className="text-ui-xs text-faint">
+          Plug an expression pedal into EXP {n + 1} to see it and calibrate it.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function ExpressionPanel(props: {
+  config: Config;
+  status: Status | null;
+  apply: (op: Op) => void;
+  calibrate: (n: number, edge: ExpEdge) => Promise<void>;
+}) {
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <ExpCard n={0} {...props} />
+      <ExpCard n={1} {...props} />
+      <p className="px-1 text-ui-xs leading-snug text-faint">
+        <Kicker className="mr-1">Tip</Kicker>
+        Heel and toe save straight away. The value only moves when the pedal is clearly past a step,
+        so a resting pedal does not flicker.
+      </p>
+    </div>
+  );
+}

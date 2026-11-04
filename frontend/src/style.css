@@ -1,0 +1,272 @@
+@import "tailwindcss";
+
+/* Design tokens, lifted from the Beam app (beam/app/frontend/src/style.css) and trimmed
+   to what this app uses. `static` so every token exists at runtime: inline styles and
+   SVG attributes read them directly, which the Tailwind scanner cannot see. */
+@theme static {
+  /* THE LIGHT LAW. Every surface is a neutral material; every colour is a light.
+     Nothing is coloured unless it is emitting: a selected tab is LIT, not tinted, and
+     the only saturated colours on screen are the pedal's own LEDs and status lamps. */
+
+  /* materials */
+  --color-bg: #08090b;
+  --color-panel: #181b1f;
+  --color-panel2: #20242a;
+  --color-panel3: #282d33;
+  --color-sunken: #0e1013;
+  --color-edge: #1e2226;
+  --color-edge-strong: #333a40;
+  --color-muted: #8b9298;
+  --color-faint: #4a5157;
+  --color-metal: #464d54;
+  --color-bone: #e7e4dc;
+  --color-text: #e9e7e1;
+  --color-ink: #1e1509;
+
+  /* lights */
+  --color-key: #fff4e4;
+  --color-beam: #ffb454; /* engaged / selected / armed */
+  --color-live: #7fe3a0; /* link up, signal present, write confirmed */
+  --color-hot: #ff5f4e; /* fault, destructive */
+  --color-cold: #c9e4f2; /* data: MIDI traffic, telemetry */
+  --color-warn: #e8a33d; /* battery mid-level */
+
+  --radius-ui-sm: 6px;
+  --radius-ui-md: 8px;
+  --radius-ui-lg: 12px;
+  --radius-ui-xl: 16px;
+
+  --text-ui-2xs: 9px;
+  --text-ui-xs: 10px;
+  --text-ui-sm: 11px;
+  --text-ui-md: 12px;
+  --text-ui-base: 13px;
+  --text-ui-lg: 15px;
+  --text-ui-xl: 17px;
+
+  --tracking-kicker: 0.12em;
+  --tracking-ui-tight: -0.015em;
+
+  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+
+  --shadow-raise: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-card: 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-pop: 0 16px 40px -12px rgb(0 0 0 / 0.7);
+  --shadow-contact: 2px 5px 6px -1px rgb(0 0 0 / 0.8);
+  --shadow-cast: 12px 32px 36px -8px rgb(0 0 0 / 0.7);
+
+  --glow-accent: 0 0 8px var(--color-beam), 0 0 20px rgb(255 180 84 / 0.45);
+  --glow-good: 0 0 8px var(--color-live), 0 0 18px rgb(127 227 160 / 0.4);
+  --glow-cold: 0 0 8px var(--color-cold), 0 0 18px rgb(201 228 242 / 0.35);
+  --glow-hot: 0 0 8px var(--color-hot), 0 0 18px rgb(255 95 78 / 0.4);
+
+  /* Motion. Two kinds of light: incandescent (warm, spatial: selection, panels) rises
+     fast and dies slow; LED (data: link lamp, MIDI traffic, the pedal's rings) switches
+     with no lag at all. */
+  --dur-fast: 100ms;
+  --dur: 160ms;
+  --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+  --dur-up: 220ms;
+  --dur-down: 340ms;
+  --ease-incand: cubic-bezier(0.3, 0.75, 0.35, 1);
+  --dur-led: 60ms;
+  --ease-led: linear;
+
+  /* A switched-off thing drains colour and light rather than turning transparent. */
+  --off-dim: saturate(0.25) brightness(0.6);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html {
+  background-color: var(--color-bg);
+}
+body {
+  margin: 0;
+  color: var(--color-text);
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--text-ui-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* The key: one warm source from the upper left. */
+  background:
+    radial-gradient(1100px 620px at 18% -12%, rgb(255 244 228 / 0.07) 0%, rgb(255 244 228 / 0) 62%),
+    var(--color-bg);
+}
+
+* {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+label[for],
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 1px solid var(--color-key);
+  outline-offset: 2px;
+}
+@layer base {
+  :focus-visible {
+    border-radius: inherit;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* LIT: selected / engaged. A warm wash from above, a bright lip, a small pool below. */
+@utility lit {
+  background-image: radial-gradient(
+    128% 190% at 50% 0%,
+    rgb(255 180 84 / 0.28) 0%,
+    rgb(255 180 84 / 0.05) 76%,
+    rgb(255 180 84 / 0) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 200 130 / 0.5),
+    0 6px 18px -8px rgb(255 180 84 / 0.55);
+}
+
+/* WARM: hover. Colourless, composes with lit. */
+@utility warm {
+  background-image: radial-gradient(
+    130% 200% at 50% 0%,
+    rgb(255 244 228 / 0.14) 0%,
+    rgb(255 244 228 / 0.02) 82%,
+    rgb(255 244 228 / 0) 100%
+  );
+}
+
+/* RIM: the key grazing a top-left edge. */
+@utility rim {
+  box-shadow:
+    inset 1px 1px 0 rgb(255 244 228 / 0.22),
+    inset -1px -1px 0 rgb(0 0 0 / 0.35),
+    0 0 0 1px rgb(255 244 228 / 0.07);
+}
+
+/* ENGRAVED: legend cut into metal. */
+@utility engraved {
+  text-shadow:
+    0 -1px 0 rgb(0 0 0 / 0.85),
+    0 1px 0 rgb(255 244 228 / 0.07);
+}
+
+@utility scroll-y {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@utility fade-up {
+  animation: fade-up var(--dur-up) var(--ease-incand) both;
+}
+
+/* A log row arriving: an LED, so it switches on, then the warm afterglow fades. */
+@keyframes row-in {
+  from {
+    background-color: rgb(201 228 242 / 0.09);
+  }
+  to {
+    background-color: rgb(201 228 242 / 0);
+  }
+}
+@utility row-in {
+  animation: row-in 900ms var(--ease-incand) both;
+}
+
+/* A slow breathing for "searching". Not a spinner: a lamp that is looking. */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@utility breathe {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+/* Thin, quiet scrollbars to match the panels. */
+.scroll-y::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-y::-webkit-scrollbar-thumb {
+  background: var(--color-edge-strong);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.scroll-y::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Range inputs: a sunken groove and a metal cap, lit by the key. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    rgb(255 180 84 / 0.75) 0 var(--fill, 0%),
+    var(--color-sunken) var(--fill, 0%) 100%
+  );
+  box-shadow: inset 0 1px 1px rgb(0 0 0 / 0.6);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #9aa2a9, #50585f 60%, #3a4046);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.7),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
