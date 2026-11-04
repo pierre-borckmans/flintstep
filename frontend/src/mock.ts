@@ -1,5 +1,5 @@
 import type { Backend } from "./api";
-import { defaultConfig, validate } from "./lib/config";
+import { defaultConfig, type Op, validate } from "./lib/config";
 import { expValue, RAW_MAX } from "./lib/exp";
 import { describeMidi } from "./lib/midi";
 import type { Action, Activity, BleState, Colour, Config, Device, State, Status } from "./types";
@@ -261,9 +261,28 @@ export function createSim(opts: SimOptions = {}) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Edits to replay on load (?demo=...), so the history and the save status can be
+ *  screenshotted without clicking: "history" makes a few changes and undoes the last
+ *  two; "invalid" ends on a config that does not validate. */
+export function demoScript(name: string): (Op | "undo")[] {
+  const edits: Op[] = [
+    { type: "tap", sw: 1, patch: { kind: "note", number: 60 } },
+    { type: "colour", sw: 0, colour: { r: 0, g: 255, b: 0 } },
+    { type: "tap", sw: 3, patch: { mode: "toggle" } },
+    { type: "addCombo" },
+    { type: "longPressMs", value: 650 },
+    { type: "ledMode", mode: "feedback" },
+  ];
+  if (name === "history") return [...edits, "undo", "undo"];
+  if (name === "invalid")
+    return [...edits.slice(0, 2), { type: "combo", index: 0, patch: { b: 0 } }];
+  return [];
+}
+
 /** The Backend over a running simulator. URL parameters shape it for screenshots:
  *  ?state=off|searching|connecting|connected, ?seed=N, ?hold=I,A (switch names),
- *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses). */
+ *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
+ *  (every save is refused). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
   const holdMask = (q.get("hold") ?? "")
@@ -282,6 +301,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
   });
   let launchAtLogin = false;
   const midiError = q.get("midi") === "error";
+  const saveError = q.get("save") === "error";
   const stateCbs = new Set<(s: State) => void>();
   const actCbs = new Set<(a: Activity) => void>();
 
@@ -314,6 +334,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     GetState: async () => state(),
     SaveConfig: async (cfg) => {
       await sleep(120);
+      if (saveError) throw new Error("could not write config.json: read-only file system");
       const err = validate(cfg);
       if (err) throw new Error(err);
       sim.setConfig(cfg);
