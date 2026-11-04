@@ -11,15 +11,18 @@ const KINDS: { value: ActionKind; label: string }[] = [
 ];
 
 /** One action: kind, then the fields that kind uses. `allowOff` is false where "off"
- *  is expressed elsewhere (the long-press toggle). */
+ *  is expressed elsewhere (the long-press toggle). `describe` replaces the line that
+ *  says what it sends, for things that are not pressed (an expression trigger). */
 export function ActionEditor({
   action,
   onChange,
   allowOff = true,
+  describe = explain,
 }: {
   action: Action;
   onChange: (patch: Partial<Action>) => void;
   allowOff?: boolean;
+  describe?: (a: Action) => string;
 }) {
   const a = action;
   return (
@@ -84,7 +87,7 @@ export function ActionEditor({
           onChange={(mode) => onChange({ mode })}
         />
       )}
-      {a.kind !== "off" && <p className="text-ui-xs leading-snug text-faint">{explain(a)}</p>}
+      {a.kind !== "off" && <p className="text-ui-xs leading-snug text-faint">{describe(a)}</p>}
     </div>
   );
 }
