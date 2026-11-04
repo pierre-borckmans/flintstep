@@ -84,7 +84,11 @@ export function ActionEditor({
           onChange={(mode) => onChange({ mode })}
         />
       )}
-      {a.kind !== "off" && <p className="text-ui-xs leading-snug text-faint">{explain(a)}</p>}
+      <p className="text-ui-xs leading-snug text-faint">
+        {a.kind === "off"
+          ? "Sends nothing. Pick CC, Note or Program to choose what this sends."
+          : explain(a)}
+      </p>
     </div>
   );
 }
