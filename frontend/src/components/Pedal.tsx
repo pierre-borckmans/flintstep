@@ -15,25 +15,101 @@ import "./Pedal.css";
 // the same coordinate space to its group. Captions sit outside the case, above the top row
 // and below the bottom row. The jacks are on the back edge, the top of this view.
 
+// REFERENCE GEOMETRY, measured off the straight top-down product shot (1080x461, face
+// 675px wide at x 207..882, y 55.5..388). Every number is normalised to the face width
+// (face = 1 wide), origin at the face's top-left corner; y grows downwards. Positions are
+// for the top row; the bottom row mirrors them about `axis`, the face's horizontal centre
+// line (the photo agrees to within a pixel on brackets, LEDs and numerals; the nuts sit
+// ~2px further out from it, which is camera parallax on their height, so they're averaged).
+// The SVG constants below are all derived from this table: check edits against it.
+//
+//   case       x -0.0615..1.0600  y -0.0600..0.5644  corner r 0.056   (tolex, ~0.06 rim)
+//   strips     gold, centres x -0.0081 / 1.0067, 0.0119 wide, y -0.0496..0.5415
+//   face       x 0..1  y 0..0.4926                                      axis y 0.2463
+//   columns    I/III 0.0647, II/IV 0.5, A/B 0.9353 (measured 0.0652, 0.5012, 0.9359)
+//   bracket    stroke-centre half-width 0.0399, top y 0.0107, bottom y 0.2089,
+//              corners r 0.0126 (top) / 0.0111 (bottom), stroke 0.0022. The bottom edge
+//              is only the two corner arcs: each stops where it turns horizontal, leaving
+//              a gap of a FIXED width (0.0533 edge to edge) on every bracket. The numeral
+//              is centred in it, so its padding is equal left and right, and is
+//              I 0.0226, II 0.0156, III 0.0081, IV 0.0044 per side.
+//   nut        hex, points up and down, centre y 0.067, vertex radius 0.0541
+//   cap        bushing ring r 0.0378, domed top r 0.0304; key slot 0.0089 x 0.005 at -0.040
+//   LED        y 0.1541, 0.0652 long overall, 0.0207 thick, sags 0.0022 at its middle
+//              (a smile on the top row, a frown on the bottom row)
+//   numerals   cap height 0.0307, centre y 0.2059 (a hair above the bracket's bottom
+//              edge); bars 0.0085 wide, 0.0052 apart; the V 0.0311 wide at the top,
+//              0.0104 at its flat foot, arms 0.0089 thick, notch 0.6 of the height deep.
+//              Widths: I 0.0085, II 0.0222, III 0.0359, IV 0.0448.
+//   A/B tile   half-width 0.0404, y 0.0074..0.2163, r 0.0119; letter cap height 0.0311,
+//              centre y 0.1893, A 0.0267 wide, B 0.0222 wide
+//   wordmark   "Spark" ink x 0.1644..0.3993, cap top 0.2081, baseline 0.2607;
+//              "CONTROL X" ink x 0.2844..0.4007, cap height 0.0141, baseline 0.2844
+//   legends    cap height 0.0135. POWER centre x 0.6652, 0.0541 wide; CONNECT 0.7793,
+//              0.0719 wide; both baseline 0.2178. AMP 0.7470 (0.0333 wide), APP 0.8107
+//              (0.0304 wide), baseline 0.2830
+//   lamps      on the axis: POWER bar centre x 0.6641, 0.0570 long, 0.0222 thick;
+//              AMP dot 0.7474, APP dot 0.8111, 0.016 across (lens and halo)
+const REF = {
+  case: { x0: -0.0615, x1: 1.06, y0: -0.06, y1: 0.5644, r: 0.056 },
+  strip: { x: [-0.0081, 1.0067], w: 0.0119, y0: -0.0496, y1: 0.5415 },
+  face: { h: 0.4926 },
+  axis: 0.2463,
+  col: [0.0647, 0.5, 0.9353],
+  bracket: { half: 0.0399, y0: 0.0107, y1: 0.2089, rTop: 0.0126, rBot: 0.0111, stroke: 0.0022 },
+  nut: { y: 0.067, r: 0.0541 },
+  cap: { ring: 0.0378, dome: 0.0304, slot: { w: 0.0089, h: 0.005, dy: -0.04 } },
+  led: { y: 0.1541, len: 0.0652, thick: 0.0207, sag: 0.0022 },
+  numeral: {
+    y: 0.2059,
+    cap: 0.0307,
+    bar: 0.0085,
+    gap: 0.0052,
+    vTop: 0.0311,
+    vFoot: 0.0104,
+    arm: 0.0089,
+  },
+  tile: { half: 0.0404, y0: 0.0074, y1: 0.2163, r: 0.0119 },
+  letter: { y: 0.1893, cap: 0.0311, w: { A: 0.0267, B: 0.0222 } as Record<string, number> },
+  spark: { x0: 0.1644, x1: 0.3993, cap: 0.0526, base: 0.2607 },
+  control: { x0: 0.2844, x1: 0.4007, cap: 0.0141, base: 0.2844 },
+  legend: { cap: 0.0135, top: 0.2178, bottom: 0.283 },
+  power: { x: 0.6652, w: 0.0541 },
+  connect: { x: 0.7793, w: 0.0719 },
+  amp: { x: 0.747, w: 0.0333 },
+  app: { x: 0.8107, w: 0.0304 },
+  lamp: { power: 0.6641, len: 0.057, thick: 0.0222, amp: 0.7474, app: 0.8111, dot: 0.016 },
+};
+
+/** The case is 1000 wide; one face width is U viewBox units. */
 const W = 1000;
-const H = 575;
+const U = W / (REF.case.x1 - REF.case.x0);
+const H = Math.round((REF.case.y1 - REF.case.y0) * U);
+/** Face-normalised -> viewBox: a length, an x, a y. */
+const u = (n: number) => n * U;
+const fx = (n: number) => (n - REF.case.x0) * U;
+const fy = (n: number) => (n - REF.case.y0) * U;
+const CASE_R = u(REF.case.r);
+const FACE = { x: fx(0), y: fy(0), w: u(1), h: u(REF.face.h) };
+/** Avenir Next's cap height, as a fraction of the font size: sizes come from cap heights. */
+const CAP = 0.708;
 const FONT = "'Avenir Next', Avenir, Futura, 'Helvetica Neue', system-ui, sans-serif";
 const BLACK: Colour = { r: 0, g: 0, b: 0 };
 
-/** Column centres, and the axis the bottom row mirrors the top row about. */
-const COL = [115, 507, 893];
-const MIRROR = 560;
-/** Each switch's group, top row: bracket 62..258, switch, LED bar, label. */
-const GROUP = { y0: 52, y1: 274, half: 58 };
+/** Column centres, and the axis the bottom row mirrors the top row about (MIRROR - y). */
+const COL = REF.col.map(fx);
+const MIRROR = 2 * fy(REF.axis);
+/** Each switch's group, top row: from the nut's top point to the numeral's foot, as wide
+ *  as the nut. It is the hit area. */
+const GROUP = {
+  y0: fy(REF.nut.y - REF.nut.r) - 4,
+  y1: fy(REF.numeral.y + REF.numeral.cap / 2) + 4,
+  half: u(REF.nut.r) + 2,
+};
 /** Margin drawn round each switch's hit area, in viewBox units. */
 const PAD = 40;
-const SW_Y = 118;
-const LED_Y = 197;
-/** The numeral sits ON the bracket's bottom edge, which breaks around it. */
-const LABEL_Y = 258;
-/** Half the gap the bracket leaves for each numeral, in viewBox units: the numeral's
- * own half-width at 34px plus breathing room, as on the pedal. */
-const LABEL_GAP: Record<string, number> = { I: 13, II: 20, III: 27, IV: 27 };
+const SW_Y = fy(REF.nut.y);
+const LED_Y = fy(REF.led.y);
 
 const slot = (n: number) => ({ x: COL[n % 3], top: n < 3, tile: n % 3 === 2 });
 const pct = (v: number, of: number) => `${(v / of) * 100}%`;
@@ -116,15 +192,15 @@ const Case = memo(function Case({ id }: { id: string }) {
       </defs>
 
       {/* tolex */}
-      <rect width={W} height={H} rx="46" fill="#121110" />
-      <rect width={W} height={H} rx="46" fill="#000" filter={`url(#${id}-tolex)`} />
-      <rect width={W} height={H} rx="46" fill={`url(#${id}-shade)`} />
+      <rect width={W} height={H} rx={CASE_R} fill="#121110" />
+      <rect width={W} height={H} rx={CASE_R} fill="#000" filter={`url(#${id}-tolex)`} />
+      <rect width={W} height={H} rx={CASE_R} fill={`url(#${id}-shade)`} />
       <rect
         x="1"
         y="1"
         width={W - 2}
         height={H - 2}
-        rx="45"
+        rx={CASE_R - 1}
         fill="none"
         stroke="#fff4e4"
         strokeOpacity="0.07"
@@ -132,47 +208,70 @@ const Case = memo(function Case({ id }: { id: string }) {
       />
 
       {/* gold trim strips, top to bottom along each side */}
-      {[47, 945].map((x) => (
-        <rect key={x} x={x} y="5" width="8" height={H - 10} rx="3" fill={`url(#${id}-trim)`} />
+      {REF.strip.x.map((x) => (
+        <rect
+          key={x}
+          x={fx(x) - u(REF.strip.w) / 2}
+          y={fy(REF.strip.y0)}
+          width={u(REF.strip.w)}
+          height={u(REF.strip.y1 - REF.strip.y0)}
+          rx={u(REF.strip.w) / 2.5}
+          fill={`url(#${id}-trim)`}
+        />
       ))}
 
       {/* the brushed face */}
-      <rect x="57" y="56" width="886" height="466" rx="5" fill="#0d0d0e" />
+      <rect x={FACE.x} y={FACE.y} width={FACE.w} height={FACE.h} rx="3" fill="#0d0d0e" />
       <rect
-        x="57"
-        y="56"
-        width="886"
-        height="466"
-        rx="5"
+        x={FACE.x}
+        y={FACE.y}
+        width={FACE.w}
+        height={FACE.h}
+        rx="3"
         fill="#000"
         filter={`url(#${id}-brush)`}
       />
-      <rect x="57" y="56" width="886" height="466" rx="5" fill={`url(#${id}-key)`} />
+      <rect x={FACE.x} y={FACE.y} width={FACE.w} height={FACE.h} rx="3" fill={`url(#${id}-key)`} />
       <rect
-        x="57.5"
-        y="56.5"
-        width="885"
-        height="465"
-        rx="5"
+        x={FACE.x + 0.5}
+        y={FACE.y + 0.5}
+        width={FACE.w - 1}
+        height={FACE.h - 1}
+        rx="3"
         fill="none"
         stroke="#000"
         strokeOpacity="0.8"
+        strokeWidth="2"
       />
-      <line x1="60" y1="521" x2="940" y2="521" stroke="#fff4e4" strokeOpacity="0.08" />
+      <line
+        x1={FACE.x + 3}
+        y1={FACE.y + FACE.h - 1}
+        x2={FACE.x + FACE.w - 3}
+        y2={FACE.y + FACE.h - 1}
+        stroke="#fff4e4"
+        strokeOpacity="0.08"
+      />
 
-      {/* wordmark: set in type, not traced */}
+      {/* wordmark: set in type, not traced, stretched to the measured ink widths */}
       <g fontFamily={FONT} fill={`url(#${id}-gold)`}>
         <text
-          x="312"
-          y="292"
-          textAnchor="middle"
-          fontSize="70"
-          fontWeight="800"
-          letterSpacing="-1.5"
+          x={fx(REF.spark.x0)}
+          y={fy(REF.spark.base)}
+          fontSize={u(REF.spark.cap) / CAP}
+          fontWeight="700"
+          textLength={u(REF.spark.x1 - REF.spark.x0)}
+          lengthAdjust="spacingAndGlyphs"
         >
           Spark
         </text>
-        <text x="414" y="322" textAnchor="end" fontSize="19" fontWeight="700" letterSpacing="1.6">
+        <text
+          x={fx(REF.control.x0)}
+          y={fy(REF.control.base)}
+          fontSize={u(REF.control.cap) / CAP}
+          fontWeight="700"
+          textLength={u(REF.control.x1 - REF.control.x0)}
+          lengthAdjust="spacingAndGlyphs"
+        >
           CONTROL X
         </text>
       </g>
@@ -180,24 +279,30 @@ const Case = memo(function Case({ id }: { id: string }) {
       {/* panel legends */}
       <g
         fontFamily={FONT}
-        fontWeight="600"
+        fontWeight="700"
+        fontSize={u(REF.legend.cap) / CAP}
         fill="#e2cfa5"
         fillOpacity="0.88"
         textAnchor="middle"
-        letterSpacing="1"
       >
-        <text x="652" y="254" fontSize="16">
-          POWER
-        </text>
-        <text x="757" y="254" fontSize="16">
-          CONNECT
-        </text>
-        <text x="729" y="316" fontSize="15">
-          AMP
-        </text>
-        <text x="786" y="316" fontSize="15">
-          APP
-        </text>
+        {(
+          [
+            ["POWER", REF.power, REF.legend.top],
+            ["CONNECT", REF.connect, REF.legend.top],
+            ["AMP", REF.amp, REF.legend.bottom],
+            ["APP", REF.app, REF.legend.bottom],
+          ] as const
+        ).map(([text, at, base]) => (
+          <text
+            key={text}
+            x={fx(at.x)}
+            y={fy(base)}
+            textLength={u(at.w)}
+            lengthAdjust="spacingAndGlyphs"
+          >
+            {text}
+          </text>
+        ))}
       </g>
 
       {/* the jack sockets on the back edge */}
@@ -210,8 +315,38 @@ const Case = memo(function Case({ id }: { id: string }) {
 
 /** A curved LED bar: a smile on the top row, a frown on the bottom row. */
 function ledPath(x: number, y: number, top: boolean) {
-  const bow = top ? 4 : -4;
-  return `M${x - 25} ${y - bow / 2} Q${x} ${y + bow * 1.5} ${x + 25} ${y - bow / 2}`;
+  // the stroke's round caps add half its width at each end; the quadratic's control point
+  // sits twice the sag off the chord, so its middle sags by exactly the measured amount
+  const half = u(REF.led.len - REF.led.thick) / 2;
+  const sag = u(REF.led.sag) * (top ? 1 : -1);
+  return `M${x - half} ${y - sag / 2} Q${x} ${y + sag * 1.5} ${x + half} ${y - sag / 2}`;
+}
+
+/** The numerals as drawn shapes, not type: upright bars and a flat-footed V, so their
+ *  width (and so their centring in the bracket's gap) never depends on a font. */
+function numeralPath(name: string, x: number, cy: number) {
+  const n = REF.numeral;
+  const h = u(n.cap);
+  const glyph = (c: string) => u(c === "V" ? n.vTop : n.bar);
+  const chars = [...name];
+  const width = chars.reduce((s, c) => s + glyph(c), 0) + u(n.gap) * (chars.length - 1);
+  const top = cy - h / 2;
+  const bottom = cy + h / 2;
+  let left = x - width / 2;
+  let d = "";
+  for (const c of chars) {
+    const gw = glyph(c);
+    if (c === "V") {
+      const mid = left + gw / 2;
+      const arm = u(n.arm);
+      const foot = u(n.vFoot) / 2;
+      d += `M${left} ${top} H${left + arm} L${mid} ${top + h * 0.6} L${left + gw - arm} ${top} H${left + gw} L${mid + foot} ${bottom} H${mid - foot} Z`;
+    } else {
+      d += `M${left} ${top} h${gw} V${bottom} h${-gw} Z`;
+    }
+    left += gw + u(n.gap);
+  }
+  return d;
 }
 
 /** The light: a slate bar when dark; when lit, a hot core, the colour, and a pool of
@@ -264,6 +399,7 @@ function LedBar({
 
 function Lamps({ id, lamps, live }: { id: string; lamps: Colour[]; live: boolean }) {
   const power: Colour = live ? { r: 40, g: 255, b: 90 } : BLACK;
+  const powerHalf = u(REF.lamp.len - REF.lamp.thick) / 2;
   return (
     <svg
       aria-hidden
@@ -274,27 +410,32 @@ function Lamps({ id, lamps, live }: { id: string; lamps: Colour[]; live: boolean
         <filter
           id={`${id}-lampglow`}
           filterUnits="userSpaceOnUse"
-          x="580"
-          y="220"
-          width="280"
+          x={fx(REF.lamp.power) - 80}
+          y={MIRROR / 2 - 60}
+          width={fx(REF.lamp.app) - fx(REF.lamp.power) + 160}
           height="120"
         >
           <feGaussianBlur stdDeviation="7" />
         </filter>
       </defs>
-      <LedBar d="M640 280 L664 280" lamp={power} glowId={`${id}-lampglow`} width={19} />
+      <LedBar
+        d={`M${fx(REF.lamp.power) - powerHalf} ${MIRROR / 2} h${2 * powerHalf}`}
+        lamp={power}
+        glowId={`${id}-lampglow`}
+        width={u(REF.lamp.thick)}
+      />
       {(
         [
-          [729, LAMP_AMP],
-          [786, LAMP_APP],
+          [REF.lamp.amp, LAMP_AMP],
+          [REF.lamp.app, LAMP_APP],
         ] as const
       ).map(([x, n]) => (
         <LedBar
           key={n}
-          d={`M${x} 280 L${x + 0.01} 280`}
+          d={`M${fx(x)} ${MIRROR / 2} h0.01`}
           lamp={lamps[n]}
           glowId={`${id}-lampglow`}
-          width={13}
+          width={u(REF.lamp.dot)}
         />
       ))}
     </svg>
@@ -324,13 +465,36 @@ function FootSwitch({
   const h = GROUP.y1 - GROUP.y0;
   const w = GROUP.half * 2;
   const name = SWITCH_NAMES[index];
-  // the bracket: up the sides, round the switch, and in along the bottom edge to a gap
-  // the width of the numeral, which sits in it
-  const g = LABEL_GAP[name] ?? 20;
-  const bracket = `M${x - g} ${y(258)} L${x - 30} ${y(258)} Q${x - 42} ${y(258)} ${x - 42} ${y(246)} L${x - 42} ${y(84)} Q${x - 42} ${y(62)} ${x - 20} ${y(62)} L${x + 20} ${y(62)} Q${x + 42} ${y(62)} ${x + 42} ${y(84)} L${x + 42} ${y(246)} Q${x + 42} ${y(258)} ${x + 30} ${y(258)} L${x + g} ${y(258)}`;
-  // the hex nut, flats left and right
+  // the bracket: up the sides and round the top; at the bottom each corner arc stops as
+  // it turns horizontal, and the numeral sits centred in the gap between the two
+  const b = REF.bracket;
+  const bx = u(b.half);
+  const [rt, rb] = [u(b.rTop), u(b.rBot)];
+  const [bt, bb] = [y(fy(b.y0)), y(fy(b.y1))];
+  const sy = top ? 1 : -1;
+  // clockwise on screen for the top row; the bottom row's mirror image runs the other way
+  const arc = (r: number) => `A${r} ${r} 0 0 ${top ? 1 : 0}`;
+  const bracket = [
+    `M${x - bx + rb} ${bb}`,
+    `${arc(rb)} ${x - bx} ${bb - sy * rb}`,
+    `V${bt + sy * rt}`,
+    `${arc(rt)} ${x - bx + rt} ${bt}`,
+    `H${x + bx - rt}`,
+    `${arc(rt)} ${x + bx} ${bt + sy * rt}`,
+    `V${bb - sy * rb}`,
+    `${arc(rb)} ${x + bx - rb} ${bb}`,
+  ].join(" ");
+  // the hex nut, points up and down, flats left and right
   const cy = y(SW_Y);
-  const nut = `M${x} ${cy - 47} L${x + 39} ${cy - 24} L${x + 39} ${cy + 24} L${x} ${cy + 47} L${x - 39} ${cy + 24} L${x - 39} ${cy - 24} Z`;
+  const nr = u(REF.nut.r);
+  const nf = nr * (Math.sqrt(3) / 2);
+  const nut = `M${x} ${cy - nr} L${x + nf} ${cy - nr / 2} V${cy + nr / 2} L${x} ${cy + nr} L${x - nf} ${cy + nr / 2} V${cy - nr / 2} Z`;
+  const tileY = [y(fy(REF.tile.y0)), y(fy(REF.tile.y1))];
+  const letterCap = u(REF.letter.cap);
+  const [ring, dome] = [u(REF.cap.ring), u(REF.cap.dome)];
+  // the selection plate: just outside the group, from above the nut to below the numeral
+  const plateY = [y(SW_Y - nr - 8), y(fy(REF.numeral.y + REF.numeral.cap / 2) + 8)];
+  const plateHalf = nf + 9;
 
   return (
     <button
@@ -365,66 +529,94 @@ function FootSwitch({
             <feGaussianBlur stdDeviation="9" />
           </filter>
         </defs>
+        <rect
+          className="pedal-plate"
+          x={x - plateHalf}
+          y={Math.min(...plateY)}
+          width={plateHalf * 2}
+          height={Math.abs(plateY[1] - plateY[0])}
+          rx="16"
+        />
         {tile ? (
           <rect
             className="pedal-tile"
-            x={x - 42}
-            y={top ? 62 : MIRROR - 258}
-            width="84"
-            height="196"
-            rx="11"
+            x={x - u(REF.tile.half)}
+            y={Math.min(...tileY)}
+            width={u(REF.tile.half) * 2}
+            height={Math.abs(tileY[1] - tileY[0])}
+            rx={u(REF.tile.r)}
             fill={`url(#${id}-tile)`}
             stroke="#fff3d6"
             strokeOpacity="0.35"
           />
         ) : (
-          <path className="pedal-bracket" d={bracket} fill="none" strokeWidth="2.6" />
+          <path
+            className="pedal-bracket"
+            d={bracket}
+            fill="none"
+            strokeWidth={u(b.stroke)}
+            strokeLinecap="round"
+          />
         )}
 
-        <LedBar d={ledPath(x, y(LED_Y), top)} lamp={lamp} glowId={`${id}-glow-${index}`} />
+        <LedBar
+          d={ledPath(x, y(LED_Y), top)}
+          lamp={lamp}
+          glowId={`${id}-glow-${index}`}
+          width={u(REF.led.thick)}
+        />
 
-        <text
-          className={tile ? undefined : "pedal-label"}
-          x={x}
-          y={tile ? y(240) : y(LABEL_Y)}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontFamily={FONT}
-          fontWeight={tile ? 800 : 700}
-          fontSize={tile ? 38 : 34}
-          letterSpacing={tile ? 0 : -1}
-          fill={tile ? "#241b10" : undefined}
-          transform={`scale(${tile ? 1 : 1.05} 1)`}
-          style={{ transformBox: "fill-box", transformOrigin: "center" }}
-        >
-          {name}
-        </text>
+        {tile ? (
+          // the letter on the tile, its cap height centred on the measured line
+          <text
+            x={x}
+            y={y(fy(REF.letter.y)) + letterCap / 2}
+            textAnchor="middle"
+            fontFamily={FONT}
+            fontWeight={800}
+            fontSize={letterCap / CAP}
+            textLength={u(REF.letter.w[name] ?? REF.letter.cap)}
+            lengthAdjust="spacingAndGlyphs"
+            fill="#241b10"
+          >
+            {name}
+          </text>
+        ) : (
+          <path className="pedal-label" d={numeralPath(name, x, y(fy(REF.numeral.y)))} />
+        )}
 
         {/* the footswitch: hex nut, then a round nickel cap that sinks when held */}
-        <ellipse cx={x + 3} cy={cy + 8} rx="43" ry="47" fill="#000" opacity="0.45" />
+        <ellipse cx={x + 3} cy={cy + 6} rx={nf + 3} ry={nr + 2} fill="#000" opacity="0.45" />
         <path
           d={nut}
           fill={`url(#${id}-nut)`}
           stroke="#4b463e"
-          strokeWidth="3"
+          strokeWidth="2"
           strokeLinejoin="round"
         />
-        <rect x={x - 5} y={cy - 46} width="10" height="7" rx="1.5" fill="#2a2723" />
+        <rect
+          x={x - u(REF.cap.slot.w) / 2}
+          y={cy + u(REF.cap.slot.dy) - u(REF.cap.slot.h) / 2}
+          width={u(REF.cap.slot.w)}
+          height={u(REF.cap.slot.h)}
+          rx="1.5"
+          fill="#2a2723"
+        />
         <g className="pedal-cap" data-held={held}>
-          <circle cx={x + 1} cy={cy + 3} r="31" fill="#000" opacity={held ? 0.2 : 0.45} />
+          <circle cx={x + 1} cy={cy + 3} r={ring + 1} fill="#000" opacity={held ? 0.2 : 0.45} />
           <circle
             cx={x}
             cy={cy}
-            r="30"
+            r={ring}
             fill={`url(#${id}-cap)`}
             stroke="#5d574d"
             strokeWidth="1.5"
           />
-          <circle cx={x} cy={cy} r="23" fill={`url(#${id}-captop)`} />
+          <circle cx={x} cy={cy} r={dome} fill={`url(#${id}-captop)`} />
           <circle
             cx={x}
             cy={cy}
-            r="23"
+            r={dome}
             fill="none"
             stroke="#fff"
             strokeOpacity="0.35"
@@ -519,16 +711,68 @@ function Jack({ n, cable }: { n: number; cable: boolean }) {
   );
 }
 
+/** The AMP and APP lamps' hit areas: each dot with its legend under it, half the gap to
+ *  its neighbour either side. A gold ring round the dot shows hover and selection. */
+const IND = {
+  half: u(REF.lamp.app - REF.lamp.amp) / 2,
+  y0: MIRROR / 2 - u(0.024),
+  y1: fy(REF.legend.bottom) + u(0.008),
+  ring: u(REF.lamp.dot) * 1.05,
+};
+
+function IndicatorButton({
+  i,
+  selected,
+  onSelect,
+}: {
+  i: 0 | 1;
+  selected: boolean;
+  onSelect: (i: 0 | 1) => void;
+}) {
+  const x = fx(i === 0 ? REF.lamp.amp : REF.lamp.app);
+  const w = IND.half * 2;
+  const h = IND.y1 - IND.y0;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(i)}
+      aria-pressed={selected}
+      aria-label={i === 0 ? "AMP lamp" : "APP lamp"}
+      className="pedal-indicator absolute cursor-pointer outline-none"
+      style={{
+        left: pct(x - IND.half, W),
+        top: pct(IND.y0, H),
+        width: pct(w, W),
+        height: pct(h, H),
+      }}
+    >
+      <svg
+        aria-hidden
+        viewBox={`${x - IND.half} ${IND.y0} ${w} ${h}`}
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+      >
+        <circle className="pedal-ring" cx={x} cy={MIRROR / 2} r={IND.ring} fill="none" />
+      </svg>
+    </button>
+  );
+}
+
 export function Pedal({
   status,
   config,
   selected,
   onSelect,
+  selectedIndicator = null,
+  onSelectIndicator,
 }: {
   status: Status | null;
   config: Config | null;
   selected: number;
   onSelect: (n: number) => void;
+  /** Which connection lamp is being edited: 0 = AMP, 1 = APP. */
+  selectedIndicator?: 0 | 1 | null;
+  /** Makes the AMP and APP lamps clickable; without it they're just lamps. */
+  onSelectIndicator?: (i: 0 | 1) => void;
 }) {
   const id = `pedal${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const live = status?.state === "connected";
@@ -549,12 +793,21 @@ export function Pedal({
           className={cx("pedal-body relative w-full", !live && "pedal-off")}
           style={{
             aspectRatio: `${W} / ${H}`,
-            borderRadius: `${(46 / W) * 100}% / ${(46 / H) * 100}%`,
+            borderRadius: `${(CASE_R / W) * 100}% / ${(CASE_R / H) * 100}%`,
             boxShadow: "var(--shadow-contact), var(--shadow-cast)",
           }}
         >
           <Case id={id} />
           <Lamps id={id} lamps={lamps} live={live} />
+          {onSelectIndicator &&
+            ([0, 1] as const).map((i) => (
+              <IndicatorButton
+                key={i}
+                i={i}
+                selected={selectedIndicator === i}
+                onSelect={onSelectIndicator}
+              />
+            ))}
           {[0, 1, 2, 3, 4, 5].map((n) => {
             const sw = config?.switches[n];
             return (

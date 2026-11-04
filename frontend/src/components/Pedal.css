@@ -28,22 +28,30 @@
   filter: brightness(0.72);
 }
 
-/* The gold bracket: quiet at rest, warmer on hover, lit when the switch is being edited. */
+/* Selection is UI, not hardware, so it isn't gold (the pedal is gold already): an ice-white
+   plate just outside the switch group, a crisp 2px rim with a soft cold glow and a faint
+   wash inside. The bracket, the tile and the LED stay exactly as they are. */
+.pedal-plate {
+  fill: rgb(201 228 242 / 0.07);
+  stroke: var(--color-cold);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity var(--dur-up) var(--ease-incand);
+}
+.pedal-switch[aria-pressed="true"] .pedal-plate {
+  opacity: 1;
+  filter: drop-shadow(0 0 5px rgb(201 228 242 / 0.8)) drop-shadow(0 0 14px rgb(201 228 242 / 0.35));
+}
+
+/* The gold bracket: quiet at rest, warmer on hover. */
 .pedal-bracket {
   stroke: var(--pedal-gold);
   stroke-opacity: 0.62;
-  transition:
-    stroke var(--dur-up) var(--ease-incand),
-    stroke-opacity var(--dur-up) var(--ease-incand),
-    filter var(--dur-up) var(--ease-incand);
+  transition: stroke-opacity var(--dur-up) var(--ease-incand);
 }
 .pedal-switch:hover .pedal-bracket {
   stroke-opacity: 0.9;
-}
-.pedal-switch[aria-pressed="true"] .pedal-bracket {
-  stroke: var(--pedal-gold-hi);
-  stroke-opacity: 1;
-  filter: drop-shadow(0 0 3px rgb(255 196 110 / 0.75)) drop-shadow(0 0 9px rgb(255 180 84 / 0.4));
 }
 
 .pedal-label {
@@ -63,11 +71,37 @@
 .pedal-switch:hover .pedal-tile {
   filter: brightness(1.08);
 }
-.pedal-switch[aria-pressed="true"] .pedal-tile {
-  filter: brightness(1.12) drop-shadow(0 0 4px rgb(255 196 110 / 0.7))
-    drop-shadow(0 0 10px rgb(255 180 84 / 0.4));
+
+/* AMP and APP, when they can be edited: a faint cold ring round the dot on hover; when
+   selected, the same plate as a switch, round the dot and its legend. */
+.pedal-ring {
+  stroke: var(--color-cold);
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  stroke-opacity: 0;
+  transition: stroke-opacity var(--dur-up) var(--ease-incand);
+}
+.pedal-indicator:hover .pedal-ring {
+  stroke-opacity: 0.55;
+}
+.pedal-indicator::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: rgb(201 228 242 / 0.07);
+  box-shadow:
+    inset 0 0 0 2px var(--color-cold),
+    0 0 6px rgb(201 228 242 / 0.7),
+    0 0 16px rgb(201 228 242 / 0.3);
+  opacity: 0;
+  transition: opacity var(--dur-up) var(--ease-incand);
+}
+.pedal-indicator[aria-pressed="true"]::before {
+  opacity: 1;
 }
 
+.pedal-indicator:focus-visible,
 .pedal-switch:focus-visible {
   outline: 1px solid var(--color-key);
   outline-offset: 2px;
