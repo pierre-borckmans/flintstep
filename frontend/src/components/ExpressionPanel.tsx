@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { errorText } from "../api";
 import type { Apply } from "../lib/config";
 import { expFraction, expValue, rawFraction } from "../lib/exp";
@@ -128,8 +128,11 @@ function ExpCard({
   engaged,
   apply,
   calibrate,
+  focused = false,
 }: {
   n: number;
+  /** Selected on the canvas: lit, and scrolled into view. */
+  focused?: boolean;
   config: Config;
   status: Status | null;
   engaged: boolean;
@@ -142,6 +145,12 @@ function ExpCard({
   const raw = status?.expRaw?.[n] ?? -1;
   const [err, setErr] = useState<string | null>(null);
   const [flash, setFlash] = useState<ExpEdge | null>(null);
+  const card = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focused) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    card.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  }, [focused]);
   const set = (edge: ExpEdge) =>
     calibrate(n, edge)
       .then(() => {
@@ -152,7 +161,17 @@ function ExpCard({
       .catch((e) => setErr(errorText(e)));
 
   return (
-    <div className="flex flex-col gap-3 rounded-ui-lg border border-edge bg-panel2/60 p-3 rim">
+    <div
+      ref={card}
+      data-focused={focused || undefined}
+      className={cx(
+        "flex scroll-m-4 flex-col gap-3 rounded-ui-lg border bg-panel2/60 p-3 rim",
+        "transition-[border-color,box-shadow] duration-(--dur-up) ease-(--ease-incand)",
+        focused
+          ? "border-cold/60 shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-cold)_25%,transparent),0_0_14px_-4px_color-mix(in_srgb,var(--color-cold)_40%,transparent)]"
+          : "border-edge",
+      )}
+    >
       <div className="flex items-center gap-2">
         <span className="text-ui-base font-semibold text-bone engraved">EXP {n + 1}</span>
         <Lamp on={cable} colour="live" size={6} />
@@ -249,8 +268,11 @@ function ExpCard({
 
 export function ExpressionPanel({
   engaged,
+  focus = null,
   ...props
 }: {
+  /** The input selected on the canvas. */
+  focus?: number | null;
   config: Config;
   status: Status | null;
   /** Each input's trigger engaged now (State.expTrigger). */
@@ -260,8 +282,8 @@ export function ExpressionPanel({
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      <ExpCard n={0} engaged={!!engaged[0]} {...props} />
-      <ExpCard n={1} engaged={!!engaged[1]} {...props} />
+      <ExpCard n={0} engaged={!!engaged[0]} focused={focus === 0} {...props} />
+      <ExpCard n={1} engaged={!!engaged[1]} focused={focus === 1} {...props} />
       <p className="px-1 text-ui-xs leading-snug text-faint">
         <Kicker className="mr-1">Tip</Kicker>
         Set heel and toe with the pedal resting where you want each end. The value only moves when

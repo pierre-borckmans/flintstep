@@ -66,6 +66,8 @@ export interface SimOptions {
   triggers?: [TriggerMode, TriggerMode];
   /** Pin each pedal at a travel percent instead of sweeping it (null: sweep). */
   expAt?: [number | null, number | null];
+  /** Start with these jacks' pedals simulated (App.SimulateExp). */
+  simulated?: [boolean, boolean];
 }
 
 /** ?cycle: one round of searching, connecting and connected (ms). */
@@ -128,6 +130,14 @@ export function createSim(opts: SimOptions = {}) {
 
   const cables = opts.cables ?? [true, false];
   const raw = [21000, -1];
+  // App.SimulateExp: a pretend pedal in a jack, held where SetSimExp put it or sweeping.
+  const fake = {
+    on: [...(opts.simulated ?? [false, false])],
+    at: [0.35, 0.7],
+    sweep: [false, false],
+  };
+  /** A cable as the pedal reports it: a real one (only while connected) or a fake one. */
+  const plugged = (n: number, live: boolean) => (live && cables[n]) || fake.on[n];
   const lastExpSent = [-1, -1];
   let lastExpAt = [0, 0];
   let trig: TriggerState[] = [idleTrigger(), idleTrigger()];
@@ -278,13 +288,15 @@ export function createSim(opts: SimOptions = {}) {
     // the triggers visibly engage and let go.
     for (let n = 0; n < 2; n++) {
       const x = config.exp[n];
-      if (!live || !cables[n]) {
+      if (!plugged(n, live)) {
         raw[n] = -1;
         letGo(n);
         continue;
       }
       const pin = opts.expAt?.[n];
-      if (pin !== undefined && pin !== null) {
+      if (fake.on[n] && !fake.sweep[n]) {
+        raw[n] = Math.round(x.min + (x.max - x.min) * fake.at[n]);
+      } else if (pin !== undefined && pin !== null) {
         raw[n] = Math.round(x.min + ((x.max - x.min) * pin) / 100);
       } else {
         const f = sweep(t + n * 4000);
@@ -353,7 +365,7 @@ export function createSim(opts: SimOptions = {}) {
       profileName: live ? "Live Set" : "",
       battery: live ? Math.floor(battery) : -1,
       powered: live && powered,
-      cables: live ? [...cables] : [false, false],
+      cables: [plugged(0, live), plugged(1, live)],
       exp: raw.map((r, n) => (r < 0 ? -1 : lastExpSent[n])),
       held: live ? held : 0,
       lamps,
@@ -373,7 +385,20 @@ export function createSim(opts: SimOptions = {}) {
     /** Which inputs' triggers are engaged now (State.expTrigger). */
     triggers(): boolean[] {
       const live = connState === "connected";
-      return trig.map((s, n) => live && cables[n] && triggerLit(s, config.exp[n].trigger));
+      return trig.map((s, n) => plugged(n, live) && triggerLit(s, config.exp[n].trigger));
+    },
+    /** Which jacks hold a simulated pedal (State.expSim). */
+    simulated: () => [...fake.on],
+    simulate(n: number, on: boolean) {
+      fake.on[n] = on;
+      if (!on) fake.sweep[n] = false;
+    },
+    setSim(n: number, f: number) {
+      fake.at[n] = Math.min(1, Math.max(0, f));
+      fake.sweep[n] = false;
+    },
+    simSweep(n: number, on: boolean) {
+      fake.sweep[n] = on;
     },
     setConfig(c: Config) {
       // Like Engine.SetConfig: a trigger whose input, mode or action changed lets go.
@@ -589,7 +614,7 @@ export function demoScript(name: string): DemoStep[] {
 /** The Backend over a running simulator. URL parameters shape it for screenshots:
  *  ?state=off|idle|searching|connecting|connected, ?cycle (walk through them for ever:
  *  searching, connecting, connected, link lost), ?freeze=N (LinkOverlay), ?seed=N, ?hold=I,A (switch names),
- *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
+ *  ?cables=11 (exp1, exp2), ?sim=01 (simulated pedals, App.SimulateExp), ?midi=error, ?still (no automatic presses), ?save=error
  *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
  *  ?lamp=amp|app (open on an indicator lamp), ?trigger=engage,toe (the two inputs'
  *  trigger modes; unset, engage,off), ?exp=60,98 (pin each pedal at a travel percent;
@@ -604,6 +629,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     .filter((i) => i >= 0)
     .reduce((m, i) => m | (1 << i), 0);
   const cablesQ = q.get("cables");
+  const simQ = q.get("sim");
   const modeQ = (s: string | undefined): TriggerMode => (s === "engage" || s === "toe" ? s : "off");
   const trigQ = q.get("trigger")?.split(",");
   const expQ = q.get("exp")?.split(",");
@@ -615,6 +641,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     fixedState: (q.get("state") as BleState | null) ?? undefined,
     cycle: q.has("cycle"),
     cables: cablesQ ? [cablesQ[0] === "1", cablesQ[1] === "1"] : undefined,
+    simulated: simQ ? [simQ[0] === "1", simQ[1] === "1"] : undefined,
     holdMask,
     autoPress: !q.has("still"),
     powered: q.has("power") ? q.get("power") === "usb" : undefined,
@@ -650,6 +677,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     activePreset: lib.activeId(),
     libraryError,
     expTrigger: sim.triggers(),
+    expSim: sim.simulated(),
   });
 
   let last = performance.now();
@@ -699,6 +727,9 @@ export function createMockBackend(q: URLSearchParams): Backend {
       lib.saveActive(sim.config);
       return structuredClone(sim.config);
     },
+    SimulateExp: async (n, on) => sim.simulate(n, on),
+    SetSimExp: async (n, fraction) => sim.setSim(n, fraction),
+    SimSweep: async (n, on) => sim.simSweep(n, on),
     SetLaunchAtLogin: async (on) => {
       launchAtLogin = on;
     },

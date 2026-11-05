@@ -819,8 +819,9 @@ function SwitchLeaders({ selected }: { selected: number }) {
   );
 }
 
-/** An expression input on the back edge: a plug and its cable when something is in it. */
-function Jack({ n, cable }: { n: number; cable: boolean }) {
+/** An expression input on the back edge: a plug and its cable when something is in it.
+ *  With `stub` false the canvas draws the whole cable (ExpPedals), so only the plug. */
+function Jack({ n, cable, stub = true }: { n: number; cable: boolean; stub?: boolean }) {
   return (
     <span className="absolute bottom-0" style={{ left: `${JACK_X[n] * 100}%` }}>
       <svg
@@ -839,6 +840,7 @@ function Jack({ n, cable }: { n: number; cable: boolean }) {
         </defs>
         <path
           d="M7 18 L7 0"
+          opacity={stub ? 1 : 0}
           stroke={`url(#cable-fade-${n})`}
           strokeWidth="5"
           strokeLinecap="round"
@@ -910,6 +912,7 @@ export function Pedal({
   onSelect,
   selectedIndicator = null,
   onSelectIndicator,
+  drawnCables = false,
 }: {
   status: Status | null;
   config: Config | null;
@@ -919,6 +922,8 @@ export function Pedal({
   selectedIndicator?: 0 | 1 | null;
   /** Makes the AMP and APP lamps clickable; without it they're just lamps. */
   onSelectIndicator?: (i: 0 | 1) => void;
+  /** The canvas draws each cable to its pedal: the jacks show only their plugs. */
+  drawnCables?: boolean;
 }) {
   const id = `pedal${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const live = status?.state === "connected";
@@ -931,8 +936,8 @@ export function Pedal({
       <Defs id={id} />
       <div className="relative w-full">
         <CaptionRow top config={config} selected={selected} onSelect={onSelect}>
-          <Jack n={0} cable={!!status?.cables?.[0]} />
-          <Jack n={1} cable={!!status?.cables?.[1]} />
+          <Jack n={0} cable={!!status?.cables?.[0]} stub={!drawnCables} />
+          <Jack n={1} cable={!!status?.cables?.[1]} stub={!drawnCables} />
         </CaptionRow>
         <div
           className={cx("pedal-body relative w-full", !live && "pedal-off")}

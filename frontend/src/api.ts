@@ -11,6 +11,13 @@ export interface Backend {
   ChoosePedal(address: string, name: string): Promise<void>;
   ForgetPedal(): Promise<void>;
   CalibrateExp(n: number, edge: ExpEdge): Promise<Config>;
+  /** A simulated expression pedal in jack n, for trying things without one: while on,
+   *  State reports cables[n] and expRaw[n] as if it were plugged in. */
+  SimulateExp(n: number, on: boolean): Promise<void>;
+  /** The simulated pedal's position, 0 heel .. 1 toe. */
+  SetSimExp(n: number, fraction: number): Promise<void>;
+  /** The simulated pedal rocks back and forth by itself. */
+  SimSweep(n: number, on: boolean): Promise<void>;
   SetLaunchAtLogin(on: boolean): Promise<void>;
   RevealLogs(): Promise<void>;
   /** Themes the native window (appearance, background) and keeps it for the next launch. */
@@ -67,6 +74,9 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     ChoosePedal: (address, name) => app.ChoosePedal(address, name),
     ForgetPedal: () => app.ForgetPedal(),
     CalibrateExp: (n, edge) => app.CalibrateExp(n, edge),
+    SimulateExp: (n, on) => app.SimulateExp(n, on),
+    SetSimExp: (n, fraction) => app.SetSimExp(n, fraction),
+    SimSweep: (n, on) => app.SimSweep(n, on),
     SetLaunchAtLogin: (on) => app.SetLaunchAtLogin(on),
     RevealLogs: () => app.RevealLogs(),
     SetTheme: (mode) => app.SetTheme(mode),
