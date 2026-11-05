@@ -9,6 +9,7 @@ import { Collapse } from "../ui/Collapse";
 import { Lamp } from "../ui/Lamp";
 import { Seg } from "../ui/Seg";
 import { Toggle } from "../ui/Toggle";
+import { ExpPlacementSetting } from "./ExpPlacementSetting";
 import { NutSetting } from "./NutSetting";
 import { ScanResults, usePedalScan } from "./PedalScan";
 import { Section } from "./Section";
@@ -167,6 +168,7 @@ export function SettingsPanel({
       <Section title="Appearance">
         <ThemeSetting />
         <NutSetting />
+        <ExpPlacementSetting />
       </Section>
 
       <Section title="App">

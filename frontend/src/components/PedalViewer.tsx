@@ -2,6 +2,17 @@ import { RotateCcw } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, useState } from "react";
 import type { Backend } from "../api";
 import {
+  choosePlacement,
+  fitWidth,
+  flatten,
+  type Layout,
+  layout as layoutFor,
+  lerpLayout,
+  type Placement,
+  SPARK,
+  unflatten,
+} from "../lib/exppedal";
+import {
   clampView,
   FITTED,
   isFitted,
@@ -13,6 +24,9 @@ import {
   zoomAt,
 } from "../lib/zoom";
 import { cx } from "../ui/cx";
+import { useExpPlacement } from "../useExpPlacement";
+import { useSprings } from "../useSprings";
+import { ExpCables, ExpPedals, SimulateHints } from "./ExpPedals";
 import { LinkCard, LinkRings, useLink } from "./LinkOverlay";
 import { Pedal } from "./Pedal";
 
@@ -38,18 +52,81 @@ function zoomFromQuery(): [number, number, number] | null {
   return n as [number, number, number];
 }
 
+/** Browser dev only: ?expfreeze=0.5 holds the expression pedals half-way in. */
+function freezeFromQuery(): number | null {
+  if (!document.documentElement.dataset.mock) return null;
+  const raw = new URLSearchParams(window.location.search).get("expfreeze");
+  const v = raw === null ? Number.NaN : Number(raw);
+  return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : null;
+}
+
+/** How the pedals settle into a new layout: a critically damped spring, ~0.3 s. */
+const LAYOUT_OMEGA = 15;
+
+/** Where the plugged-in expression pedals go and how big everything is: the target
+ *  layout for the space there is, sprung toward so appearing, leaving and switching
+ *  placement all glide. */
+function useCanvasLayout(avail: { w: number; h: number } | null, present: [boolean, boolean]) {
+  const pref = useExpPlacement();
+  const [FREEZE] = useState(freezeFromQuery);
+  const auto = useRef<Placement>("behind");
+  let placement: Placement = pref === "auto" ? auto.current : pref;
+  if (pref === "auto" && avail) {
+    placement = choosePlacement(avail, present, auto.current);
+    auto.current = placement;
+  }
+  const size = avail ?? { w: 480, h: 480 };
+  const w = fitWidth(placement, present, size);
+  let target: Layout = layoutFor(placement, present, w);
+  const want = [present[0] ? 1 : 0, present[1] ? 1 : 0];
+  if (FREEZE !== null) {
+    const none = layoutFor(placement, [false, false], fitWidth(placement, [false, false], size));
+    target = lerpLayout(none, target, FREEZE);
+    want[0] *= FREEZE;
+    want[1] *= FREEZE;
+  }
+  // Nothing glides while the window opens (the first size and State land as they are),
+  // nor while it is resized, where the canvas follows the hand; a placement that flips
+  // during a resize still glides to its new side.
+  const born = useRef(performance.now());
+  const opening = performance.now() - born.current < 800;
+  const last = useRef({ size: "", placement });
+  const sizeKey = avail ? `${avail.w}x${avail.h}` : "";
+  const resized = sizeKey !== last.current.size && placement === last.current.placement;
+  last.current = { size: sizeKey, placement };
+  const v = useSprings(
+    [...flatten(target), ...want],
+    LAYOUT_OMEGA,
+    !avail || opening || resized || FREEZE !== null,
+  );
+  const mirror: [boolean, boolean] = [target.units[0].mirror, target.units[1].mirror];
+  return { placement, layout: unflatten(v, mirror), presence: v.slice(-2) };
+}
+
 /** Keep the entire pedal and its mapping captions inside the available space, and let
  *  it be looked at closer: the wheel (or a pinch) zooms toward the pointer, a drag pans
  *  while zoomed, a double-click away from the controls fits it again. The wheel over a
  *  nut in Match my pedal mode still turns the nut (it claims the event first). */
 export function PedalViewer({
   backend,
+  engaged = [],
+  simulated = [],
+  selectedExp = null,
+  onSelectExp,
   ...props
-}: ComponentProps<typeof Pedal> & { backend: Backend }) {
+}: ComponentProps<typeof Pedal> & {
+  backend: Backend;
+  /** Each input's trigger engaged now (State.expTrigger). */
+  engaged?: boolean[];
+  /** Each jack's pedal simulated (State.expSim). */
+  simulated?: boolean[];
+  selectedExp?: 0 | 1 | null;
+  onSelectExp?: (n: 0 | 1) => void;
+}) {
   const viewer = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const object = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(480);
+  const [avail, setAvail] = useState<{ w: number; h: number } | null>(null);
   const [view, setViewState] = useState<View>(FITTED);
   const [motion, setMotion] = useState<Motion>("follow");
   const [panning, setPanning] = useState(false);
@@ -65,6 +142,10 @@ export function PedalViewer({
   const swallow = useRef(false);
   const link = useLink(props.status, props.config);
   const status = props.status && { ...props.status, lamps: link.lamps(props.status.lamps) };
+  const cables = props.status?.cables;
+  const present: [boolean, boolean] = [!!cables?.[0], !!cables?.[1]];
+  const canvas = useCanvasLayout(avail, present);
+  const { layout } = canvas;
   /** The case in the fitted object's px, for the rings drawn round it. */
   const [caseRect, setCaseRect] = useState<{ x: number; y: number; w: number; h: number } | null>(
     null,
@@ -101,9 +182,7 @@ export function PedalViewer({
       const { width: w, height: h } = entry.contentRect;
       // Observe the grid-sized outer panel, not its content: WebKit can size
       // a flex child from the pedal itself, creating a resize feedback loop.
-      const availableWidth = w - 64;
-      const availableHeight = h - 64;
-      setWidth(Math.max(0, Math.min(availableWidth, (availableHeight - 168) / 0.557 + 16)));
+      setAvail({ w: Math.max(0, w - 64), h: Math.max(0, h - 64) });
       // A new size moves the fitted pedal under the zoom: start again from fitted.
       const next = `${w}x${h}`;
       if (size && next !== size) setView(FITTED, "follow");
@@ -241,10 +320,39 @@ export function PedalViewer({
             transition: TRANSITION[motion],
           }}
         >
-          <div ref={object} className="viewer-object" style={{ width }}>
+          <div
+            ref={object}
+            className="viewer-object"
+            style={{ width: layout.box.w, height: layout.box.h }}
+          >
+            <ExpCables layout={layout} placement={canvas.placement} presence={canvas.presence} />
             <LinkRings view={link.view} phase={link.phase} rect={caseRect} />
-            <div className="relative z-[1]">
-              <Pedal {...props} status={status} />
+            <div
+              className="absolute z-[1]"
+              style={{
+                left: layout.spark.x,
+                top: layout.spark.y,
+                width: layout.spark.w + 2 * SPARK.padX,
+              }}
+            >
+              <Pedal {...props} status={status} drawnCables />
+            </div>
+            <div className="absolute inset-0 z-[2] pointer-events-none [&>*]:pointer-events-auto">
+              <ExpPedals
+                layout={layout}
+                placement={canvas.placement}
+                presence={canvas.presence}
+                status={props.status}
+                config={props.config}
+                engaged={engaged}
+                simulated={simulated}
+                selected={selectedExp}
+                onSelect={(n) => onSelectExp?.(n)}
+                backend={backend}
+              />
+              {props.status && (
+                <SimulateHints layout={layout} present={present} backend={backend} />
+              )}
             </div>
           </div>
         </div>

@@ -28,13 +28,20 @@ export default function App({ backend }: { backend: Backend }) {
   const bridge = useBridge(backend);
   const { state, config, apply } = bridge;
   const sim = useSimControls(backend, state);
-  const [sel, setSel] = useState(() => Math.max(0, Number(q.get("sel") ?? 0)) % 6);
-  // An indicator lamp (Amp 0, App 1) being edited instead of a switch: one or the
-  // other, never both. ?lamp=amp|app opens on one, for screenshots.
+  // What is selected on the canvas: a switch, an indicator lamp (Amp 0, App 1) or an
+  // expression pedal, only ever one. `sel` remembers the last switch for the Switches
+  // tab. ?sel=N|exp1|exp2 and ?lamp=amp|app open on one, for screenshots.
+  const expQ = q.get("sel")?.match(/^exp([12])$/);
+  const [sel, setSel] = useState(() =>
+    expQ ? 0 : Math.max(0, Number(q.get("sel") ?? 0) || 0) % 6,
+  );
   const [ind, setInd] = useState<IndicatorIndex | null>(() =>
     q.get("lamp") === "amp" ? 0 : q.get("lamp") === "app" ? 1 : null,
   );
-  const [tab, setTabNow] = useState<Tab>(() => (q.get("tab") as Tab) || "switches");
+  const [exp, setExp] = useState<0 | 1 | null>(() => (expQ ? (expQ[1] === "1" ? 0 : 1) : null));
+  const [tab, setTabNow] = useState<Tab>(
+    () => (q.get("tab") as Tab) || (expQ ? "expression" : "switches"),
+  );
   // Which way the panels slide: the previous tab's place relative to the new one.
   const [tabFrom, setTabFrom] = useState(0);
   const setTab = (t: Tab) => {
@@ -74,11 +81,23 @@ export default function App({ backend }: { backend: Backend }) {
   const select = (n: number) => {
     setSel(n);
     setInd(null);
+    setExp(null);
     setTab("switches");
   };
   const selectIndicator = (i: IndicatorIndex) => {
     setInd(i);
+    setExp(null);
     setTab("switches");
+  };
+  const selectExp = (n: 0 | 1) => {
+    setExp(n);
+    setInd(null);
+    setTab("expression");
+  };
+  /** The Switches tab picked while a pedal is selected goes back to the last switch. */
+  const pickTab = (t: Tab) => {
+    if (t === "switches") setExp(null);
+    setTab(t);
   };
 
   return (
@@ -97,10 +116,14 @@ export default function App({ backend }: { backend: Backend }) {
             backend={backend}
             status={status}
             config={config}
-            selected={ind === null ? sel : -1}
+            selected={ind === null && exp === null ? sel : -1}
             onSelect={select}
             selectedIndicator={ind}
             onSelectIndicator={selectIndicator}
+            engaged={state?.expTrigger ?? []}
+            simulated={state?.expSim ?? []}
+            selectedExp={exp}
+            onSelectExp={selectExp}
           />
           <div
             className="viewer-divider"
@@ -160,7 +183,7 @@ export default function App({ backend }: { backend: Backend }) {
             base={tabsId}
             tabs={TABS}
             value={tab}
-            onChange={setTab}
+            onChange={pickTab}
           />
           <div className="scroll-y min-h-0 flex-1">
             {!config || !state ? (
@@ -181,6 +204,7 @@ export default function App({ backend }: { backend: Backend }) {
                     config={config}
                     status={status}
                     engaged={state.expTrigger ?? []}
+                    focus={exp}
                     apply={apply}
                     calibrate={bridge.calibrate}
                     sim={sim}
