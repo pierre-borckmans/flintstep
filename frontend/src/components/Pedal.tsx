@@ -376,9 +376,9 @@ function LedBar({
   lamp: Colour | undefined;
   glowId: string;
   width?: number;
-  /** How far the light spills, and how hot its centre looks, 1 = the switch LEDs. The
-   *  POWER pill and the AMP/APP dots are small frosted windows on the real pedal: their
-   *  light stays close and reads as an even colour, not a white-hot point. */
+  /** How far the light spills, 1 = the switch LEDs. Below 1 the lamp is also flat (no
+   *  white-hot core): the POWER pill and the AMP/APP dots are small frosted windows on
+   *  the real pedal, an even colour with little spill. */
   glow?: number;
 }) {
   const { colour: c, level } = lampLight(lamp ?? BLACK);
@@ -406,12 +406,14 @@ function LedBar({
         strokeWidth={width}
         style={{ opacity: lit ? 0.4 + 0.6 * a : 0 }}
       />
-      <path
-        d={d}
-        stroke={rgb(core)}
-        strokeWidth={width * 0.42}
-        style={{ opacity: lit ? (0.35 + 0.6 * a) * Math.min(1, 0.25 + glow) : 0 }}
-      />
+      {glow >= 1 && (
+        <path
+          d={d}
+          stroke={rgb(core)}
+          strokeWidth={width * 0.42}
+          style={{ opacity: lit ? 0.35 + 0.6 * a : 0 }}
+        />
+      )}
     </g>
   );
 }
