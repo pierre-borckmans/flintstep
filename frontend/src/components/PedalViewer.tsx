@@ -1,5 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, useState } from "react";
+import type { Backend } from "../api";
 import {
   clampView,
   FITTED,
@@ -12,6 +13,7 @@ import {
   zoomAt,
 } from "../lib/zoom";
 import { cx } from "../ui/cx";
+import { LinkCard, LinkRings, useLink } from "./LinkOverlay";
 import { Pedal } from "./Pedal";
 
 /** Drag farther than this (CSS px) and it pans rather than clicks. */
@@ -40,7 +42,10 @@ function zoomFromQuery(): [number, number, number] | null {
  *  it be looked at closer: the wheel (or a pinch) zooms toward the pointer, a drag pans
  *  while zoomed, a double-click away from the controls fits it again. The wheel over a
  *  nut in Match my pedal mode still turns the nut (it claims the event first). */
-export function PedalViewer(props: ComponentProps<typeof Pedal>) {
+export function PedalViewer({
+  backend,
+  ...props
+}: ComponentProps<typeof Pedal> & { backend: Backend }) {
   const viewer = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const object = useRef<HTMLDivElement>(null);
@@ -58,6 +63,12 @@ export function PedalViewer(props: ComponentProps<typeof Pedal>) {
     trail: { t: number; x: number; y: number }[];
   } | null>(null);
   const swallow = useRef(false);
+  const link = useLink(props.status, props.config);
+  const status = props.status && { ...props.status, lamps: link.lamps(props.status.lamps) };
+  /** The case in the fitted object's px, for the rings drawn round it. */
+  const [caseRect, setCaseRect] = useState<{ x: number; y: number; w: number; h: number } | null>(
+    null,
+  );
 
   const setView = (v: View, m: Motion) => {
     current.current = v;
@@ -107,12 +118,35 @@ export function PedalViewer(props: ComponentProps<typeof Pedal>) {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const o = object.current;
+    const body = o?.querySelector<HTMLElement>(".pedal-body");
+    if (!o || !body) return;
+    const measure = () => {
+      const a = o.getBoundingClientRect();
+      const b = body.getBoundingClientRect();
+      const k = o.offsetWidth ? a.width / o.offsetWidth : 1; // undo the zoom
+      if (!k) return;
+      setCaseRect({
+        x: (b.left - a.left) / k,
+        y: (b.top - a.top) / k,
+        w: b.width / k,
+        h: b.height / k,
+      });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(body);
+    observer.observe(o);
+    return () => observer.disconnect();
+  }, []);
+
   // React's wheel listener is passive; zooming must not scroll anything.
   useEffect(() => {
     const el = viewer.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (e.defaultPrevented) return; // a nut turned
+      if ((e.target as Element).closest("[data-link-card]")) return; // its list scrolls
       const factor = wheelFactor(e);
       const v = current.current;
       // Fitted and asked to shrink: nothing to do, let the page have it.
@@ -139,7 +173,7 @@ export function PedalViewer(props: ComponentProps<typeof Pedal>) {
       onPointerDown={(e) => {
         swallow.current = false;
         if (e.button !== 0 || isFitted(current.current)) return;
-        if ((e.target as Element).closest("[data-zoom-reset]")) return;
+        if ((e.target as Element).closest("[data-zoom-reset], [data-link-card]")) return;
         const p = local(e);
         pan.current = {
           id: e.pointerId,
@@ -195,7 +229,7 @@ export function PedalViewer(props: ComponentProps<typeof Pedal>) {
       }}
       onDoubleClick={(e) => {
         // On a control (a switch, a caption, a nut being turned) it keeps its own meaning.
-        if ((e.target as Element).closest("button")) return;
+        if ((e.target as Element).closest("button, [data-link-card]")) return;
         if (!isFitted(current.current)) reset();
       }}
     >
@@ -208,10 +242,14 @@ export function PedalViewer(props: ComponentProps<typeof Pedal>) {
           }}
         >
           <div ref={object} className="viewer-object" style={{ width }}>
-            <Pedal {...props} />
+            <LinkRings view={link.view} phase={link.phase} rect={caseRect} />
+            <div className="relative z-[1]">
+              <Pedal {...props} status={status} />
+            </div>
           </div>
         </div>
       </div>
+      <LinkCard view={link.view} phase={link.phase} backend={backend} config={props.config} />
       <button
         type="button"
         data-zoom-reset

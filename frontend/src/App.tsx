@@ -88,6 +88,7 @@ export default function App({ backend }: { backend: Backend }) {
           style={{ "--viewer-split": `${split}%` } as CSSProperties}
         >
           <PedalViewer
+            backend={backend}
             status={status}
             config={config}
             selected={ind === null ? sel : -1}

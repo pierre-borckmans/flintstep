@@ -49,6 +49,9 @@ export interface SimOptions {
   seed?: number;
   /** Pin the connection state instead of walking searching -> connecting -> connected. */
   fixedState?: BleState;
+  /** Walk searching -> connecting -> connected -> (lost) searching for ever, every few
+   *  seconds, so the link's transitions can be watched. */
+  cycle?: boolean;
   /** Which jacks have a cable. */
   cables?: [boolean, boolean];
   /** Switches held for good (bit mask), for screenshots. */
@@ -64,6 +67,9 @@ export interface SimOptions {
   /** Pin each pedal at a travel percent instead of sweeping it (null: sweep). */
   expAt?: [number | null, number | null];
 }
+
+/** ?cycle: one round of searching, connecting and connected (ms). */
+const CYCLE_MS = 11600;
 
 const DARK: Colour = { r: 0, g: 0, b: 0 };
 const scale = (c: Colour, pct: number): Colour => ({
@@ -136,6 +142,9 @@ export function createSim(opts: SimOptions = {}) {
   const echoes: { at: number; bytes: number[] }[] = [];
   let connectedAt = opts.fixedState ? 0 : 2000;
   let connState: BleState = opts.fixedState ?? "searching";
+  /** When the current searching spell began, and whether a lost link started it. */
+  let searchFrom = 0;
+  let lost = false;
   let powered = opts.powered ?? false;
   let battery = 76; // percent, fractional while it moves
   let lastOut = Number.NEGATIVE_INFINITY;
@@ -204,7 +213,17 @@ export function createSim(opts: SimOptions = {}) {
   function step(dt: number): Activity[] {
     out.length = 0;
     t += dt;
-    if (!opts.fixedState) {
+    if (opts.cycle && !opts.fixedState) {
+      // 5 s searching, 1.6 s connecting, 5 s connected, then the link drops.
+      const p = t % CYCLE_MS;
+      const next: BleState = p < 5000 ? "searching" : p < 6600 ? "connecting" : "connected";
+      if (next === "searching" && connState !== "searching") {
+        searchFrom = t - p;
+        lost = connState === "connected";
+        held = 0;
+      }
+      connState = next;
+    } else if (!opts.fixedState) {
       if (connState === "searching" && t > 1100) connState = "connecting";
       if (connState === "connecting" && t > connectedAt) connState = "connected";
     }
@@ -309,12 +328,20 @@ export function createSim(opts: SimOptions = {}) {
           ind && indicatorLit(ind.mode, inputs) ? scale(ind.colour, config.brightness) : DARK;
       });
     }
+    // Go's words: a scan, then a countdown to the next one (ble/loop.go).
+    const since = t - searchFrom;
+    const searching =
+      lost && since < 1500
+        ? "Connection lost, reconnecting"
+        : since % 6000 < 2000
+          ? `Looking for ${config.pedal.name || "a Spark Control X"}`
+          : `Not found, trying again in ${Math.ceil((6000 - (since % 6000)) / 1000)} s`;
     const detail: Record<BleState, string> = {
       off: "Bluetooth is off",
-      idle: "Not looking for a pedal",
-      searching: "Looking for a Spark Control X",
-      connecting: "Connecting to SparkX v4.1.23 fbfc",
-      connected: "Connected",
+      idle: "",
+      searching,
+      connecting: `Connecting to ${config.pedal.name || "the Spark Control X"}`,
+      connected: `Connected to ${config.pedal.name || "the Spark Control X"}`,
     };
     return {
       state: connState,
@@ -560,7 +587,8 @@ export function demoScript(name: string): DemoStep[] {
 }
 
 /** The Backend over a running simulator. URL parameters shape it for screenshots:
- *  ?state=off|searching|connecting|connected, ?seed=N, ?hold=I,A (switch names),
+ *  ?state=off|idle|searching|connecting|connected, ?cycle (walk through them for ever:
+ *  searching, connecting, connected, link lost), ?freeze=N (LinkOverlay), ?seed=N, ?hold=I,A (switch names),
  *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
  *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
  *  ?lamp=amp|app (open on an indicator lamp), ?trigger=engage,toe (the two inputs'
@@ -585,6 +613,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     expAt: expQ ? [pinQ(expQ[0]), pinQ(expQ[1])] : undefined,
     seed: Number(q.get("seed") ?? 7),
     fixedState: (q.get("state") as BleState | null) ?? undefined,
+    cycle: q.has("cycle"),
     cables: cablesQ ? [cablesQ[0] === "1", cablesQ[1] === "1"] : undefined,
     holdMask,
     autoPress: !q.has("still"),
@@ -654,7 +683,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
       return structuredClone(c);
     },
     Scan: async (): Promise<Device[]> => {
-      await sleep(1600);
+      await sleep(1500);
       return [
         { name: "SparkX v4.1.23 fbfc", address: "4F1A-SPARKX-MOCK", rssi: -48, system: true },
         { name: "SparkX v4.1.20 a01e", address: "9C02-SPARKX-MOCK", rssi: -77, system: false },

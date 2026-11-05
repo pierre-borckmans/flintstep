@@ -11,6 +11,7 @@ const DRAG = { "--wails-draggable": "drag" } as CSSProperties;
 function Connection({ state }: { state: State | null }) {
   const p = state?.pedal;
   const s = p?.state ?? "idle";
+  const looking = s === "searching" || s === "connecting";
   const words =
     s === "connected"
       ? p?.name || "Spark Control X"
@@ -23,12 +24,24 @@ function Connection({ state }: { state: State | null }) {
             : "Not connected";
   return (
     <div className="flex min-w-0 items-center gap-2" title={p?.detail}>
-      <Lamp
-        on={s !== "idle"}
-        colour={s === "connected" ? "live" : s === "off" ? "hot" : "beam"}
-        size={7}
-        className={cx((s === "searching" || s === "connecting") && "breathe")}
-      />
+      <span className="relative grid place-items-center">
+        <Lamp
+          on={s !== "idle"}
+          colour={s === "connected" ? "live" : s === "off" ? "hot" : "beam"}
+          size={7}
+          className={cx(looking && "breathe")}
+          style={
+            looking ? { animationDuration: s === "connecting" ? "0.8s" : undefined } : undefined
+          }
+        />
+        {looking && (
+          <span
+            key={s}
+            className="lamp-ping"
+            style={s === "connecting" ? { animationDuration: "0.8s" } : undefined}
+          />
+        )}
+      </span>
       <span className={cx("truncate text-ui-md", s === "connected" ? "text-text" : "text-muted")}>
         {s === "connected" && <span className="text-muted">Connected to </span>}
         {words}

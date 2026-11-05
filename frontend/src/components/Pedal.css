@@ -107,11 +107,13 @@
   border-radius: 10px;
 }
 
+/* Powering up takes its time (the overlay's rings fall in first); powering down is quick. */
+.pedal-body {
+  transition: filter 700ms var(--ease-incand) 120ms;
+}
 .pedal-off {
   filter: var(--off-dim);
-}
-.pedal-body {
-  transition: filter var(--dur-down) var(--ease-incand);
+  transition: filter var(--dur-up) var(--ease-incand);
 }
 
 /* POWER while charging: a soft one-second breath, like the pedal's own LED. Steady for

@@ -37,6 +37,7 @@ type GoApp = Omit<Backend, "onState" | "onActivity">;
 interface WailsRuntime {
   EventsOn(name: string, cb: (...data: unknown[]) => void): (() => void) | undefined;
   EventsOff?(name: string, ...rest: string[]): void;
+  BrowserOpenURL?(url: string): void;
 }
 
 declare global {
@@ -89,6 +90,13 @@ export async function loadBackend(): Promise<{ backend: Backend; mock: boolean }
   if (app && window.runtime) return { backend: wailsBackend(app, window.runtime), mock: false };
   const { createMockBackend } = await import("./mock");
   return { backend: createMockBackend(new URLSearchParams(window.location.search)), mock: true };
+}
+
+/** Opens a URL with the system (a web page, or a System Settings pane). Wails' runtime
+ *  hands it to macOS; in the browser mock it is only logged. */
+export function openURL(url: string) {
+  if (window.runtime?.BrowserOpenURL) window.runtime.BrowserOpenURL(url);
+  else console.info("[mock] open", url);
 }
 
 /** Wails rejects with a string; Error objects come from the mock. */
