@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SaveStatus } from "../lib/autosave";
 import * as H from "../lib/history";
 import { relTime } from "../lib/midi";
+import { keys } from "../lib/platform";
 import { calmStart, type Shown, settle, shownOf } from "../lib/savestatus";
 import { hasOwnUndo, historyKey } from "../lib/shortcuts";
 import type { Config } from "../types";
@@ -222,7 +223,7 @@ export function HistoryControls({
         kind="ghost"
         aria-label="Undo"
         title={undoLabel ? `Undo ${undoLabel}` : "Nothing to undo"}
-        data-kbd={undoLabel ? "⌘Z" : undefined}
+        data-kbd={undoLabel ? keys("⌘Z") : undefined}
         disabled={!undoLabel}
         onClick={undo}
         icon={<Undo2 size={13} />}
@@ -232,7 +233,7 @@ export function HistoryControls({
         kind="ghost"
         aria-label="Redo"
         title={redoLabel ? `Redo ${redoLabel}` : "Nothing to redo"}
-        data-kbd={redoLabel ? "⇧⌘Z" : undefined}
+        data-kbd={redoLabel ? keys("⇧⌘Z") : undefined}
         disabled={!redoLabel}
         onClick={redo}
         icon={<Redo2 size={13} />}

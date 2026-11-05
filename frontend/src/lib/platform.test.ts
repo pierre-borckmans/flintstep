@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { os, revealLabel, systemLookName, thisComputer } from "./platform";
+import { keys, os, revealLabel, systemLookName, thisComputer } from "./platform";
 
 describe("os", () => {
   it("reads navigator.platform", () => {
@@ -25,5 +25,14 @@ describe("words", () => {
     expect(thisComputer("linux")).toBe("this computer");
     expect(systemLookName("linux")).toBe("the desktop");
     expect(revealLabel("linux")).toBe("Open the folder");
+  });
+});
+
+describe("keys", () => {
+  it("keeps the Mac symbols on a Mac and spells them out elsewhere", () => {
+    expect(keys("⇧⌘Z", "mac")).toBe("⇧⌘Z");
+    expect(keys("⌘Z", "linux")).toBe("Ctrl Z");
+    expect(keys("⇧⌘Z", "linux")).toBe("Ctrl Shift Z");
+    expect(keys("F2", "linux")).toBe("F2");
   });
 });

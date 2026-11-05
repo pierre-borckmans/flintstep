@@ -2,6 +2,7 @@ import { ArrowDownLeft, ArrowUpRight, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { describeRow, type LogEntry, type RowModel, type Target } from "../lib/activity";
 import { relTime } from "../lib/midi";
+import { keys } from "../lib/platform";
 import { MIDI_LED_PORT_NAME, MIDI_PORT_NAME } from "../product";
 import type { Config, Midi } from "../types";
 import { INDICATOR_NAMES, SWITCH_NAMES } from "../types";
@@ -211,7 +212,7 @@ export function ActivityLog({
           kind="ghost"
           className="-mr-2"
           title="Clear the log"
-          data-kbd="⌘K"
+          data-kbd={keys("⌘K")}
           disabled={log.length === 0}
           onClick={onClear}
           icon={<Trash2 size={12} />}

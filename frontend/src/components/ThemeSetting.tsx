@@ -13,7 +13,11 @@ export function ThemeSetting() {
         label="Theme"
         size="sm"
         options={[
-          { value: "system", label: "System", title: "Follow macOS: dark or light with it" },
+          {
+            value: "system",
+            label: "System",
+            title: `Follow ${systemLookName()}: dark or light with it`,
+          },
           { value: "dark", label: "Dark" },
           { value: "light", label: "Light" },
         ]}

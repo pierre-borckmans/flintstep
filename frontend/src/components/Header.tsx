@@ -33,7 +33,7 @@ function Connection({ state }: { state: State | null }) {
       : s === "idle"
         ? "Choose a pedal in Settings, under Pedal"
         : s === "off"
-          ? "Turn Bluetooth on in macOS to connect"
+          ? "Turn Bluetooth on to connect"
           : "";
   return (
     <div

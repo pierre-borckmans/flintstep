@@ -32,3 +32,16 @@ export function systemLookName(o: OS = OS_NOW): string {
 export function revealLabel(o: OS = OS_NOW): string {
   return o === "mac" ? "Reveal in Finder" : "Open the folder";
 }
+
+/** A shortcut written the Mac way ("⇧⌘Z") as key caps for a tooltip's data-kbd: as it
+ *  is on a Mac, "Ctrl Shift Z" elsewhere (ui/tooltip splits caps on spaces). */
+export function keys(mac: string, o: OS = OS_NOW): string {
+  if (o === "mac") return mac;
+  const mods = [
+    mac.includes("⌘") && "Ctrl",
+    mac.includes("⇧") && "Shift",
+    mac.includes("⌥") && "Alt",
+  ];
+  const key = mac.replace(/[⌘⇧⌥]/g, "");
+  return [...mods.filter(Boolean), key].join(" ");
+}
