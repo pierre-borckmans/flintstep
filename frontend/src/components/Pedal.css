@@ -80,7 +80,7 @@
   stroke-opacity: 0;
   transition: stroke-opacity var(--dur-up) var(--ease-incand);
 }
-.pedal-indicator:hover .pedal-ring {
+.pedal-ring[data-on] {
   stroke-opacity: 0.55;
 }
 .pedal-indicator::before {

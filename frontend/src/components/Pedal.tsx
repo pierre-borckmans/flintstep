@@ -1,4 +1,4 @@
-import { memo, useId } from "react";
+import { memo, useId, useState } from "react";
 import { actionCaption, longCaption } from "../lib/caption";
 import { isDark, lampLight, rgb } from "../lib/colour";
 import { degText } from "../lib/nuts";
@@ -81,7 +81,7 @@ const REF = {
   connect: { x: 0.7793, w: 0.0719 },
   amp: { x: 0.747, w: 0.0333 },
   app: { x: 0.8107, w: 0.0304 },
-  lamp: { power: 0.6641, len: 0.057, thick: 0.0222, amp: 0.7474, app: 0.8111, dot: 0.016 },
+  lamp: { power: 0.6641, len: 0.057, thick: 0.0222, amp: 0.7474, app: 0.8111, dot: 0.019 },
 };
 
 /** The case is 1000 wide; one face width is U viewBox units. */
@@ -420,10 +420,14 @@ function Lamps({
   id,
   lamps,
   power: powerLed,
+  ringed = null,
 }: {
   id: string;
   lamps: Colour[];
   power: { colour: PowerColour; blink: boolean };
+  /** The AMP/APP dot under the pointer, ringed. Drawn here, in the same coordinates as
+   *  the dot, so the ring is centred on it whatever the viewer's aspect. */
+  ringed?: 0 | 1 | null;
 }) {
   // POWER mirrors the pedal's: its colour from the charge level, blinking while charging.
   const power: Colour = POWER_RGB[powerLed.colour];
@@ -468,6 +472,17 @@ function Lamps({
           glowId={`${id}-lampglow`}
           width={u(REF.lamp.dot)}
           glow={0.25}
+        />
+      ))}
+      {([REF.lamp.amp, REF.lamp.app] as const).map((x, i) => (
+        <circle
+          key={x}
+          className="pedal-ring"
+          data-on={ringed === i || undefined}
+          cx={fx(x)}
+          cy={MIRROR / 2}
+          r={IND.ring}
+          fill="none"
         />
       ))}
     </svg>
@@ -855,10 +870,12 @@ function IndicatorButton({
   i,
   selected,
   onSelect,
+  onHover,
 }: {
   i: 0 | 1;
   selected: boolean;
   onSelect: (i: 0 | 1) => void;
+  onHover: (i: 0 | 1 | null) => void;
 }) {
   const x = fx(i === 0 ? REF.lamp.amp : REF.lamp.app);
   const w = IND.half * 2;
@@ -867,6 +884,10 @@ function IndicatorButton({
     <button
       type="button"
       onClick={() => onSelect(i)}
+      onPointerEnter={() => onHover(i)}
+      onPointerLeave={() => onHover(null)}
+      onFocus={() => onHover(i)}
+      onBlur={() => onHover(null)}
       aria-pressed={selected}
       aria-label={i === 0 ? "AMP lamp" : "APP lamp"}
       className="pedal-indicator absolute cursor-pointer outline-none"
@@ -876,15 +897,7 @@ function IndicatorButton({
         width: pct(w, W),
         height: pct(h, H),
       }}
-    >
-      <svg
-        aria-hidden
-        viewBox={`${x - IND.half} ${IND.y0} ${w} ${h}`}
-        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
-      >
-        <circle className="pedal-ring" cx={x} cy={MIRROR / 2} r={IND.ring} fill="none" />
-      </svg>
-    </button>
+    ></button>
   );
 }
 
@@ -910,6 +923,7 @@ export function Pedal({
   const lamps = status?.lamps ?? [];
   const held = status?.held ?? 0;
   const nuts = useNuts();
+  const [ringed, setRinged] = useState<0 | 1 | null>(null);
   return (
     <div className="pedal @container flex flex-col items-center px-2 pt-1 pb-1">
       <Defs id={id} />
@@ -931,6 +945,7 @@ export function Pedal({
           <Lamps
             id={id}
             lamps={lamps}
+            ringed={onSelectIndicator ? ringed : null}
             power={powerLamp({
               connected: live,
               level: status?.battery ?? -1,
@@ -944,6 +959,7 @@ export function Pedal({
                 i={i}
                 selected={selectedIndicator === i}
                 onSelect={onSelectIndicator}
+                onHover={setRinged}
               />
             ))}
           {[0, 1, 2, 3, 4, 5].map((n) => {
