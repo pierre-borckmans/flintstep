@@ -1,7 +1,7 @@
 # Flintstep
 
 [![CI](https://github.com/pierre-borckmans/flintstep/actions/workflows/ci.yml/badge.svg)](https://github.com/pierre-borckmans/flintstep/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/pierre-borckmans/flintstep?include_prereleases)](https://github.com/pierre-borckmans/flintstep/releases/latest)
+[![Release](https://img.shields.io/github/v/release/pierre-borckmans/flintstep?include_prereleases)](https://github.com/pierre-borckmans/flintstep/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Use a Positive Grid Spark Control X as a MIDI foot controller on your Mac.
