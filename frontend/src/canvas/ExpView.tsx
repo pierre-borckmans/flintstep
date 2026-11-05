@@ -268,7 +268,8 @@ function SimTag({ w, mirror, palette }: { w: number; mirror: boolean; palette: P
   );
 }
 
-/** Under the drawing: a gauge of the value with the calibration on it. Heel to toe
+/** Under the drawing: a gauge of the value going out, and the trigger threshold. The
+ *  calibration lives in the Expression card, not here. Heel to toe
  *  follows the drawing: on a mirrored pedal the toe end is on the left. */
 function Gauge({
   x,
@@ -302,18 +303,11 @@ function Gauge({
     const r = at(b);
     return [Math.min(l, r), Math.abs(r - l)] as const;
   };
-  const labelStyle = useMemo(
-    () => new TextStyle({ fontFamily: p.mono, fontSize: 8, fontWeight: "600", fill: p.faint }),
-    [p.mono, p.faint],
-  );
   const key = JSON.stringify([m, mirror, w, engaged, p.cold, p.beam, x.enabled]);
   const draw = useCallback(
     (g: Graphics) => {
       g.clear();
-      for (const f of [m.heel, m.toe]) g.rect(at(f), 4, 1, 14).fill({ color: p.faint });
       g.roundRect(x0, 13, gw, 3, 1.5).fill({ color: p.edgeStrong });
-      const [sl, sw] = span(Math.min(m.heel, m.toe), Math.max(m.heel, m.toe));
-      g.rect(sl, 13, sw, 3).fill({ color: p.leader });
       if (m.threshold !== null && m.release !== null) {
         const [bl, bw] = span(m.release, m.threshold);
         // hatched: 1px lines every 3px at 135°
@@ -335,15 +329,12 @@ function Gauge({
         g.roundRect(nx - 4, 6, 8, 15, 4).fill({ color: p.cold, alpha: 0.18 });
         g.roundRect(nx - 1.5, 9, 3, 11, 1.5).fill({ color: p.cold });
       }
-      if (m.raw !== null) g.circle(at(m.raw), 21, 2).fill({ color: p.faint, alpha: 0.7 });
     },
     [key],
   );
   return (
     <pixiContainer alpha={x.enabled ? 1 : 0.4}>
       <pixiGraphics draw={draw} />
-      <pixiText text="H" style={labelStyle} x={at(m.heel) + 3} y={3} />
-      <pixiText text="T" style={labelStyle} x={at(m.toe) + 3} y={3} />
     </pixiContainer>
   );
 }
