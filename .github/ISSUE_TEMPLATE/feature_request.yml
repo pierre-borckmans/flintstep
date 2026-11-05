@@ -1,0 +1,20 @@
+name: Feature request
+description: Something the app could do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The situation, not the solution. "On stage I need to..." helps more than "add a button".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Your DAW, how you use the pedal, how other tools handle it.

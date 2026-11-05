@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for the hardened runtime (codesign option "runtime"). Deliberately empty.
+
+  The app is distributed with a Developer ID, not through the App Store, so it is not
+  sandboxed and none of the com.apple.security.app-sandbox family applies. Under the
+  hardened runtime alone, what it uses needs nothing extra:
+
+  - CoreBluetooth (central role). The hardened runtime has no Bluetooth entitlement;
+    com.apple.security.device.bluetooth is a sandbox entitlement. Access is a TCC prompt,
+    driven by NSBluetoothAlwaysUsageDescription in Info.plist, which is all a
+    non-sandboxed app needs.
+  - CoreMIDI virtual source and destination. No entitlement or TCC prompt.
+  - WKWebView (Wails v2 on macOS). JavaScript runs and JITs in WebKit's own
+    com.apple.WebKit.WebContent process, which Apple signs, so this process needs neither
+    com.apple.security.cs.allow-jit nor allow-unsigned-executable-memory. (Electron needs
+    allow-jit because V8 runs in the app process; Wails does not embed V8.)
+  - The Go runtime and cgo. Go does not generate code at run time. Every Mach-O in the
+    bundle is ours and signed with the same identity, so library validation can stay on.
+  - "Reveal in Finder" (logs) runs /usr/bin/open, a separate Apple-signed process, so no
+    com.apple.security.automation.apple-events either.
+
+  If a future feature needs one (a microphone, Apple Events to another app), add the key
+  here and say why next to it. The same file is used for local and ad-hoc builds, so a
+  missing entitlement shows up in `make app` before it reaches a release.
+-->
+<plist version="1.0">
+<dict/>
+</plist>

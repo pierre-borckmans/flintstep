@@ -10,6 +10,10 @@ permissions:
 jobs:
   dmg:
     runs-on: macos-latest
+    env:
+      # Secrets can't be tested in `if:`, so expose whether they are set. Without the
+      # certificate the job still releases, ad hoc and labelled "not notarized".
+      HAVE_CERT: ${{ secrets.MACOS_CERT_P12_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -22,9 +26,69 @@ jobs:
         with:
           bun-version-file: frontend/package.json
       - run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0
-      - run: make dmg VERSION=${{ github.ref_name }}
+
+      - name: Load product.env
+        run: |
+          grep -E '^[A-Z_][A-Z0-9_]*=' product.env >> "$GITHUB_ENV"
+          echo "KEYCHAIN=$RUNNER_TEMP/release-signing.keychain-db" >> "$GITHUB_ENV"
+
+      - name: Import the Developer ID certificate
+        if: env.HAVE_CERT == 'true'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          p12="$RUNNER_TEMP/cert.p12"
+          ca="$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          pass="$(openssl rand -hex 24)"
+          printf '%s' "$MACOS_CERT_P12_BASE64" | base64 --decode > "$p12"
+          # A throwaway keychain: unlocked for the job, deleted in the last step.
+          security create-keychain -p "$pass" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$pass" "$KEYCHAIN"
+          security import "$p12" -k "$KEYCHAIN" -P "$MACOS_CERT_PASSWORD" -f pkcs12 -T /usr/bin/codesign
+          # The Developer ID intermediate, in case the runner image lacks it; without it
+          # the identity isn't valid and find-identity -v skips it.
+          curl -fsSL -o "$ca" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          security import "$ca" -k "$KEYCHAIN" || true
+          # Let codesign use the key without a UI prompt.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$KEYCHAIN" >/dev/null
+          # Search this keychain first, keep the others.
+          existing="$(security list-keychains -d user | tr -d '"' | xargs)"
+          # shellcheck disable=SC2086 # one path per word
+          security list-keychains -d user -s "$KEYCHAIN" $existing
+          rm -f "$p12"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Build, sign, notarize
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          if [ "$HAVE_CERT" = true ]; then
+            make release VERSION="$GITHUB_REF_NAME"
+          else
+            echo "::warning::MACOS_CERT_P12_BASE64 is not set: building an ad-hoc release, not notarized"
+            SIGN_IDENTITY=- make release VERSION="$GITHUB_REF_NAME"
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
-          files: build/bin/SparkX-MIDI-${{ github.ref_name }}.dmg
-          fail_on_unmatched_files: true
+          name: ${{ env.PRODUCT_NAME }} ${{ github.ref_name }}
+          body_path: build/bin/release-notes.md
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            build/bin/*.dmg
+            build/bin/SHA256SUMS.txt
+
+      - name: Delete the signing keychain
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/cert.p12"
+          if [ -f "$KEYCHAIN" ]; then security delete-keychain "$KEYCHAIN"; fi
