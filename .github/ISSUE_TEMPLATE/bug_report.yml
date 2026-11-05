@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown at the bottom of Settings.
+      placeholder: v0.2.0
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: Apple menu > About This Mac. Say whether it's Apple silicon or Intel.
+      placeholder: macOS 15.3, Apple silicon
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Pedal firmware
+      description: The app logs it on connect ("ble: firmware ..."); the Spark app shows it too.
+      placeholder: 4.1.23
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Settings > Logs and Bluetooth trace > Reveal in Finder, or ~/Library/Application Support/SparkX MIDI/.
+        Attach app.log, and ble-trace.log for connection problems. Look through them
+        first for anything you'd rather not share.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: DAW, MIDI setup, screenshots.
