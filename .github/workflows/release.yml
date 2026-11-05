@@ -142,8 +142,8 @@ jobs:
 
           The `.AppImage` and `.deb` files are an **experimental** Linux build. They are
           built and smoke-tested in CI, but nobody has tried them with a real pedal on
-          Linux yet. They need BlueZ, WebKitGTK 4.1 and ALSA; see the Linux section of the
-          README. Please report what works and what doesn't in an issue.
+          Linux yet. They need BlueZ, WebKitGTK 4.1 and ALSA; see docs/LINUX.md.
+          Please report what works and what doesn't in an issue.
           Checksums: `SHA256SUMS-linux.txt` (`sha256sum -c SHA256SUMS-linux.txt`).
           NOTES
       - uses: softprops/action-gh-release@v2

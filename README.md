@@ -4,198 +4,75 @@
 [![Release](https://img.shields.io/github/v/release/pierre-borckmans/flintstep)](https://github.com/pierre-borckmans/flintstep/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A macOS menu-bar app that connects to a Positive Grid Spark Control X over Bluetooth and
-publishes it as a normal MIDI device named **Flintstep**. Logic, Ableton, MainStage,
-a browser or anything else that takes MIDI can then use the pedal as a foot controller.
-You don't need the Spark app, a Spark amp, a firmware change or Audio MIDI Setup.
+Use a Positive Grid Spark Control X as a MIDI foot controller on your Mac.
 
-The REACTOR Control should work too: it's the same hardware. It is untested so far, so if
-you have one, please [report how it went](https://github.com/pierre-borckmans/flintstep/issues/new?template=pedal_compatibility.yml).
-Web page: <https://flintstep.app>. There is also an [experimental Linux
-build](#linux-experimental).
+Flintstep is a menu-bar app. It connects to the pedal over Bluetooth and shows up as a MIDI device called **Flintstep** in Logic, Ableton, MainStage or anything else that takes MIDI. You don't need the Spark app, an amp or a firmware update.
 
-Positive Grid ships no MIDI mode. The Spark Control X advertises the Bluetooth MIDI service but
-never sends anything on it; its switches, expression jacks, battery and LEDs all run over
-two vendor services. This app speaks those and turns them into MIDI.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/img/app-dark.png">
+  <img src="site/img/app-light.png" alt="Flintstep's editor: a drawing of the pedal with each switch's message, and a panel setting switch I to CC 80, momentary, with an amber LED." width="1180">
+</picture>
 
-Not affiliated with Positive Grid.
-
-## Which pedals
-
-- **Spark Control X**: tested, firmware 4.1.23.
-- **REACTOR Control**: Positive Grid's footswitch for its REACTOR amps. Same chassis,
-  switches and LEDs as the Spark Control X (one expression jack instead of two), and almost
-  certainly the same AirTurn electronics, so the app treats it the same way. Nobody has
-  tried one yet. It pairs with the amp, so turn the amp off before connecting. Its USB-C
-  port only charges; "wired" means a TRS cable to the amp, which Flintstep doesn't use.
-- **Other pedals on the same hardware**: a pedal with an unknown name is accepted once
-  connected if it has both the AirTurn switch service and the FFC8 command service the
-  protocol runs on. Scan lists such devices as "(unverified)" until you pick one. The app
-  never connects to an unverified device on its own.
-
-Whichever pedal is connected, the MIDI ports keep the same names, so your DAW's setup
-survives a change of pedal. The app shows the model in its header and menu.
-[docs/PROTOCOL-NOTES.md](docs/PROTOCOL-NOTES.md) has what is known about the REACTOR
-Control and what is not.
+<https://flintstep.app>
 
 ## What it does
 
-- Six switches (I, II, A over III, IV, B), CC 80 to 85 on channel 1 by default. Each one
-  can be a momentary or toggle CC, a note or a program change, with an optional long-press
-  action. Two-switch combos add more triggers.
-- Two expression inputs, CC 11 and CC 7 by default, calibrated in the app (heel/toe), each
-  with a response curve (linear, gentle or fast start, S, or your own). The
-  calibration never gets written to the pedal.
-- LEDs in two modes. In **local** mode a switch lights while held and while its toggle is
-  on. In **MIDI feedback** mode the app listens on a second virtual port, **Flintstep
-  LEDs**: send the same CC back from your DAW and the LED shows the real state (plugin
-  bypassed, track armed).
-- Presets: keep several named mappings (one per DAW, one per gig) and switch from the
-  editor or the menu bar. Export one as a `.flintstep.json` file and import it on another Mac;
-  exports from SparkX MIDI (`.sparkx.json`) and an old `config.json` import too.
-- Remembers the pedal and reconnects on its own. Battery level in the menu bar. Optional
-  launch at login.
+- Six switches. Each sends a CC (momentary or toggle), a note or a program change. A long press can send something else, and pressing two together is a trigger of its own. Defaults are CC 80 to 85 on channel 1.
+- Two expression inputs for TRS pedals, CC 11 and CC 7 by default. Click Calibrate, rock the pedal a few times and Flintstep learns heel and toe. A response curve puts the resolution where you want it: gentle start, fast start, an S you can shape, or your own curve through points you drag.
+- LEDs your DAW can drive. Send the same CC back to the **Flintstep LEDs** port and the switch lights to match, say a plugin bypassed or a track armed. Without feedback, a switch lights while held or while its toggle is on.
+- Presets, one per DAW or per gig, switchable from the menu bar, each with its own undo history. Export one to use it on another Mac.
 
-The app never sends the commands that rewrite the profiles stored in the pedal (types 03,
-07, 0a, 0e, 13). LED colours are volatile: a power cycle clears them.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/img/curve-dark.png">
+  <img src="site/img/curve-light.png" alt="The response curve editor with a custom curve through three draggable points." width="326">
+</picture>
 
-> **Expression pedals:** use a standard **TRS** expression pedal on a TRS cable (the M-Audio EX-P is tested and works, with its polarity switch on **M-Audio**). If the range looks bent, short or wanders, flip the pedal's polarity switch. Two-wire pedals made for one brand, like the **Line 6 EX-1**, are detected but always read zero. After plugging in, set heel and toe in the Expression tab.
+Flintstep never writes to the profiles stored on the pedal. LED colours it sets are gone after a power cycle.
 
 ## Install
 
-Download `Flintstep-<version>.dmg` from the
-[Releases](https://github.com/pierre-borckmans/flintstep/releases) page, open it and drag **Flintstep** onto Applications.
+Download the DMG from [Releases](https://github.com/pierre-borckmans/flintstep/releases), open it and drag Flintstep to Applications. Universal build, macOS 12 or later.
 
-The release notes say whether a build is notarised. A notarised build opens like any
-other app. One that isn't gets blocked on first launch: open it once, then go to System
-Settings > Privacy & Security and click Open Anyway (on macOS 14 and earlier, right-click
-the app and pick Open). Or clear the quarantine flag once:
+Builds aren't notarised yet, so macOS blocks the first launch. Open the app once, then click Open Anyway in System Settings > Privacy & Security. Or run:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/Flintstep.app"
+xattr -dr com.apple.quarantine /Applications/Flintstep.app
 ```
 
-Each download comes with `SHA256SUMS.txt`; `shasum -a 256 -c SHA256SUMS.txt` checks the
-DMG. Universal build, Apple silicon and Intel, macOS 12 or later.
+Turn the pedal on, keep the Spark app closed, and allow Bluetooth when asked. The pedal takes one connection at a time.
 
-macOS asks for Bluetooth access on first run. The app lives in the menu bar, not the Dock.
+**Expression pedals** need a TRS cable and a TRS pedal. The M-Audio EX-P works with its polarity switch on M-Audio. If the range looks short or bent, flip the polarity switch. Two-wire pedals such as the Line 6 EX-1 read zero.
 
-### Coming from SparkX MIDI
+**Coming from SparkX MIDI** (the old name): your presets move over on first launch. Pick the new **Flintstep** ports in your DAW and allow Bluetooth again.
 
-Flintstep used to be called SparkX MIDI. The first launch under the new name moves
-`~/Library/Application Support/SparkX MIDI` to `.../Flintstep` and carries "launch at
-login" over. macOS sees a new app, so it asks for Bluetooth access again, and your DAW
-sees new MIDI ports called **Flintstep** and **Flintstep LEDs**: pick them again where
-you used the old ones. You can delete `SparkX MIDI.app` afterwards.
+## Other pedals and platforms
 
-## Linux (experimental)
-
-There is a Linux build. It compiles, packages and starts, and CI smoke-tests it in a
-container, but nobody has used it with a real pedal yet: the Bluetooth and MIDI code
-has never met the hardware on Linux. If you try it, please
-[open an issue](https://github.com/pierre-borckmans/flintstep/issues) and say what
-worked and what didn't (distribution, desktop, `~/.config/Flintstep/app.log`).
-
-Releases that include it carry `Flintstep-<version>-x86_64.AppImage` /
-`-aarch64.AppImage` and `flintstep_<version>_amd64.deb` / `_arm64.deb`, with
-`SHA256SUMS-linux.txt`.
-
-- **.deb** (Debian 12+, Ubuntu 22.04+): `sudo apt install ./flintstep_<version>_amd64.deb`.
-  It pulls in GTK 3, WebKitGTK 4.1 and ALSA, and recommends BlueZ.
-- **AppImage**: `chmod +x Flintstep-*.AppImage` and run it. It does not bundle GTK or
-  WebKit, so it needs `libwebkit2gtk-4.1-0` and `libasound2` installed (most desktops
-  have them), and FUSE 2 or 3 to mount itself.
-
-What it needs from the system:
-
-- **BlueZ**, running: `systemctl status bluetooth`. The app talks to `bluetoothd` over
-  the system D-Bus, as any desktop Bluetooth tool does; the default BlueZ policy lets a
-  logged-in user do that. If the app says it is not allowed, check
-  `/etc/dbus-1/system.d/bluetooth.conf`. A soft-blocked adapter shows as "blocked by
-  rfkill": `rfkill unblock bluetooth`.
-- **The ALSA sequencer** (`/dev/snd/seq`, module `snd-seq`; loaded on any desktop with
-  sound). Your user must be able to open it, which on most distributions means being
-  logged in at the seat or in the `audio` group. The pedal shows up as ALSA ports
-  **Flintstep** and **Flintstep LEDs**; PipeWire
-  and JACK applications see them through their ALSA MIDI bridges (`aconnect -l` lists
-  them).
-- **A tray**, for the menu-bar behaviour: KDE, Xfce, Cinnamon and Ubuntu's GNOME show
-  it; stock GNOME needs the AppIndicator extension. Without a tray the window's close
-  button quits the app instead of hiding it.
-
-The remembered pedal is stored per OS (a MAC address here, a CoreBluetooth identifier
-on macOS), so the first launch on Linux finds the pedal again by name. "Launch at
-login" writes `~/.config/autostart/flintstep.desktop`. Data lives in
-`~/.config/Flintstep/`. Build it yourself with `make linux` (Docker); see
-[docs/PORTING.md](docs/PORTING.md) for what was tested and how.
-
-## Layout
-
-| Path | What |
-| --- | --- |
-| `internal/sparkx` | The pedal protocol. Pure Go, no Bluetooth. |
-| `internal/ble` | Bluetooth link via tinygo bluetooth (CoreBluetooth on macOS, BlueZ on Linux): find, connect, reconnect, lamps. |
-| `internal/mapping` | Config and the engine: switch edges and exp values in, MIDI and lamp colours out. |
-| `internal/bridge` | Glue between the pedal, the engine and the MIDI port. Tested with fakes. |
-| `internal/coremidi` | Virtual MIDI source and LED destination (cgo): CoreMIDI, or ALSA sequencer ports on Linux. |
-| `internal/tray`, `internal/loginitem` | Menu-bar item and LaunchAgent; on Linux a StatusNotifierItem and an XDG autostart entry. |
-| `internal/platform` | The list of per-OS seams and a test pinning their signatures. |
-| `internal/presets` | The preset library (library.json), export and import. |
-| `internal/store`, `internal/rotlog` | Atomic file writes, the old config file, the data folder move, capped logs. |
-| `internal/product` | The app's names, checked against `product.env` by a test. |
-| `cmd/flintstep-cli` | The bridge as a terminal command, no UI. |
-| `frontend/` | React + Tailwind UI. |
-| `tools/probe/sparkx.swift` | The CoreBluetooth probe the protocol was checked with. |
-| `build/linux`, `scripts/linux` | The Linux Docker image, build, packaging and smoke test. |
-
-`docs/CONTRACTS.md` has the interfaces between the packages. `docs/RELEASING.md` covers
-signing, notarisation and cutting a release. Names used by the build live in `product.env`.
-
-Data lives in `~/Library/Application Support/Flintstep/`: `library.json` (the presets),
-`app.log`, `ble-trace.log`. Versions before presets kept one mapping in `config.json`; the
-first launch with presets turns it into a preset called "My mapping" and leaves the file
-alone. If `library.json` is ever unreadable, the app moves it aside as
-`library.json.corrupt-<time>`, starts from the defaults and says so in the preset menu.
+- **REACTOR Control.** Same hardware with one expression jack, so it should work. Nobody has tried one: please [report how it goes](https://github.com/pierre-borckmans/flintstep/issues/new?template=pedal_compatibility.yml). Turn the REACTOR amp off first.
+- **Other AirTurn-based pedals** show up as "(unverified)" in Scan. Flintstep only connects if you pick one.
+- **Linux** has an experimental build that hasn't met a real pedal yet. See [docs/LINUX.md](docs/LINUX.md).
 
 ## Develop
 
-Needs Go 1.25+, bun 1.3.14, Wails v2.17 (`go install github.com/wailsapp/wails/v2/cmd/wails@v2.17.0`)
-and golangci-lint v2.
+Go 1.25+, bun 1.3.14, Wails v2.17 and golangci-lint v2.
 
 ```sh
 make install   # frontend deps
-make dev       # wails dev, live reload
-make cert      # once per Mac: local signing cert, so Bluetooth permission survives rebuilds
-make app       # build/bin/Flintstep.app (universal; PLATFORM=darwin/arm64 is faster)
-make dmg       # build/bin/Flintstep-<version>.dmg, version from git describe
-make release VERSION=v0.2.0   # signed DMG + checksums, notarised when credentials exist
-make cli       # build/bin/flintstep-cli
-make check     # lint + tests, what CI runs
-make linux     # Linux binary, AppImage and .deb for amd64 and arm64, in Docker
-make linux-test   # Linux vet, lint and tests with cgo, in Docker
-make linux-smoke  # start the Linux binary under Xvfb, in Docker
+make cert      # once per Mac, so the Bluetooth permission survives rebuilds
+make dev       # wails dev with live reload
+make check     # lint and tests, as CI runs them
+make app       # build/bin/Flintstep.app
 ```
 
-Without the app: `go run ./cmd/flintstep-cli -scan` lists pedals, and
-`go run ./cmd/flintstep-cli` bridges the first one it finds and prints every message.
+`go run ./cmd/flintstep-cli` bridges the pedal without the UI and prints every message.
 
-Turn the pedal on and keep the Spark app closed (or the REACTOR amp off). A pedal holds
-one connection at a time.
+More in `docs/`: [PROTOCOL-NOTES](docs/PROTOCOL-NOTES.md) (how the pedal talks), [CONTRACTS](docs/CONTRACTS.md) (how the packages fit), [RELEASING](docs/RELEASING.md) (signing and releases), [PORTING](docs/PORTING.md). Data lives in `~/Library/Application Support/Flintstep/`.
 
 ## Credits
 
-Paul Hamshere's [Spark-Control-X](https://github.com/paulhamsh/Spark-Control-X) notes
-first wrote the protocol down. Parts of the Bluetooth layer were adapted from the
-author's earlier BEAM Mini controller project.
+Paul Hamshere's [Spark-Control-X](https://github.com/paulhamsh/Spark-Control-X) notes first wrote the protocol down. Parts of the Bluetooth layer come from my earlier BEAM Mini controller project.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The licences of the Go modules and frontend packages
-built into the app are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which ships
-inside the app and the DMG; in the app it is under Settings > App > Acknowledgements.
-`make notices` regenerates it after a dependency change, and CI fails until it is
-current. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security
-reports: [SECURITY.md](SECURITY.md).
+MIT, see [LICENSE](LICENSE). Bundled dependencies are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). See also [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
-Spark, Spark Control X, REACTOR and REACTOR Control are trademarks of Positive Grid.
-Flintstep is not affiliated with or endorsed by Positive Grid.
+Spark, Spark Control X, REACTOR and REACTOR Control are trademarks of Positive Grid. Flintstep is not affiliated with or endorsed by Positive Grid.

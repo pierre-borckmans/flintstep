@@ -120,7 +120,7 @@ clean:
 
 # ---- Linux (experimental) ----
 # Built in Docker (build/linux/Dockerfile), from macOS or Linux. Hardware-untested: see
-# the Linux section of README.md and docs/PORTING.md.
+# docs/LINUX.md and docs/PORTING.md.
 LINUX_ARCHES ?= amd64 arm64
 .PHONY: linux linux-test linux-smoke
 
