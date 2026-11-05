@@ -555,14 +555,16 @@ function pickFile(): Promise<{ text: string; name: string } | null> {
   });
 }
 
-/** A demo step: an edit, an undo, or switching to the preset of that name. */
-export type DemoStep = Op | "undo" | { preset: string };
+/** A demo step: an edit, an undo or redo, or switching to the preset of that name. */
+export type DemoStep = Op | "undo" | "redo" | { preset: string };
 
 /** Edits to replay on load (?demo=...), so the history and the save status can be
  *  screenshotted without clicking: "history" makes a few changes and undoes the last
- *  two; "invalid" ends on a config that does not validate; "presets" edits, switches to
- *  "Ableton live", edits there, and undoes back across the switch; "presets-redo" stops
- *  on Ableton live. */
+ *  two; "invalid" ends on a config that does not validate. The preset ones show that
+ *  each preset has its own history: "presets-b" makes two edits in My mapping, switches
+ *  to Ableton live, makes two there and undoes one (only Ableton live's); "presets" then
+ *  goes back to My mapping, whose two edits are still there, and undoes both and redoes
+ *  one. */
 export function demoScript(name: string): DemoStep[] {
   const edits: Op[] = [
     { type: "tap", sw: 1, patch: { kind: "note", number: 60 } },
@@ -573,14 +575,16 @@ export function demoScript(name: string): DemoStep[] {
     { type: "ledMode", mode: "feedback" },
   ];
   if (name === "history") return [...edits, "undo", "undo"];
-  const across: DemoStep[] = [
+  const inB: DemoStep[] = [
     edits[0],
+    edits[4],
     { preset: "Ableton live" },
     edits[1],
     { type: "brightness", value: 60 },
+    "undo",
   ];
-  if (name === "presets") return [...across, "undo", "undo", "undo"];
-  if (name === "presets-redo") return across;
+  if (name === "presets-b") return inB;
+  if (name === "presets") return [...inB, { preset: "My mapping" }, "undo", "undo", "redo"];
   if (name === "invalid")
     return [...edits.slice(0, 2), { type: "combo", index: 0, patch: { b: 0 } }];
   return [];
@@ -651,6 +655,27 @@ export function createMockBackend(q: URLSearchParams): Backend {
     libraryError,
     expTrigger: sim.triggers(),
   });
+
+  // For browser checks: window.__mockMenu("Ableton live") switches the way Go's menu-bar
+  // menu does, without asking the UI (the next state tick tells it), and
+  // window.__mockPreset(name) is what the library holds for a preset.
+  if (typeof window !== "undefined") {
+    const byName = (name: string) => lib.list().find((x) => x.name === name);
+    Object.assign(window, {
+      __mockMenu: (name: string) => {
+        const p = byName(name);
+        if (p) run(lib.select(p.id));
+      },
+      __mockPreset: (name: string) => {
+        const p = byName(name);
+        if (!p) return null;
+        const was = lib.activeId();
+        const c = lib.select(p.id);
+        lib.select(was);
+        return c;
+      },
+    });
+  }
 
   let last = performance.now();
   setInterval(() => {

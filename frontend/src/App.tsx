@@ -57,9 +57,10 @@ export default function App({ backend }: { backend: Backend }) {
     import("./mock").then(async ({ demoScript }) => {
       const pause = () => new Promise((r) => setTimeout(r, 400));
       for (const s of demoScript(demo)) {
-        if (s === "undo") {
-          bridge.undo();
-          await pause(); // an undo across a switch talks to Go
+        if (s === "undo" || s === "redo") {
+          if (s === "undo") bridge.undo();
+          else bridge.redo();
+          await pause();
         } else if ("preset" in s) {
           const p = bridge.presets.list.find((x) => x.name === s.preset);
           if (p) await bridge.presets.select(p.id, p.name);

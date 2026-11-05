@@ -9,7 +9,6 @@ import {
   exportFileName,
   listKey,
   MAX_NAME,
-  presetLabel,
   uniqueName,
 } from "./presets";
 
@@ -58,9 +57,6 @@ describe("names", () => {
     expect(copyName("Live", ["Live"])).toBe("Live copy");
     expect(copyName("Live", ["Live", "Live copy"])).toBe("Live copy (2)");
     expect(copyName("z".repeat(MAX_NAME), []).length).toBe(MAX_NAME);
-  });
-  it("presetLabel is the history entry for a switch", () => {
-    expect(presetLabel("Ableton live")).toBe("Preset · Ableton live");
   });
   it("exportFileName mirrors Go's", () => {
     expect(exportFileName("Ableton live")).toBe("Ableton live.sparkx.json");

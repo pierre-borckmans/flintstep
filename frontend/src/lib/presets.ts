@@ -46,9 +46,6 @@ export function uniqueName(base: string, names: string[]): string {
 export const copyName = (name: string, names: string[]) =>
   uniqueName(`${cut(name, MAX_NAME - 5)} copy`, names);
 
-/** The undo history's label for switching to a preset. */
-export const presetLabel = (name: string) => `Preset · ${name}`;
-
 export function exportFileName(name: string): string {
   const n =
     name
