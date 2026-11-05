@@ -413,7 +413,8 @@ type Activity struct {
   Source string `json:"source"` // mapping.Origin: switch | long | combo | exp | trigger | release (out), feedback (in)
   Index int `json:"index"`; Pair [2]int `json:"pair"`; Of string `json:"of,omitempty"` // as in mapping.Origin
 }
-type Options struct { OnActivity func(Activity); OnStatus func(ble.Status); OnTrigger func([2]bool); OnSim func(); Now func() time.Time }
+type Options struct { OnActivity func(Activity); OnStatus func(ble.Status); OnTrigger func([2]bool); OnSim func();
+                      OnRaw func(n, raw int); OnWiden func(n, lo, hi int); Now func() time.Time }
 func (b *Bridge) ExpTriggers() [2]bool // Engine.ExpTriggers under the bridge's lock
 
 // Simulated expression pedals (sim.go): test the whole exp path without one.
@@ -444,6 +445,38 @@ simulated value is fed again, so a new calibration shows on a parked pedal. Work
 with the pedal disconnected too. Never persisted: off at launch. OnSim is called (no
 lock held) on every on/off/sweep change and each value fed.
 
+Calibration by sweeping (capture.go). Every raw value goes through expStep, real or
+simulated, and a running sweep keeps them all there: the 20 Hz state stream coalesces and
+would miss a quick flick to the toe.
+
+```go
+func (b *Bridge) StartExpSweep(n int) error              // needs a cable (a simulated one counts); seeds with the
+                                                         // resting raw value; starting again starts over
+func (b *Bridge) FinishExpSweep(n int) (SweepResult, error) // ends it; ErrSweepTooSmall keeps it running; saves nothing
+func (b *Bridge) CancelExpSweep(n int) error
+func (b *Bridge) ExpCaptures() [2]Capture
+func SweepCalibration(low, high int) (SweepResult, error) // heel = low + 1 % span, toe = high - 1 % span; span < 4000 refused
+type Capture struct { On bool; Low, High, RawLow, RawHigh, Samples, Reversals int; Ready bool;
+                      StartedAt, MovedAt, ExtremeAt int64 } // json camelCase, times unix ms
+type SweepResult struct { Low, High, Heel, Toe int }
+```
+
+Low and High are robust: the lowest and highest values with another value within 5 % of the
+span (at least 400), so a lone glitch is left out. A reversal is going back 15 % of the span
+from the run's furthest point once the span is MinSweepSpan (4000) wide. Ready = robust span
+>= 4000 and (a reversal or 70 % of the jack). MovedAt moves on a change over 1.5 % of the span
+(at least 300), so a resting foot's jitter is "at rest". The UI ends a sweep (lib/sweep.ts):
+Ready and still for SweepRest (1.2 s), or at SweepTimeout (15 s) with whatever is enough,
+otherwise it cancels with ErrSweepTooSmall's words. Heel is always the low end and toe the
+high end; Invert is untouched.
+
+Learning the range (widen.go): with a calibrated input and no sweep on it, a value past the
+low or high end by more than the 1 % margin is noted; 3 of them within 3 s of each other
+propose (Options.OnWiden(n, lo, hi)) that end at the second furthest value, the margin back
+inside. Never narrower; proposals build on each other until the next Apply, which starts over
+from the applied calibration. Nothing is applied by the bridge. Options.OnRaw(n, raw) sees
+every value expStep feeds, inside the step.
+
 ## Wails bindings (package main, `App`), what the frontend calls
 
 ```ts
@@ -462,6 +495,11 @@ CalibrateExp(n: number, edge: "min" | "max"): Promise<Config> // stores the inpu
 SimulateExp(n: number, on: boolean): Promise<void>  // Bridge.SimulateExp; not saved
 SetSimExp(n: number, fraction: number): Promise<void> // Bridge.SetSimExp
 SimSweep(n: number, on: boolean): Promise<void>     // Bridge.SimSweep
+StartExpSweep(n: number): Promise<void>             // Bridge.StartExpSweep
+FinishExpSweep(n: number): Promise<SweepResult>     // Bridge.FinishExpSweep; saves nothing: the UI applies heel/toe
+                                                    // as one edit ("Exp N · calibrated by sweeping")
+CancelExpSweep(n: number): Promise<void>
+WatchExpRaw(on: boolean): Promise<void>             // the "expraw" event runs while on
 SetLaunchAtLogin(on: boolean): Promise<void>
 RevealLogs(): Promise<void>
 SetTheme(mode: "system" | "dark" | "light"): Promise<void> // native window appearance + background,
@@ -497,6 +535,7 @@ type State = {
   expSim: [boolean, boolean]     // each input simulated now (Bridge.ExpSim); pedal is Bridge.Status,
                                  // so a simulated jack shows cables[n] true and its expRaw[n]
   expSweep: [boolean, boolean]   // each simulated input sweeping (Bridge.ExpSweep)
+  expCapture: [Capture, Capture] // each input's calibration sweep (Bridge.ExpCaptures)
 }
 ```
 
@@ -525,4 +564,9 @@ pedal's status (connected, powered) and two flash timers: a MIDI flash stays lit
 the last message (each message extends it), timed on the bridge's injected clock and ended by
 its tick loop, so a burst is two lamp updates (on, off), diffed like every lamp.
 
-Events (Wails `EventsOn`): `"state"` -> State (throttled ~20/s), `"activity"` -> Activity.
+Events (Wails `EventsOn`): `"state"` -> State (throttled ~20/s), `"activity"` -> Activity,
+`"expraw"` -> `{ samples: [{t, v}[], {t, v}[]] }` (every raw value per input since the last
+event, t unix ms, at most every 16 ms, only while WatchExpRaw is on; the Expression cards' live
+traces), `"expwiden"` -> `{ n, low, high }` (Options.OnWiden; the UI widens the calibration
+if that input's "Learn range" is on, a localStorage setting `flintstep.expLearn`, default on,
+as one history entry per burst, "Exp N · range widened").

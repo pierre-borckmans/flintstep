@@ -3,14 +3,17 @@ import { errorText } from "../api";
 import type { Apply } from "../lib/config";
 import { expFraction, expValue, rawFraction } from "../lib/exp";
 import { cableLabel } from "../lib/expsim";
-import type { Config, ExpEdge, Status } from "../types";
+import { calibrationHint, sweepProgress, sweepPrompt } from "../lib/sweep";
+import type { Capture, Config, ExpEdge, Status } from "../types";
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
 import { NumField } from "../ui/NumField";
 import { Toggle } from "../ui/Toggle";
+import type { ExpLive } from "../useExpLive";
 import { type SimControls, SimRow, SimTag } from "./ExpSim";
+import { RawTrace } from "./RawTrace";
 import { ThresholdOverlay, ThresholdZone, TriggerBlock } from "./Trigger";
 
 /** The live reading: a bar of the value the input sends (0..127), and under it the raw
@@ -127,6 +130,90 @@ function Meter({
   );
 }
 
+const thousands = (v: number) => (v < 0 ? "--" : v.toLocaleString("en-US").replace(/,/g, " "));
+
+/** A sweep running: what to do, the extremes so far on the jack's range, how far along
+ *  it looks, and Done / Cancel (it ends on its own once the pedal rests). */
+function SweepCapture({
+  n,
+  c,
+  onDone,
+  onCancel,
+}: {
+  n: number;
+  c: Capture;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  // The rest phase moves with no new values: tick while it runs.
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+  const p = sweepProgress(c, now);
+  const has = c.low >= 0;
+  return (
+    <section
+      aria-label={`EXP ${n + 1} calibration sweep`}
+      aria-live="polite"
+      className="flex flex-col gap-2 rounded-ui-sm border border-cold/40 bg-sunken/60 p-2.5"
+    >
+      <p className="text-ui-sm font-medium text-bone">{sweepPrompt(c)}</p>
+      <div
+        className="relative h-2 rounded-[3px] bg-sunken inset-shadow-deep"
+        title="Range swept so far, on the jack's 0–65535"
+      >
+        {has && (
+          <div
+            className="absolute inset-y-0 rounded-[3px] bg-cold/70"
+            style={{
+              left: `${rawFraction(c.low) * 100}%`,
+              width: `${Math.max(0.5, (rawFraction(c.high) - rawFraction(c.low)) * 100)}%`,
+            }}
+          />
+        )}
+      </div>
+      <div className="flex justify-between font-mono text-ui-2xs text-muted tabular-nums">
+        <span>low {thousands(c.low)}</span>
+        <span>span {has ? thousands(c.high - c.low) : "--"}</span>
+        <span>high {thousands(c.high)}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div
+          className="h-1 flex-1 overflow-hidden rounded-full bg-edge"
+          role="progressbar"
+          aria-label="Sweep progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(p * 100)}
+        >
+          <div
+            className="h-full rounded-full bg-live"
+            style={{ width: `${p * 100}%`, transition: "width 120ms linear" }}
+          />
+        </div>
+        <Button
+          size="sm"
+          kind={c.ready ? "primary" : "plain"}
+          onClick={onDone}
+          title="Finish now with what was swept"
+        >
+          Done
+        </Button>
+        <Button
+          size="sm"
+          kind="ghost"
+          onClick={onCancel}
+          title="Stop without changing the calibration"
+        >
+          Cancel
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function ExpCard({
   n,
   config,
@@ -136,6 +223,7 @@ function ExpCard({
   calibrate,
   focused = false,
   sim,
+  live,
 }: {
   n: number;
   /** Selected on the canvas: lit, and scrolled into view. */
@@ -146,6 +234,8 @@ function ExpCard({
   apply: Apply;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
   sim?: SimControls;
+  /** Traces, sweeps and learning (useExpLive); without it the card has none of them. */
+  live?: ExpLive;
 }) {
   const x = config.exp[n];
   const trigOn = x.trigger.mode !== "off";
@@ -170,6 +260,10 @@ function ExpCard({
         setTimeout(() => setFlash(null), 900);
       })
       .catch((e) => setErr(errorText(e)));
+  const capture = live?.captures[n];
+  const sweeping = !!capture?.on;
+  const sweepErr = live?.errors[n] ?? null;
+  const hint = live && cable && !sweeping ? calibrationHint(x, live.seen[n]) : null;
 
   return (
     <div
@@ -223,6 +317,17 @@ function ExpCard({
           }
         />
       </div>
+      {live && cable && (
+        <RawTrace
+          ring={live.rings[n]}
+          n={n}
+          min={x.min}
+          max={x.max}
+          invert={x.invert}
+          swept={sweeping && capture ? capture : null}
+          watch={live.watch}
+        />
+      )}
 
       <div className={cx("grid grid-cols-2 gap-2", !x.enabled && "opacity-50")}>
         <NumField
@@ -243,11 +348,56 @@ function ExpCard({
         />
       </div>
 
+      {live && sweeping && capture ? (
+        <SweepCapture
+          n={n}
+          c={capture}
+          onDone={() => void live.sweep.finish(n)}
+          onCancel={() => void live.sweep.cancel(n)}
+        />
+      ) : (
+        live && (
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              kind="primary"
+              disabled={!cable}
+              onClick={() => {
+                setErr(null);
+                void live.sweep.start(n);
+              }}
+              title={
+                cable
+                  ? "Click, then rock the pedal all the way back and forth: heel and toe are set from the ends it reaches"
+                  : "Plug in or simulate a pedal first"
+              }
+            >
+              Calibrate by sweeping
+            </Button>
+            <div className="flex-1" />
+            <span className="text-ui-xs text-muted">Learn range</span>
+            <Toggle
+              label={`Learn EXP ${n + 1} range while playing`}
+              title="Widen heel or toe when the pedal goes past them while you play"
+              on={live.learn[n]}
+              onChange={(on) => live.setLearn(n, on)}
+            />
+          </div>
+        )
+      )}
+      {sweepErr && <p className="text-ui-xs text-hot">{sweepErr}</p>}
+      {hint && !sweepErr && (
+        <p className="text-ui-xs text-warn" role="status">
+          {hint}
+        </p>
+      )}
+
       <div className="flex items-center gap-2">
+        {live && <Kicker className="!text-faint">Fine-tune</Kicker>}
         <Button
           size="sm"
           kind={flash === "min" ? "primary" : "plain"}
-          disabled={!cable}
+          disabled={!cable || sweeping}
           onClick={() => set("min")}
           title={
             cable
@@ -260,7 +410,7 @@ function ExpCard({
         <Button
           size="sm"
           kind={flash === "max" ? "primary" : "plain"}
-          disabled={!cable}
+          disabled={!cable || sweeping}
           onClick={() => set("max")}
           title={
             cable
@@ -307,6 +457,8 @@ export function ExpressionPanel({
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
   /** The simulated pedals; without it the cards have no "Simulate pedal" row. */
   sim?: SimControls;
+  /** Traces, sweeps and learning the range. */
+  live?: ExpLive;
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -314,8 +466,9 @@ export function ExpressionPanel({
       <ExpCard n={1} engaged={!!engaged[1]} focused={focus === 1} {...props} />
       <p className="px-1 text-ui-xs leading-snug text-faint">
         <Kicker className="mr-1">Tip</Kicker>
-        Set heel and toe with the pedal resting where you want each end. The value only moves when
-        the pedal is clearly past a step, so a resting pedal does not flicker.
+        Calibrate by sweeping, then rock the pedal heel to toe and back: it finishes on its own once
+        the pedal rests. Set heel and Set toe take the pedal's position as it is now. The value only
+        moves when the pedal is clearly past a step, so a resting pedal does not flicker.
       </p>
     </div>
   );

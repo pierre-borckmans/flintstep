@@ -127,6 +127,53 @@ export interface State {
   expSim: boolean[];
   /** 2: each simulated pedal is sweeping heel to toe on its own. */
   expSweep: boolean[];
+  /** 2: each input's calibration sweep (bridge.Capture). */
+  expCapture: Capture[];
+}
+
+/** bridge.Capture: a calibration sweep as it stands. Times are unix ms. */
+export interface Capture {
+  on: boolean;
+  /** The robust extremes (a lone glitch left out), -1 before any value. */
+  low: number;
+  high: number;
+  /** The plain extremes, -1 before any value. */
+  rawLow: number;
+  rawHigh: number;
+  samples: number;
+  /** Turns back once the span is wide enough to count. */
+  reversals: number;
+  /** Wide enough and turned back: at rest it can end. */
+  ready: boolean;
+  startedAt: number;
+  movedAt: number;
+  extremeAt: number;
+}
+
+/** bridge.SweepResult: a finished sweep, extremes as kept and heel/toe inset. */
+export interface SweepResult {
+  low: number;
+  high: number;
+  heel: number;
+  toe: number;
+}
+
+/** One raw value and when it came (unix ms). */
+export interface RawSample {
+  t: number;
+  v: number;
+}
+
+/** The "expraw" event: each input's raw values since the last one, oldest first. */
+export interface ExpRawEvent {
+  samples: RawSample[][];
+}
+
+/** The "expwiden" event: Go proposes widening input n's range to low..high. */
+export interface ExpWiden {
+  n: number;
+  low: number;
+  high: number;
 }
 
 /** presets.Info: a preset as the picker lists it. */

@@ -85,15 +85,19 @@ type Bridge struct {
 
 	trig [sparkx.ExpInputs]bool // the expression triggers engaged, as last reported
 
-	sim     [sparkx.ExpInputs]simInput // the simulated expression pedals (sim.go)
-	simLoop bool                       // the sim loop is running
-	isDone  bool                       // Close was called
+	sim     [sparkx.ExpInputs]simInput   // the simulated expression pedals (sim.go)
+	simLoop bool                         // the sim loop is running
+	capt    [sparkx.ExpInputs]capture    // calibration sweeps (capture.go)
+	wid     [sparkx.ExpInputs]widenState // learning the range (widen.go)
+	isDone  bool                         // Close was called
 
 	now        func() time.Time
 	onActivity func(Activity)
 	onStatus   func(ble.Status)
 	onTrigger  func([sparkx.ExpInputs]bool)
 	onSim      func()
+	onRaw      func(n, raw int)
+	onWiden    func(n, lo, hi int)
 
 	ticking bool
 	stop    chan struct{}
@@ -112,6 +116,12 @@ type Options struct {
 	// OnSim is called, with no lock held, when a simulated expression pedal turns on or
 	// off or its value reaches the engine: what Status and ExpSim report changed.
 	OnSim func()
+	// OnRaw is called with every raw expression value that reaches the engine, real or
+	// simulated, inside the step that feeds it: it must not call back into the bridge.
+	OnRaw func(n, raw int)
+	// OnWiden proposes a wider calibrated range lo..hi for input n (widen.go), from
+	// inside a step like OnRaw. Nothing is applied: that is the caller's choice.
+	OnWiden func(n, lo, hi int)
 	// Now is the clock; nil is time.Now. Tests set it.
 	Now func() time.Time
 }
@@ -132,7 +142,11 @@ func New(cfg mapping.Config, out MIDIOut, o Options) *Bridge {
 		onStatus:   o.OnStatus,
 		onTrigger:  o.OnTrigger,
 		onSim:      o.OnSim,
+		onRaw:      o.OnRaw,
+		onWiden:    o.OnWiden,
 		sim:        newSims(),
+		capt:       newCaptures(),
+		wid:        newWidens(),
 		stop:       make(chan struct{}),
 	}
 }
@@ -181,6 +195,7 @@ func (b *Bridge) Apply(cfg mapping.Config) (mapping.Config, error) {
 	b.mu.Lock()
 	b.cfg = cfg
 	releases := b.eng.SetConfig(cfg)
+	b.wid = newWidens() // proposals are measured from the new calibration
 	b.simRepushLocked() // a new calibration applies to a parked simulated pedal at once
 	b.mu.Unlock()
 	b.send(releases)
@@ -238,12 +253,20 @@ func (b *Bridge) onExp(n, raw int) {
 // values and simulated ones go the same way. The caller holds step.
 func (b *Bridge) expStep(n, raw int) {
 	b.mu.Lock()
+	b.recordLocked(n, raw)
+	lo, hi, widen := b.widenLocked(n, raw)
 	msgs := b.eng.Exp(n, raw, b.now())
 	pending := b.eng.Pending()
 	b.mu.Unlock()
 	if len(msgs) > 0 {
 		b.send(msgs)
 		b.syncLamps()
+	}
+	if b.onRaw != nil {
+		b.onRaw(n, raw)
+	}
+	if widen && b.onWiden != nil {
+		b.onWiden(n, lo, hi)
 	}
 	b.syncTriggers()
 	if pending {

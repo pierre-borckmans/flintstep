@@ -61,6 +61,8 @@ type State struct {
 	ExpSim [2]bool `json:"expSim"`
 	// ExpSweep says which simulated inputs are sweeping heel to toe on their own.
 	ExpSweep [2]bool `json:"expSweep"`
+	// ExpCapture is each input's calibration sweep (bridge.Capture).
+	ExpCapture [2]bridge.Capture `json:"expCapture"`
 }
 
 // App is bound to the frontend: its exported methods are the UI's API.
@@ -78,6 +80,7 @@ type App struct {
 	mstate  MIDIState
 
 	dirty    chan struct{}
+	raw      *rawStream // raw expression values for the live trace (expraw.go)
 	stopOnce sync.Once
 	stop     chan struct{}
 
@@ -92,7 +95,7 @@ type App struct {
 }
 
 func NewApp() *App {
-	a := &App{dirty: make(chan struct{}, 1), stop: make(chan struct{})}
+	a := &App{dirty: make(chan struct{}, 1), stop: make(chan struct{}), raw: newRawStream()}
 	a.emitTo = func(name string, data any) { runtime.EventsEmit(a.ctx, name, data) }
 	a.dialogs = wailsDialogs{app: a}
 	a.prefs = store.DefaultPrefs()
@@ -150,6 +153,11 @@ func (a *App) startup(ctx context.Context) {
 		OnStatus:   func(ble.Status) { a.changed() },
 		OnTrigger:  func([2]bool) { a.changed() },
 		OnSim:      a.changed,
+		OnRaw: func(n, raw int) {
+			a.raw.add(n, raw)
+			a.changed() // a sweep's readout moves with every value
+		},
+		OnWiden: func(n, lo, hi int) { a.emit("expwiden", ExpWiden{N: n, Low: lo, High: hi}) },
 	})
 	v, err := coremidi.NewVirtual(midiClient, midiSource, midiDest, a.bridge.Feedback)
 	if err != nil {
@@ -169,6 +177,7 @@ func (a *App) startup(ctx context.Context) {
 
 	tray.Start(tray.Icon, a.onTray)
 	go a.stateLoop()
+	go a.raw.loop(a.stop, a.emit)
 	a.changed()
 }
 
@@ -273,6 +282,7 @@ func (a *App) GetState() State {
 		ExpTrigger:    a.bridge.ExpTriggers(),
 		ExpSim:        a.bridge.ExpSim(),
 		ExpSweep:      a.bridge.ExpSweep(),
+		ExpCapture:    a.bridge.ExpCaptures(),
 	}
 }
 

@@ -15,6 +15,7 @@ import { STORAGE_PREFIX } from "./product";
 import type { IndicatorIndex } from "./types";
 import { type TabDef, TabPanel, Tabs, useTabsId } from "./ui/Tabs";
 import { useBridge } from "./useBridge";
+import { useExpLive } from "./useExpLive";
 
 const SPLIT_KEY = `${STORAGE_PREFIX}viewer.split`;
 
@@ -31,6 +32,7 @@ export default function App({ backend }: { backend: Backend }) {
   const bridge = useBridge(backend);
   const { state, config, apply } = bridge;
   const sim = useSimControls(backend, state);
+  const live = useExpLive(backend, state, config, bridge.applyAs);
   // What is selected on the canvas: a switch, an indicator lamp (Amp 0, App 1) or an
   // expression pedal, only ever one. `sel` remembers the last switch for the Switches
   // tab. ?sel=N|exp1|exp2 and ?lamp=amp|app open on one, for screenshots.
@@ -236,6 +238,7 @@ export default function App({ backend }: { backend: Backend }) {
                     apply={apply}
                     calibrate={bridge.calibrate}
                     sim={sim}
+                    live={live}
                   />
                 ) : (
                   <SettingsPanel

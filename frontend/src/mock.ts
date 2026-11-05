@@ -13,6 +13,13 @@ import {
   exportFileName,
   uniqueName,
 } from "./lib/presets";
+import {
+  createRecorder,
+  createWidener,
+  IDLE_CAPTURE,
+  sweepCalibration,
+  TOO_SMALL,
+} from "./lib/sweep";
 import { idleTrigger, pickMode, stepTrigger, type TriggerState, triggerLit } from "./lib/trigger";
 import { MIDI_LED_PORT_NAME, MIDI_PORT_NAME } from "./product";
 import type {
@@ -22,6 +29,8 @@ import type {
   Colour,
   Config,
   Device,
+  ExpRawEvent,
+  ExpWiden,
   PedalModel,
   PresetInfo,
   PresetSource,
@@ -73,6 +82,11 @@ export interface SimOptions {
   /** Start each input's simulated pedal (bridge/sim.go) at a travel percent of the jack,
    *  or sweeping; null leaves it off. */
   simAt?: [SimStart, SimStart];
+  /** The real pedals' raw range, heel to toe, when unpinned; unset, the calibration's,
+   *  so the sweep always fills it. The browser mock sets an M-Audio EX-P's. */
+  travel?: [number, number];
+  /** Heel and toe raw for both inputs; unset, the default 0..65535. */
+  cal?: [number, number];
 }
 
 /** How a simulated pedal starts: at a percent of the jack's range, or sweeping. */
@@ -134,6 +148,7 @@ export function createSim(opts: SimOptions = {}) {
   const modes = opts.triggers ?? ["engage", "off"];
   config.exp.forEach((x, n) => {
     x.trigger = pickMode(x.trigger, modes[n], n);
+    if (opts.cal) [x.min, x.max] = opts.cal;
   });
 
   const cables = opts.cables ?? [true, false];
@@ -351,7 +366,8 @@ export function createSim(opts: SimOptions = {}) {
         raw[n] = Math.round(x.min + ((x.max - x.min) * pin) / 100);
       } else {
         const f = sweep(t + n * 4000);
-        raw[n] = x.min + (x.max - x.min) * f + (f > 0 && f < 1 ? (rand() - 0.5) * 120 : 0);
+        const [heel, toe] = opts.travel ?? [x.min, x.max];
+        raw[n] = heel + (toe - heel) * f + (f > 0 && f < 1 ? (rand() - 0.5) * 120 : 0);
         raw[n] = Math.round(Math.min(RAW_MAX, Math.max(0, raw[n])));
       }
       const f = x.enabled ? expFraction(raw[n], x) : null;
@@ -710,7 +726,10 @@ export function demoScript(name: string): DemoStep[] {
  *  "-" or unset sweeps it), ?sim=40,sweep (start each input's simulated
  *  pedal at a percent of the jack, or sweeping; "-" or unset leaves it off), ?presets=one (a single preset; otherwise four samples),
  *  ?library=corrupt (the library error Go shows after a damaged file),
- *  ?picker=open|rename|delete (App opens the preset picker). See also demoScript (?demo=). */
+ *  ?picker=open|rename|delete (App opens the preset picker), ?cal=21448,27500 (both
+ *  inputs' heel and toe; unset, as swept from the mock pedals, which read raw 256..27500
+ *  like an M-Audio EX-P), ?capture=1|2 (a calibration sweep starts on that input once
+ *  the pedal is up). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
   const holdMask = (q.get("hold") ?? "")
@@ -725,6 +744,9 @@ export function createMockBackend(q: URLSearchParams): Backend {
   const pinQ = (s: string | undefined) => (s && /^\d+(\.\d+)?$/.test(s) ? Number(s) : null);
   const simQ = q.get("sim")?.split(",");
   const simStart = (s: string | undefined): SimStart => (s === "sweep" ? "sweep" : pinQ(s));
+  const calQ = q.get("cal")?.split(",").map(Number);
+  const cal: [number, number] =
+    calQ?.length === 2 && calQ.every(Number.isFinite) ? [calQ[0], calQ[1]] : EX_P_SWEPT;
   const sim = createSim({
     triggers: trigQ ? [modeQ(trigQ[0]), modeQ(trigQ[1])] : undefined,
     expAt: expQ ? [pinQ(expQ[0]), pinQ(expQ[1])] : undefined,
@@ -737,6 +759,8 @@ export function createMockBackend(q: URLSearchParams): Backend {
     autoPress: !q.has("still"),
     powered: q.has("power") ? q.get("power") === "usb" : undefined,
     epoch: Date.now(),
+    travel: EX_P,
+    cal,
   });
   let launchAtLogin = false;
   const lib = createMockLibrary(sim.config, q.get("presets") === "one" ? [] : samplePresets());
@@ -763,6 +787,37 @@ export function createMockBackend(q: URLSearchParams): Backend {
   };
   const stateCbs = new Set<(s: State) => void>();
   const actCbs = new Set<(a: Activity) => void>();
+  const rawCbs = new Set<(e: ExpRawEvent) => void>();
+  const widenCbs = new Set<(e: ExpWiden) => void>();
+  // Calibration sweeps and learning the range, as the bridge does them (lib/sweep.ts).
+  const recorders: (ReturnType<typeof createRecorder> | null)[] = [null, null];
+  const wideners = [createWidener(), createWidener()];
+  const lastRaw = [-1, -1];
+  const lastCal = ["", ""];
+  let watching = false;
+  /** Each raw value as the pedal would report it: only when it changes. */
+  const feedRaw = () => {
+    const now = Date.now();
+    const st = sim.status();
+    const ev: ExpRawEvent = { samples: [[], []] };
+    st.expRaw.forEach((raw, n) => {
+      const x = sim.config.exp[n];
+      const calKey = `${x.min}:${x.max}`;
+      if (calKey !== lastCal[n]) {
+        lastCal[n] = calKey;
+        wideners[n].reset();
+      }
+      if (raw < 0 || raw === lastRaw[n]) return;
+      lastRaw[n] = raw;
+      recorders[n]?.add(raw, now);
+      ev.samples[n].push({ t: now, v: raw });
+      const p = recorders[n] ? null : wideners[n].add(x, raw, now);
+      if (p) for (const cb of widenCbs) cb({ n, low: p[0], high: p[1] });
+    });
+    if (watching && (ev.samples[0].length || ev.samples[1].length)) {
+      for (const cb of rawCbs) cb(ev);
+    }
+  };
 
   const state = (): State => ({
     pedal: sim.status(),
@@ -783,6 +838,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     expTrigger: sim.triggers(),
     expSim: sim.simState().on,
     expSweep: sim.simState().sweep,
+    expCapture: recorders.map((r) => (r ? r.view() : IDLE_CAPTURE)),
   });
 
   // For browser checks: window.__mockMenu("Ableton live") switches the way Go's menu-bar
@@ -806,12 +862,34 @@ export function createMockBackend(q: URLSearchParams): Backend {
     });
   }
 
+  /** App.StartExpSweep: needs a cable; starts from where the pedal is. */
+  const startSweep = (n: number) => {
+    const st = sim.status();
+    if (!st.cables[n]) throw new Error(`plug an expression pedal into jack ${n + 1} first`);
+    const r = createRecorder(Date.now());
+    if (st.expRaw[n] >= 0) r.add(st.expRaw[n], Date.now());
+    recorders[n] = r;
+  };
+  // ?capture=1|2: a sweep starts on that input once the pedal is up (screenshots).
+  const captureQ = Number(q.get("capture"));
+  if (captureQ === 1 || captureQ === 2) {
+    const tryStart = setInterval(() => {
+      try {
+        startSweep(captureQ - 1);
+        clearInterval(tryStart);
+      } catch {
+        // No cable yet: still connecting.
+      }
+    }, 200);
+  }
+
   let last = performance.now();
   setInterval(() => {
     const now = performance.now();
     const acts = sim.step(now - last);
     last = now;
     for (const a of acts) for (const cb of actCbs) cb(a);
+    feedRaw();
     const s = state();
     for (const cb of stateCbs) cb(s);
   }, 50);
@@ -853,6 +931,22 @@ export function createMockBackend(q: URLSearchParams): Backend {
     SimulateExp: async (n, on) => sim.simulate(n, on),
     SetSimExp: async (n, f) => sim.simPosition(n, f),
     SimSweep: async (n, on) => sim.simSweep(n, on),
+    StartExpSweep: async (n) => startSweep(n),
+    FinishExpSweep: async (n) => {
+      const r = recorders[n];
+      if (!r) throw new Error(`expression ${n + 1} is not being swept`);
+      const v = r.view();
+      const res = sweepCalibration(v.low, v.high);
+      if (!res) throw new Error(TOO_SMALL);
+      recorders[n] = null;
+      return res;
+    },
+    CancelExpSweep: async (n) => {
+      recorders[n] = null;
+    },
+    WatchExpRaw: async (on) => {
+      watching = on;
+    },
     SetLaunchAtLogin: async (on) => {
       launchAtLogin = on;
     },
@@ -906,8 +1000,22 @@ export function createMockBackend(q: URLSearchParams): Backend {
       actCbs.add(cb);
       return () => actCbs.delete(cb);
     },
+    onExpRaw: (cb) => {
+      rawCbs.add(cb);
+      return () => rawCbs.delete(cb);
+    },
+    onExpWiden: (cb) => {
+      widenCbs.add(cb);
+      return () => widenCbs.delete(cb);
+    },
   };
 }
+
+/** The mock's expression pedals read like the M-Audio EX-P on a real jack
+ *  (docs/PROTOCOL-NOTES.md): raw 256 at the heel to 27500 at the toe. */
+const EX_P: [number, number] = [256, 27500];
+/** What a sweep of them calibrates: each end 1 % of the span inside. */
+const EX_P_SWEPT: [number, number] = [528, 27228];
 
 /** The mock's pedal, as a Spark Control X advertises itself. */
 const MOCK_PEDAL = "SparkX v4.1.23 fbfc";

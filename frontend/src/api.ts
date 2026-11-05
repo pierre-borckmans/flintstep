@@ -1,5 +1,16 @@
 import type { ThemeMode } from "./lib/theme";
-import type { Activity, Config, Device, ExpEdge, PresetInfo, PresetSource, State } from "./types";
+import type {
+  Activity,
+  Config,
+  Device,
+  ExpEdge,
+  ExpRawEvent,
+  ExpWiden,
+  PresetInfo,
+  PresetSource,
+  State,
+  SweepResult,
+} from "./types";
 
 /** What the UI needs from the Go side. In the desktop app this is the Wails
  *  binding of `App` in package main; in a plain browser it is the mock. */
@@ -24,6 +35,15 @@ export interface Backend {
   /** Sweeps input n's simulated pedal heel → toe → heel every 4 s, eased, from where it
    *  is; on turns the simulation on if needed. */
   SimSweep(n: number, on: boolean): Promise<void>;
+  /** Starts recording input n's raw values for a calibration sweep, from where the pedal
+   *  is; State.expCapture[n] follows it. Needs a cable (a simulated one counts). */
+  StartExpSweep(n: number): Promise<void>;
+  /** Ends the sweep and returns the heel and toe it calibrates; saves nothing. A sweep
+   *  that covered too little is refused and keeps going. */
+  FinishExpSweep(n: number): Promise<SweepResult>;
+  CancelExpSweep(n: number): Promise<void>;
+  /** Turns the "expraw" event (every raw value, batched) on while a card shows a trace. */
+  WatchExpRaw(on: boolean): Promise<void>;
   RevealLogs(): Promise<void>;
   /** Themes the native window (appearance, background) and keeps it for the next launch. */
   SetTheme(mode: ThemeMode): Promise<void>;
@@ -46,9 +66,12 @@ export interface Backend {
   ImportPreset(): Promise<PresetInfo>;
   onState(cb: (s: State) => void): () => void;
   onActivity(cb: (a: Activity) => void): () => void;
+  onExpRaw(cb: (e: ExpRawEvent) => void): () => void;
+  /** Go proposes a wider calibrated range for an input (learning the range). */
+  onExpWiden(cb: (e: ExpWiden) => void): () => void;
 }
 
-type GoApp = Omit<Backend, "onState" | "onActivity">;
+type GoApp = Omit<Backend, "onState" | "onActivity" | "onExpRaw" | "onExpWiden">;
 
 interface WailsRuntime {
   EventsOn(name: string, cb: (...data: unknown[]) => void): (() => void) | undefined;
@@ -88,6 +111,10 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     SimulateExp: (n, on) => app.SimulateExp(n, on),
     SetSimExp: (n, f) => app.SetSimExp(n, f),
     SimSweep: (n, on) => app.SimSweep(n, on),
+    StartExpSweep: (n) => app.StartExpSweep(n),
+    FinishExpSweep: (n) => app.FinishExpSweep(n),
+    CancelExpSweep: (n) => app.CancelExpSweep(n),
+    WatchExpRaw: (on) => app.WatchExpRaw(on),
     RevealLogs: () => app.RevealLogs(),
     SetTheme: (mode) => app.SetTheme(mode),
     GetTheme: () => app.GetTheme(),
@@ -102,6 +129,8 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     ImportPreset: () => app.ImportPreset(),
     onState: on<State>("state"),
     onActivity: on<Activity>("activity"),
+    onExpRaw: on<ExpRawEvent>("expraw"),
+    onExpWiden: on<ExpWiden>("expwiden"),
   };
 }
 

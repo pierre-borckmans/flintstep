@@ -285,6 +285,22 @@ export function useBridge(backend: Backend) {
     [commit, rules, show],
   );
 
+  /** An edit with its own history label, not the described one: a sweep's calibration,
+   *  a widening learnt while playing. Edits with the same `key` within the coalescing
+   *  gap, or with the same `burst` however far apart, join one entry (a widening burst);
+   *  a null key is a step of its own. Saved like any edit, after the autosave delay. */
+  const applyAs = useCallback(
+    (op: Op, label: string, key: string | null = null, burst: number | null = null) => {
+      const s = stacks.current;
+      if (!s) return;
+      const h = S.active(s);
+      commit(
+        H.push(h, rules, edit(H.current(h), op), { at: Date.now(), key, label, gesture: burst }),
+      );
+    },
+    [commit, rules],
+  );
+
   const undo = useCallback(() => {
     if (stacks.current) commit(H.undo(S.active(stacks.current)));
   }, [commit]);
@@ -456,6 +472,7 @@ export function useBridge(backend: Backend) {
     /** The active preset's undo history. */
     history,
     apply,
+    applyAs,
     undo,
     redo,
     jump,

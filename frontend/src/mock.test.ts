@@ -34,6 +34,26 @@ describe("mock pedal", () => {
     expect(sim.status().lamps[0]).toEqual(sim.config.switches[0].colour);
     expect(sim.status().lamps[1]).toEqual({ r: 0, g: 0, b: 0 });
   });
+  it("sweeps its own raw travel, whatever the calibration", () => {
+    const sim = createSim({
+      seed: 2,
+      fixedState: "connected",
+      autoPress: false,
+      travel: [256, 27500],
+      cal: [21448, 27500],
+    });
+    let lo = Number.POSITIVE_INFINITY;
+    let hi = 0;
+    for (let i = 0; i < 200; i++) {
+      sim.step(50);
+      const r = sim.status().expRaw[0];
+      lo = Math.min(lo, r);
+      hi = Math.max(hi, r);
+    }
+    expect(sim.config.exp[0].min).toBe(21448);
+    expect(lo).toBeLessThan(400);
+    expect(hi).toBeGreaterThan(27300);
+  });
   it("calibrates from the live raw value", () => {
     const sim = createSim({
       seed: 1,
