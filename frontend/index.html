@@ -3,12 +3,25 @@
 <head>
     <meta charset="UTF-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>SparkX MIDI</title>
+    <title>Flintstep</title>
     <script>
-      // The forced theme, before the first paint (see src/lib/theme.ts). System needs
-      // nothing: style.css follows prefers-color-scheme.
+      // Before the first paint. 1: view settings saved under the app's old name
+      // ("sparkx.*") are copied to "flintstep.*" when those are unset (src/lib/storage.ts
+      // does the same). 2: the forced theme (src/lib/theme.ts). System needs nothing:
+      // style.css follows prefers-color-scheme.
       try {
-        var t = localStorage.getItem("sparkx.theme");
+        var ls = localStorage, oldP = "sparkx.", newP = "flintstep.", old = [];
+        for (var i = 0; i < ls.length; i++) {
+          var k = ls.key(i);
+          if (k && k.indexOf(oldP) === 0) old.push(k);
+        }
+        for (var j = 0; j < old.length; j++) {
+          var nk = newP + old[j].slice(oldP.length);
+          if (ls.getItem(nk) === null) ls.setItem(nk, ls.getItem(old[j]));
+        }
+      } catch (e) {}
+      try {
+        var t = localStorage.getItem("flintstep.theme");
         if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
       } catch (e) {}
     </script>

@@ -46,8 +46,8 @@ import "./Pedal.css";
 //              Widths: I 0.0085, II 0.0222, III 0.0359, IV 0.0448.
 //   A/B tile   half-width 0.0404, y 0.0074..0.2163, r 0.0119; letter cap height 0.0311,
 //              centre y 0.1893, A 0.0267 wide, B 0.0222 wide
-//   wordmark   "Spark" ink x 0.1644..0.3993, cap top 0.2081, baseline 0.2607;
-//              "CONTROL X" ink x 0.2844..0.4007, cap height 0.0141, baseline 0.2844
+//   wordmark   none: the maker's wordmark is left off, so that corner of the face is
+//              bare brushed metal (the site's drawing does the same)
 //   legends    cap height 0.0135. POWER centre x 0.6652, 0.0541 wide; CONNECT 0.7793,
 //              0.0719 wide; both baseline 0.2178. AMP 0.7470 (0.0333 wide), APP 0.8107
 //              (0.0304 wide), baseline 0.2830
@@ -74,8 +74,6 @@ const REF = {
   },
   tile: { half: 0.0404, y0: 0.0074, y1: 0.2163, r: 0.0119 },
   letter: { y: 0.1893, cap: 0.0311, w: { A: 0.0267, B: 0.0222 } as Record<string, number> },
-  spark: { x0: 0.1644, x1: 0.3993, cap: 0.0526, base: 0.2607 },
-  control: { x0: 0.2844, x1: 0.4007, cap: 0.0141, base: 0.2844 },
   legend: { cap: 0.0135, top: 0.2178, bottom: 0.283 },
   power: { x: 0.6652, w: 0.0541 },
   connect: { x: 0.7793, w: 0.0719 },
@@ -152,11 +150,6 @@ function Defs({ id }: { id: string }) {
           <stop offset="0.6" stopColor="#e3dac6" />
           <stop offset="1" stopColor="#b8ae99" />
         </radialGradient>
-        <linearGradient id={`${id}-gold`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ecd39d" />
-          <stop offset="0.5" stopColor="#c9a96b" />
-          <stop offset="1" stopColor="#9c7d48" />
-        </linearGradient>
         <linearGradient id={`${id}-trim`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor="#7a6136" />
           <stop offset="0.45" stopColor="#e9cf96" />
@@ -172,7 +165,7 @@ function Defs({ id }: { id: string }) {
   );
 }
 
-/** The case: tolex, gold trim, brushed face, the wordmark and the panel legends. */
+/** The case: tolex, gold trim, brushed face and the panel legends. */
 const Case = memo(function Case({ id }: { id: string }) {
   return (
     <svg
@@ -265,30 +258,6 @@ const Case = memo(function Case({ id }: { id: string }) {
         stroke="#fff4e4"
         strokeOpacity="0.08"
       />
-
-      {/* wordmark: set in type, not traced, stretched to the measured ink widths */}
-      <g fontFamily={FONT} fill={`url(#${id}-gold)`}>
-        <text
-          x={fx(REF.spark.x0)}
-          y={fy(REF.spark.base)}
-          fontSize={u(REF.spark.cap) / CAP}
-          fontWeight="700"
-          textLength={u(REF.spark.x1 - REF.spark.x0)}
-          lengthAdjust="spacingAndGlyphs"
-        >
-          Spark
-        </text>
-        <text
-          x={fx(REF.control.x0)}
-          y={fy(REF.control.base)}
-          fontSize={u(REF.control.cap) / CAP}
-          fontWeight="700"
-          textLength={u(REF.control.x1 - REF.control.x0)}
-          lengthAdjust="spacingAndGlyphs"
-        >
-          CONTROL X
-        </text>
-      </g>
 
       {/* panel legends */}
       <g

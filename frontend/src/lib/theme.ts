@@ -3,11 +3,13 @@
 // <html data-theme>: "light" or "dark" when forced, absent for system, where style.css
 // follows prefers-color-scheme itself. The store is in useTheme.ts; this is pure.
 
+import { STORAGE_PREFIX } from "../product";
+
 export type ThemeMode = "system" | "dark" | "light";
 export type Resolved = "dark" | "light";
 
 /** Also read by the inline script in index.html, before the first paint. */
-export const THEME_KEY = "sparkx.theme";
+export const THEME_KEY = `${STORAGE_PREFIX}theme`;
 
 const MODES: readonly ThemeMode[] = ["system", "dark", "light"];
 

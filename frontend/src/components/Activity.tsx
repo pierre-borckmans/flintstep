@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { describeMidi, relTime } from "../lib/midi";
+import { MIDI_PORT_NAME } from "../product";
 import type { Midi } from "../types";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
@@ -57,7 +58,7 @@ export function ActivityLog({ log, midi }: { log: LoggedActivity[]; midi: Midi |
         <div className="activity-empty">
           <span className="text-ui-md text-muted">Listening for MIDI</span>
           <span className="text-ui-sm text-faint">
-            Press a switch. Messages sent to “{midi?.source || "Spark Control X"}” appear here.
+            Press a switch. Messages sent to “{midi?.source || MIDI_PORT_NAME}” appear here.
           </span>
         </div>
       ) : (

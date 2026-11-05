@@ -3,6 +3,8 @@
 // user's own pedal. Purely visual: it lives in localStorage, never in the config, the
 // auto-save or the undo history. Everything here is pure; the store is in useNuts.ts.
 
+import { STORAGE_PREFIX } from "../product";
+
 export type NutMode = "aligned" | "shuffled" | "custom";
 
 export type NutState = {
@@ -16,7 +18,7 @@ export type NutState = {
 export const NUT_COUNT = 6;
 /** A hexagon looks the same every 60 degrees. */
 export const NUT_PERIOD = 60;
-export const NUT_KEY = "sparkx.nuts";
+export const NUT_KEY = `${STORAGE_PREFIX}nuts`;
 
 const MODES: readonly NutMode[] = ["aligned", "shuffled", "custom"];
 

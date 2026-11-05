@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "../product";
 import type { Colour, Indicator, IndicatorMode } from "../types";
 
 // THE AMP AND APP LAMPS: mapping.Indicator's modes, in words for the editor, and the
@@ -5,7 +6,7 @@ import type { Colour, Indicator, IndicatorMode } from "../types";
 
 export const INDICATOR_MODES: { value: IndicatorMode; label: string; hint: string }[] = [
   { value: "off", label: "Off", hint: "Never lit." },
-  { value: "connected", label: "Connected", hint: "Lit while SparkX MIDI holds the pedal." },
+  { value: "connected", label: "Connected", hint: `Lit while ${PRODUCT_NAME} holds the pedal.` },
   {
     value: "midiOut",
     label: "MIDI out",

@@ -167,7 +167,7 @@ describe("mock preset library", () => {
   it("imports what it exports", () => {
     const lib = createMockLibrary(first());
     const { text, file } = lib.exported(lib.activeId());
-    expect(file).toBe("My mapping.sparkx.json");
+    expect(file).toBe("My mapping.flintstep.json");
     const got = lib.import(text, file);
     expect(got.name).toBe("My mapping (2)");
     expect(lib.select(got.id).longPressMs).toBe(800);

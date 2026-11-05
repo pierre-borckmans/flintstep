@@ -4,6 +4,7 @@
 // and the cable from each jack. All in CSS px of the viewer's fitted layout, as
 // functions of w, the Spark's case width; nothing here touches the DOM.
 
+import { STORAGE_PREFIX } from "../product";
 import type { ExpConfig } from "../types";
 import { RAW_MAX } from "./exp";
 import { TRIGGER } from "./trigger";
@@ -121,7 +122,7 @@ export function readout(cc: number, channel: number, value: number | null): stri
 export type Placement = "behind" | "beside";
 export type PlacementPref = "auto" | Placement;
 
-export const EXPPOS_KEY = "sparkx.exppedals.placement";
+export const EXPPOS_KEY = `${STORAGE_PREFIX}exppedals.placement`;
 
 export function parsePlacement(raw: string | null | undefined): PlacementPref {
   return raw === "behind" || raw === "beside" || raw === "auto" ? raw : "auto";

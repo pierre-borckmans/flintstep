@@ -2,6 +2,7 @@ import { Plug, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { batteryInfo } from "../lib/battery";
 import { levelColour } from "../lib/power";
+import { PRODUCT_NAME } from "../product";
 import type { State } from "../types";
 import { cx } from "../ui/cx";
 import { Lamp } from "../ui/Lamp";
@@ -98,9 +99,7 @@ export function Header({ state, children }: { state: State | null; children?: Re
     .join(" · ");
   return (
     <header style={DRAG} className="app-header">
-      <span className="app-wordmark">
-        SparkX <span className="text-muted">MIDI</span>
-      </span>
+      <span className="app-wordmark">{PRODUCT_NAME}</span>
       <span className="header-rule h-4 w-px shrink-0 bg-edge-strong" />
       <Connection state={state} />
       <div className="min-w-2 flex-1" />

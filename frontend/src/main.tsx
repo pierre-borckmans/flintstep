@@ -3,9 +3,12 @@ import { createRoot } from "react-dom/client";
 import "./style.css";
 import App from "./App";
 import { loadBackend } from "./api";
+import { localStore, migrateStorage } from "./lib/storage";
 import { initTheme } from "./useTheme";
 
 const root = createRoot(document.getElementById("root") as HTMLElement);
+
+migrateStorage(localStore());
 
 loadBackend().then(({ backend, mock }) => {
   if (mock) document.documentElement.dataset.mock = "1";

@@ -11,9 +11,12 @@ import { type PickerStart, PresetPicker } from "./components/PresetPicker";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SwitchEditor, SwitchTabs } from "./components/SwitchEditor";
 import { readViewPreference, saveViewPreference } from "./lib/view";
+import { STORAGE_PREFIX } from "./product";
 import type { IndicatorIndex } from "./types";
 import { TabPanel, Tabs, useTabsId } from "./ui/Tabs";
 import { useBridge } from "./useBridge";
+
+const SPLIT_KEY = `${STORAGE_PREFIX}viewer.split`;
 
 type Tab = "switches" | "expression" | "settings";
 const TABS: { id: Tab; label: string }[] = [
@@ -51,10 +54,10 @@ export default function App({ backend }: { backend: Backend }) {
   };
   const tabsId = useTabsId();
   const status = state?.pedal ?? null;
-  const [split, setSplit] = useState(() => readViewPreference("sparkx.viewer.split", 72, 40, 82));
+  const [split, setSplit] = useState(() => readViewPreference(SPLIT_KEY, 72, 40, 82));
   const workspace = useRef<HTMLDivElement>(null);
   const drag = useRef(false);
-  useEffect(() => saveViewPreference("sparkx.viewer.split", split), [split]);
+  useEffect(() => saveViewPreference(SPLIT_KEY, split), [split]);
 
   // Browser dev only: replay ?demo=... edits once the history exists (see mock.ts).
   const demoed = useRef(false);

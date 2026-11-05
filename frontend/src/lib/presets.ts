@@ -3,13 +3,17 @@
 // A preset is a name and a whole Config. Nothing here looks inside a Config except to
 // drop the pedal, which belongs to the Mac rather than to any one mapping.
 
+import { PRODUCT_NAME } from "../product";
 import type { Config, PresetInfo } from "../types";
 import { defaultConfig } from "./config";
 
 export const MAX_NAME = 40;
-export const EXPORT_FORMAT = "sparkx-midi-preset";
+export const EXPORT_FORMAT = "flintstep-preset";
 export const EXPORT_VERSION = 1;
-const SUFFIX = ".sparkx.json";
+const SUFFIX = ".flintstep.json";
+/** What exports were called before the rename to Flintstep; import still takes them. */
+const LEGACY_FORMAT = "sparkx-midi-preset";
+const LEGACY_SUFFIX = ".sparkx.json";
 
 /** Characters, not UTF-16 units: "é" is one. */
 const len = (s: string) => [...s].length;
@@ -73,11 +77,12 @@ function nameFromFile(path: string): string {
   const base = path.split(/[/\\]/).pop() ?? "";
   const lower = base.toLowerCase();
   if (lower.endsWith(SUFFIX)) return base.slice(0, -SUFFIX.length).trim();
+  if (lower.endsWith(LEGACY_SUFFIX)) return base.slice(0, -LEGACY_SUFFIX.length).trim();
   if (lower.endsWith(".json")) return base.slice(0, -5).trim();
   return base.trim();
 }
 
-const NOT_A_PRESET = "This file is not a SparkX MIDI preset";
+const NOT_A_PRESET = `This file is not a ${PRODUCT_NAME} preset`;
 
 /** An exported preset, or a bare Config (an old config.json) named after its file.
  *  Throws with words for the UI. The mock's import; Go has its own. */
@@ -96,9 +101,9 @@ export function decodePreset(text: string, filename: string): { name: string; co
   let name = "";
   let cfg: Record<string, unknown>;
   if ("format" in o) {
-    if (o.format !== EXPORT_FORMAT) throw new Error(NOT_A_PRESET);
+    if (o.format !== EXPORT_FORMAT && o.format !== LEGACY_FORMAT) throw new Error(NOT_A_PRESET);
     if (typeof o.version !== "number" || o.version > EXPORT_VERSION) {
-      throw new Error("This preset was made by a newer SparkX MIDI");
+      throw new Error(`This preset was made by a newer ${PRODUCT_NAME}`);
     }
     if (!o.config || typeof o.config !== "object") {
       throw new Error("This preset file has no mapping in it");

@@ -1,3 +1,4 @@
+import { PRODUCT_NAME } from "../product";
 import type { Colour, Config, PedalRef, Status } from "../types";
 import { LAMP_AMP, LAMP_APP } from "../types";
 
@@ -101,7 +102,7 @@ export function linkView(status: Status | null, remembered: PedalRef): LinkView 
         title,
         detail: "",
         pedal,
-        hint: "SparkX MIDI reaches the pedal over Bluetooth. Turn it on, or allow SparkX MIDI under Privacy & Security.",
+        hint: `${PRODUCT_NAME} reaches the pedal over Bluetooth. Turn it on, or allow ${PRODUCT_NAME} under Privacy & Security.`,
         actions: [{ id: "bluetooth", label: "Open Bluetooth settings", kind: "primary" }],
       };
     }

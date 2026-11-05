@@ -59,8 +59,8 @@ describe("names", () => {
     expect(copyName("z".repeat(MAX_NAME), []).length).toBe(MAX_NAME);
   });
   it("exportFileName mirrors Go's", () => {
-    expect(exportFileName("Ableton live")).toBe("Ableton live.sparkx.json");
-    expect(exportFileName("A/B: test")).toBe("A-B- test.sparkx.json");
+    expect(exportFileName("Ableton live")).toBe("Ableton live.flintstep.json");
+    expect(exportFileName("A/B: test")).toBe("A-B- test.flintstep.json");
   });
 });
 
@@ -93,7 +93,7 @@ describe("decodePreset", () => {
     c.longPressMs = 900;
     const text = encodePreset("Ableton live", c);
     expect(text).not.toContain("4F1A");
-    expect(JSON.parse(text).format).toBe("sparkx-midi-preset");
+    expect(JSON.parse(text).format).toBe("flintstep-preset");
     const got = decodePreset(text, "x.json");
     expect(got.name).toBe("Ableton live");
     expect(got.config.longPressMs).toBe(900);
@@ -105,7 +105,16 @@ describe("decodePreset", () => {
     const got = decodePreset(JSON.stringify(c), "/Users/me/config.json");
     expect(got.name).toBe("config");
     expect(got.config.pedal.address).toBe("");
-    expect(decodePreset(JSON.stringify(c), "Gig.sparkx.json").name).toBe("Gig");
+    expect(decodePreset(JSON.stringify(c), "Gig.flintstep.json").name).toBe("Gig");
+  });
+  it("takes exports from before the rename to Flintstep", () => {
+    const c = defaultConfig();
+    c.longPressMs = 700;
+    const { pedal: _, ...rest } = c;
+    const old = JSON.stringify({ format: "sparkx-midi-preset", version: 1, config: rest });
+    const got = decodePreset(old, "/tmp/Old gig.sparkx.json");
+    expect(got.name).toBe("Old gig");
+    expect(got.config.longPressMs).toBe(700);
   });
   it("refuses what is not a preset", () => {
     for (const bad of [
@@ -114,8 +123,9 @@ describe("decodePreset", () => {
       "{}",
       '{"hello":1}',
       '{"format":"other","version":1,"config":{}}',
+      '{"format":"flintstep-preset","version":99,"config":{}}',
+      '{"format":"flintstep-preset","version":1}',
       '{"format":"sparkx-midi-preset","version":99,"config":{}}',
-      '{"format":"sparkx-midi-preset","version":1}',
     ]) {
       expect(() => decodePreset(bad, "x.json"), bad).toThrow();
     }

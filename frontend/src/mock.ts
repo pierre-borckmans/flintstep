@@ -13,6 +13,7 @@ import {
   uniqueName,
 } from "./lib/presets";
 import { idleTrigger, pickMode, stepTrigger, type TriggerState, triggerLit } from "./lib/trigger";
+import { MIDI_LED_PORT_NAME, MIDI_PORT_NAME } from "./product";
 import type {
   Action,
   Activity,
@@ -724,12 +725,12 @@ export function createMockBackend(q: URLSearchParams): Backend {
     config: structuredClone(sim.config),
     midi: midiError
       ? {
-          source: "Spark Control X",
-          dest: "Spark Control X LEDs",
+          source: MIDI_PORT_NAME,
+          dest: MIDI_LED_PORT_NAME,
           ok: false,
           error: "MIDIClientCreate failed (-10830)",
         }
-      : { source: "Spark Control X", dest: "Spark Control X LEDs", ok: true, error: "" },
+      : { source: MIDI_PORT_NAME, dest: MIDI_LED_PORT_NAME, ok: true, error: "" },
     launchAtLogin,
     version: "0.1.0-dev",
     presets: lib.list(),

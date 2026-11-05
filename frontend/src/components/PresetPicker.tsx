@@ -366,7 +366,7 @@ function PresetMenu({
           size="sm"
           kind="ghost"
           icon={<Upload size={12} />}
-          title="Add a preset from a .sparkx.json file (an old config.json works too)"
+          title="Add a preset from a .flintstep.json file (older .sparkx.json exports and config.json work too)"
           onClick={() => void importOne()}
         >
           Import…

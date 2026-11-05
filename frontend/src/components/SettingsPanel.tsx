@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Backend } from "../api";
 import { errorText } from "../api";
 import { type Apply, LONG_PRESS } from "../lib/config";
+import { MIDI_LED_PORT_NAME, PRODUCT_NAME } from "../product";
 import type { Config, State } from "../types";
 import { Button } from "../ui/Button";
 import { Collapse } from "../ui/Collapse";
@@ -130,8 +131,8 @@ export function SettingsPanel({
           ) : (
             <>
               Your DAW drives the lights: send the same CC or note back to{" "}
-              <span className="text-muted">“{state.midi.dest || "Spark Control X LEDs"}”</span> and
-              the switch lights while the value is above 0.
+              <span className="text-muted">“{state.midi.dest || MIDI_LED_PORT_NAME}”</span> and the
+              switch lights while the value is above 0.
             </>
           )}
         </p>
@@ -230,7 +231,9 @@ export function SettingsPanel({
           </p>
         </Collapse>
         {err && <p className="text-ui-xs text-hot">{err}</p>}
-        <p className="pt-1 text-ui-2xs text-faint">SparkX MIDI {state.version}</p>
+        <p className="pt-1 text-ui-2xs text-faint">
+          {PRODUCT_NAME} {state.version}
+        </p>
       </Section>
     </div>
   );
