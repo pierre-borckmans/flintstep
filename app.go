@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -417,9 +416,9 @@ func (a *App) SetLaunchAtLogin(on bool) error {
 	return loginitem.Set(on)
 }
 
-// RevealLogs shows app.log in Finder.
+// RevealLogs shows app.log in Finder (the file manager on Linux).
 func (a *App) RevealLogs() error {
-	return exec.Command("open", "-R", filepath.Join(a.dir, "app.log")).Run()
+	return revealFile(filepath.Join(a.dir, "app.log"))
 }
 
 // ---- menu bar ----
