@@ -38,7 +38,11 @@ for arch in "$@"; do
   run=(docker run --rm --platform "linux/$arch"
     -v "$ROOT:/src:ro" -v "$out:/out"
     -v "flintstep-gomod:/root/go/pkg/mod" -v "flintstep-gocache-$arch:/root/.cache/go-build"
-    -e SRC=/src)
+    -e SRC=/src
+    # The checkout is owned by another user inside the container (on CI especially),
+    # so git refuses to describe it and Go's VCS stamping fails the build. The version
+    # is passed explicitly; stamping adds nothing here.
+    -e GOFLAGS=-buildvcs=false)
   case "$mode" in
     build)
       "${run[@]}" "$image" /src/scripts/linux/build.sh "$version" /out
