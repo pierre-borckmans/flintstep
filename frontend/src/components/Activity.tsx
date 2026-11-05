@@ -1,9 +1,10 @@
-import { ArrowDownLeft, ArrowUpRight, Eraser } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { describeRow, type LogEntry, type RowModel, type Target } from "../lib/activity";
 import { relTime } from "../lib/midi";
-import { MIDI_PORT_NAME } from "../product";
+import { MIDI_LED_PORT_NAME, MIDI_PORT_NAME } from "../product";
 import type { Config, Midi } from "../types";
+import { INDICATOR_NAMES, SWITCH_NAMES } from "../types";
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
@@ -31,6 +32,41 @@ function useNow(every = 1000) {
   return now;
 }
 
+/** What clicking a chip selects, for its tooltip. */
+function targetName(t: Target): string {
+  if (t.kind === "switch") return `switch ${SWITCH_NAMES[t.n]}`;
+  if (t.kind === "exp") return `EXP ${t.n + 1}`;
+  return `the ${INDICATOR_NAMES[t.n]} lamp`;
+}
+
+const TYPE_TITLE: Record<RowModel["type"], string> = {
+  cc: "Control change",
+  note: "Note on or off",
+  pc: "Program change",
+  other: "Another MIDI message, by its status byte",
+};
+
+/** The column titles, on the same grid as the rows (.act-grid) so they cannot drift. */
+function HeadRow() {
+  return (
+    <div className="act-grid act-head">
+      <span className="text-right" title="How long ago">
+        Time
+      </span>
+      <span className="act-dir" title={"Direction\nOut: sent to your apps. In: from your DAW"}>
+        <span aria-hidden>⇅</span>
+      </span>
+      <span title={"Where it came from: a switch, a pedal or your DAW\nClick a chip to edit it"}>
+        From
+      </span>
+      <span title="CC, note or program change">Type</span>
+      <span title="Controller, note or program number">Number</span>
+      <span title="The value sent, or on and off for a switch">Value</span>
+      <span title="MIDI channel, shown when it is not 1">Ch</span>
+    </div>
+  );
+}
+
 function Row({
   a,
   m,
@@ -51,11 +87,14 @@ function Row({
   const target = m.chip.target;
   return (
     <li
-      className={cx("activity-row", fresh ? "log-open" : "row-in")}
-      title={`${a.label || m.hex}\n${m.hex}`}
+      className={cx("act-grid activity-row", fresh ? "log-open" : "row-in")}
+      title={a.label ? `${a.label}\nBytes ${m.hex}` : `Bytes ${m.hex}`}
     >
       <span className="act-time">{relTime(a.at, now)}</span>
-      <span className={cx("act-dir", out ? "text-faint" : "text-cold")}>
+      <span
+        className={cx("act-dir", out ? "text-faint" : "text-cold")}
+        title={out ? "Sent to your apps" : "From your DAW"}
+      >
         {out ? (
           <ArrowUpRight size={11} aria-label="out" />
         ) : (
@@ -68,14 +107,14 @@ function Row({
           className="act-chip"
           data-tone={m.chip.tone}
           data-cont={cont || undefined}
-          title={target ? `${m.chip.title}\nClick to show it` : m.chip.title}
+          title={target ? `Select ${targetName(target)}\n${m.chip.title}` : m.chip.title}
           disabled={!target}
           onClick={() => target && onSelect(target)}
         >
           {m.chip.text}
         </button>
       </span>
-      <span className="act-type" data-type={m.type}>
+      <span className="act-type" data-type={m.type} title={TYPE_TITLE[m.type]}>
         {m.typeText}
       </span>
       <span className="act-num">
@@ -153,24 +192,32 @@ export function ActivityLog({
           {total} {total === 1 ? "message" : "messages"}
         </span>
         <div className="flex-1" />
-        <span className="flex items-center gap-1.5 text-ui-xs text-muted" title={midi?.source}>
+        <span
+          className="flex items-center gap-1.5 text-ui-xs text-muted"
+          title={`Out: sent to your apps\nPort ${midi?.source || MIDI_PORT_NAME}`}
+        >
           <Lamp on={outOn} colour="live" size={6} />
           out
         </span>
-        <span className="flex items-center gap-1.5 text-ui-xs text-muted" title={midi?.dest}>
+        <span
+          className="flex items-center gap-1.5 text-ui-xs text-muted"
+          title={`In: LED feedback from your DAW\nPort ${midi?.dest || MIDI_LED_PORT_NAME}`}
+        >
           <Lamp on={inOn} colour="cold" size={6} />
           in
         </span>
         <Button
           size="sm"
           kind="ghost"
-          className="-mr-2 w-6 px-0"
-          aria-label="Clear the log"
-          title="Clear the log (⌘K)"
+          className="-mr-2"
+          title="Clear the log"
+          data-kbd="⌘K"
           disabled={log.length === 0}
           onClick={onClear}
-          icon={<Eraser size={13} />}
-        />
+          icon={<Trash2 size={12} />}
+        >
+          Clear
+        </Button>
       </div>
       {log.length === 0 ? (
         <div className="activity-empty">
@@ -180,19 +227,22 @@ export function ActivityLog({
           </span>
         </div>
       ) : (
-        <ol className="activity-list scroll-y" aria-label="MIDI messages, newest first">
-          {rows.map(({ a, m }, i) => (
-            <Row
-              key={a.id}
-              a={a}
-              m={m}
-              cont={rows[i + 1]?.m.chip.text === m.chip.text}
-              fresh={a.id > first.current!}
-              now={now}
-              onSelect={onSelect}
-            />
-          ))}
-        </ol>
+        <div className="activity-list scroll-y">
+          <HeadRow />
+          <ol aria-label="MIDI messages, newest first">
+            {rows.map(({ a, m }, i) => (
+              <Row
+                key={a.id}
+                a={a}
+                m={m}
+                cont={rows[i + 1]?.m.chip.text === m.chip.text}
+                fresh={a.id > first.current!}
+                now={now}
+                onSelect={onSelect}
+              />
+            ))}
+          </ol>
+        </div>
       )}
     </section>
   );

@@ -26,6 +26,7 @@ function SwitchSelect({
   return (
     <select
       aria-label={label}
+      title={label}
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
       className="h-7 rounded-ui-sm border border-edge bg-sunken px-2 font-semibold text-ui-sm text-bone outline-none"
@@ -80,6 +81,11 @@ export function SwitchEditor({ config, sw, apply }: { config: Config; sw: number
             </span>
             <Toggle
               label="Long press"
+              title={
+                hasLong
+                  ? "Turn off: holding does the same as tapping"
+                  : `Give this switch a second message when held for ${config.longPressMs} ms`
+              }
               on={hasLong}
               onChange={(on) =>
                 apply({
@@ -129,6 +135,7 @@ export function SwitchEditor({ config, sw, apply }: { config: Config; sw: number
             size="sm"
             kind="plain"
             icon={<Plus size={12} />}
+            title="Add a combo: two switches pressed together send a third message"
             onClick={() => apply({ type: "addCombo" })}
           >
             Add
@@ -180,7 +187,7 @@ export function SwitchEditor({ config, sw, apply }: { config: Config; sw: number
                         size="sm"
                         kind="ghost"
                         aria-label={`Remove combo ${comboName(k)}`}
-                        title="Remove"
+                        title={`Remove combo ${comboName(k)}`}
                         onClick={() => setRemoving(key)}
                         icon={<X size={13} />}
                       />

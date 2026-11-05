@@ -43,7 +43,10 @@ export function useSimControls(backend: Backend, state: State | null): SimContro
 /** The small "SIMULATED" tag beside an input's title. */
 export function SimTag() {
   return (
-    <span className="rounded-ui-sm border border-beam/50 px-1 py-px font-mono text-[9px] leading-none font-semibold tracking-kicker text-beam">
+    <span
+      title="No pedal on this jack: the app makes up the readings"
+      className="rounded-ui-sm border border-beam/50 px-1 py-px font-mono text-[9px] leading-none font-semibold tracking-kicker text-beam"
+    >
       SIMULATED
     </span>
   );
@@ -118,6 +121,7 @@ function PositionSlider({
       aria-valuemax={100}
       aria-valuenow={Math.round(f * 100)}
       aria-valuetext={`${Math.round(f * 100)} % toward the toe`}
+      title={`Simulated position, ${Math.round(f * 100)}% toward the toe\nDrag, or use the arrow keys`}
       className="group relative h-[18px] flex-1 cursor-ew-resize touch-none outline-none select-none"
       onPointerDown={(e) => {
         if (e.button !== 0) return;
@@ -191,6 +195,11 @@ export function SimRow({
         {realCable && <span className="text-ui-xs text-faint">a real pedal is plugged in</span>}
         <Toggle
           label={`Simulate a pedal on EXP ${n + 1}`}
+          title={
+            realCable
+              ? "Unplug the real pedal to simulate one"
+              : "Fake a pedal on this jack, to try calibration, CC and trigger without one"
+          }
           on={on && !realCable}
           disabled={realCable}
           onChange={(v) => run(sim.simulate(n, v))}
@@ -204,6 +213,7 @@ export function SimRow({
           <span className="ml-2 text-ui-xs text-muted">Sweep</span>
           <Toggle
             label={`Sweep EXP ${n + 1} heel to toe`}
+            title="Rock the simulated pedal heel to toe and back on its own"
             on={sweeping}
             onChange={(v) => run(sim.setSweep(n, v))}
           />

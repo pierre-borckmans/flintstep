@@ -758,20 +758,44 @@ input[type="range"]::-webkit-slider-thumb {
 .activity-list {
   min-height: 0;
   flex: 1;
-  padding: 2px 0;
+  padding-bottom: 2px;
 }
 .activity-panel:focus {
   outline: none;
 }
 /* One message per line, in columns: when · which way · what sent it · type · number ·
-   value · channel. Numbers in mono so a sweep's values do not dance. */
-.activity-row {
+   value · channel. The column titles above use the same grid, so they line up. The
+   channel column is as wide as "ch 16", so a row without one keeps the others still. */
+.act-grid {
   display: grid;
-  grid-template-columns: 24px 11px 80px 34px 50px minmax(0, 1fr) auto;
+  grid-template-columns: 26px 11px 80px 34px 50px minmax(0, 1fr) 5ch;
   align-items: center;
   column-gap: 8px;
-  height: 23px;
   padding: 0 14px 0 10px;
+}
+/* The column titles: a kicker row that stays put while the messages scroll under it. */
+.act-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 20px;
+  border-bottom: 1px solid var(--color-edge);
+  background: var(--color-chrome);
+  font: 600 9px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+  white-space: nowrap;
+}
+.act-head > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.act-head > :last-child {
+  text-align: right;
+}
+.activity-row {
+  height: 23px;
   font: 11px var(--font-mono);
   font-variant-numeric: tabular-nums;
   border-bottom: 1px solid var(--row-line);
@@ -896,6 +920,9 @@ input[type="range"]::-webkit-slider-thumb {
 .act-ch {
   font-size: 10px;
   color: var(--color-faint);
+}
+.act-ch {
+  text-align: right;
 }
 .activity-empty {
   display: flex;

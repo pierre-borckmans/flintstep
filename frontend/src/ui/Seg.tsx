@@ -7,6 +7,8 @@ export interface SegOption<T extends string> {
   label: string;
   /** A few words under the label (the trigger modes). */
   hint?: string;
+  /** A tooltip, for an option whose label does not say enough by itself. */
+  title?: string;
 }
 
 /** Segmented control. The chosen segment is lit, never tinted: one lit thumb slides
@@ -70,6 +72,7 @@ export function Seg<T extends string>({
             role="radio"
             aria-checked={on}
             data-value={o.value}
+            title={o.title}
             tabIndex={on || (index < 0 && o === options[0]) ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cx(

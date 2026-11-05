@@ -115,7 +115,7 @@ export function ThresholdOverlay({
         aria-valuemax={TRIGGER.max}
         aria-valuenow={th}
         aria-valuetext={`${th} percent`}
-        title="Drag, or use the arrow keys (shift for 5%)"
+        title={`Trigger threshold, ${th}%\nDrag, or use the arrow keys (Shift for 5%)`}
         onKeyDown={(e) => {
           const v = nudge(th, e.key, e.shiftKey);
           if (v === null) return;
@@ -137,10 +137,20 @@ export function ThresholdOverlay({
   );
 }
 
-const MODES: { value: TriggerMode; label: string; hint: string }[] = [
-  { value: "off", label: "Off", hint: "CC only" },
-  { value: "engage", label: "Auto-engage", hint: "leave the heel" },
-  { value: "toe", label: "Toe click", hint: "push the toe" },
+const MODES: { value: TriggerMode; label: string; hint: string; title: string }[] = [
+  { value: "off", label: "Off", hint: "CC only", title: "No trigger: the pedal only sends its CC" },
+  {
+    value: "engage",
+    label: "Auto-engage",
+    hint: "leave the heel",
+    title: "On when you rock off the heel, off when you rest it back, like an auto-wah",
+  },
+  {
+    value: "toe",
+    label: "Toe click",
+    hint: "push the toe",
+    title: "Clicks when you push past the threshold, like the switch under a wah's toe",
+  },
 ];
 
 /** The trigger's settings, under the input's own: mode, threshold, off delay, and
@@ -191,7 +201,12 @@ export function TriggerBlock({
             >
               {state}
             </span>
-            <Lamp on={lit} colour="beam" size={8} title={lit ? "Engaged" : "Not engaged"} />
+            <Lamp
+              on={lit}
+              colour="beam"
+              size={8}
+              title={lit ? "Trigger engaged" : "Trigger not engaged"}
+            />
           </>
         )}
       </div>
@@ -208,6 +223,11 @@ export function TriggerBlock({
         <div className="flex items-center gap-2">
           <NumField
             label={t.mode === "toe" ? "Click at" : "Engage at"}
+            hint={
+              t.mode === "toe"
+                ? "Pedal position where it clicks"
+                : "Pedal position where it switches on"
+            }
             value={t.threshold}
             min={TRIGGER.min}
             max={TRIGGER.max}

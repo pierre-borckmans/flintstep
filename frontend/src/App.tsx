@@ -13,16 +13,16 @@ import { SwitchEditor, SwitchTabs } from "./components/SwitchEditor";
 import { readViewPreference, saveViewPreference } from "./lib/view";
 import { STORAGE_PREFIX } from "./product";
 import type { IndicatorIndex } from "./types";
-import { TabPanel, Tabs, useTabsId } from "./ui/Tabs";
+import { type TabDef, TabPanel, Tabs, useTabsId } from "./ui/Tabs";
 import { useBridge } from "./useBridge";
 
 const SPLIT_KEY = `${STORAGE_PREFIX}viewer.split`;
 
 type Tab = "switches" | "expression" | "settings";
-const TABS: { id: Tab; label: string }[] = [
-  { id: "switches", label: "Switches" },
-  { id: "expression", label: "Expression" },
-  { id: "settings", label: "Settings" },
+const TABS: TabDef<Tab>[] = [
+  { id: "switches", label: "Switches", title: "What each footswitch, combo and lamp does" },
+  { id: "expression", label: "Expression", title: "Calibrate and map the two pedal inputs" },
+  { id: "settings", label: "Settings", title: "LEDs, timing, pedal, appearance and app" },
 ];
 
 const q = new URLSearchParams(window.location.search);

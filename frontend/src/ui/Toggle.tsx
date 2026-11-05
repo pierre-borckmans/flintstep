@@ -7,11 +7,14 @@ export function Toggle({
   onChange,
   label,
   disabled,
+  title,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
   label?: string;
   disabled?: boolean;
+  /** A tooltip, where the label beside it does not say what on means. */
+  title?: string;
 }) {
   return (
     <button
@@ -19,6 +22,7 @@ export function Toggle({
       role="switch"
       aria-checked={on}
       aria-label={label}
+      title={title}
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={cx(

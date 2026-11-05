@@ -117,6 +117,13 @@ function HistoryList({
                   type="button"
                   onClick={() => onJump(e.i)}
                   aria-current={here ? "step" : undefined}
+                  title={`${e.label}\n${
+                    here
+                      ? "Where the preset is now"
+                      : undone
+                        ? "Undone. Click to redo up to here"
+                        : "Click to go back to here"
+                  }`}
                   className={cx(
                     "grid w-full grid-cols-[6px_1fr_auto] items-center gap-2.5 px-3 py-[5px] text-left transition-[color,background-color] duration-(--dur) ease-(--ease)",
                     here ? "bg-panel2" : "hover:warm",
@@ -129,7 +136,6 @@ function HistoryList({
                       here ? "text-bone" : undone ? "text-faint" : "text-text/90",
                       e.i === 0 && !here && "text-muted",
                     )}
-                    title={e.label}
                   >
                     {e.label}
                   </span>
@@ -175,13 +181,15 @@ export function HistoryControls({
   // changes: they cross-fade in place.
   const shown = useCalmStatus(st);
   let lamp = <Lamp on={justSaved} colour="live" size={6} />;
-  let tip = savedAt ? "Saved. Every change saves itself." : "Every change saves itself.";
+  let tip = savedAt
+    ? `Saved at ${new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}\nEvery change saves itself`
+    : "Every change saves itself";
   if (shown === "fault") {
     lamp = <Lamp on colour="hot" size={6} />;
-    tip = st.kind === "invalid" || st.kind === "failed" ? `Not saved: ${st.error}` : "Not saved";
+    tip = st.kind === "invalid" || st.kind === "failed" ? `Not saved\n${st.error}` : "Not saved";
   } else if (shown === "saving") {
     lamp = <Lamp on colour="beam" size={6} />;
-    tip = "Saving…";
+    tip = "Saving the latest change";
   }
 
   const undoLabel = history && H.undoLabel(history);
@@ -213,7 +221,8 @@ export function HistoryControls({
         size="sm"
         kind="ghost"
         aria-label="Undo"
-        title={undoLabel ? `Undo ${undoLabel} (⌘Z)` : "Nothing to undo"}
+        title={undoLabel ? `Undo ${undoLabel}` : "Nothing to undo"}
+        data-kbd={undoLabel ? "⌘Z" : undefined}
         disabled={!undoLabel}
         onClick={undo}
         icon={<Undo2 size={13} />}
@@ -222,7 +231,8 @@ export function HistoryControls({
         size="sm"
         kind="ghost"
         aria-label="Redo"
-        title={redoLabel ? `Redo ${redoLabel} (⇧⌘Z)` : "Nothing to redo"}
+        title={redoLabel ? `Redo ${redoLabel}` : "Nothing to redo"}
+        data-kbd={redoLabel ? "⇧⌘Z" : undefined}
         disabled={!redoLabel}
         onClick={redo}
         icon={<Redo2 size={13} />}
@@ -233,7 +243,11 @@ export function HistoryControls({
         data-history-toggle
         aria-label="History"
         aria-expanded={open}
-        title={changes > 0 ? `History: ${changes} change${changes === 1 ? "" : "s"}` : "History"}
+        title={
+          changes > 0
+            ? `History\n${changes} change${changes === 1 ? "" : "s"} to ${preset || "this preset"} this session`
+            : "History\nNo changes this session yet"
+        }
         disabled={!history}
         onClick={() => setOpen((o) => !o)}
         icon={<HistoryIcon size={13} />}
