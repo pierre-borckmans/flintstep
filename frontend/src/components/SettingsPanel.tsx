@@ -1,4 +1,4 @@
-import { FolderOpen, Radar, RotateCcw } from "lucide-react";
+import { FolderOpen, Radar, RotateCcw, ScrollText } from "lucide-react";
 import { useState } from "react";
 import type { Backend } from "../api";
 import { errorText } from "../api";
@@ -10,6 +10,7 @@ import { Collapse } from "../ui/Collapse";
 import { Lamp } from "../ui/Lamp";
 import { Seg } from "../ui/Seg";
 import { Toggle } from "../ui/Toggle";
+import { Acknowledgements } from "./Acknowledgements";
 import { ExpPlacementSetting } from "./ExpPlacementSetting";
 import { NutSetting } from "./NutSetting";
 import { ScanResults, usePedalScan } from "./PedalScan";
@@ -111,6 +112,7 @@ export function SettingsPanel({
 }) {
   const [login, setLogin] = useState(state.launchAtLogin);
   const [confirm, setConfirm] = useState(false);
+  const [acks, setAcks] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   return (
@@ -230,6 +232,12 @@ export function SettingsPanel({
             lose their calibration. The chosen pedal is kept, and ⌘Z brings the rest back.
           </p>
         </Collapse>
+        <Row label="Open-source licences">
+          <Button size="sm" icon={<ScrollText size={12} />} onClick={() => setAcks(true)}>
+            Acknowledgements
+          </Button>
+        </Row>
+        {acks && <Acknowledgements backend={backend} onClose={() => setAcks(false)} />}
         {err && <p className="text-ui-xs text-hot">{err}</p>}
         <p className="pt-1 text-ui-2xs text-faint">
           {PRODUCT_NAME} {state.version}

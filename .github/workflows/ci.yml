@@ -42,6 +42,23 @@ jobs:
         env:
           CGO_ENABLED: "1"
 
+  # THIRD_PARTY_NOTICES.md must list what the binaries contain: regenerate and compare.
+  # Needs both the Go module cache and frontend/node_modules.
+  notices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: frontend/package.json
+      - run: bun install --frozen-lockfile
+        working-directory: frontend
+      - run: scripts/notices.sh -check
+
   web:
     runs-on: ubuntu-latest
     steps:

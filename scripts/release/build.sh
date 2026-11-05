@@ -33,6 +33,9 @@ wails build -clean -trimpath -platform "$PLATFORM" -ldflags "-X main.version=$VE
 
 [ -d "$APP_PATH" ] || die "wails did not produce $APP_PATH"
 
+# The licences ship with the binary: ours, and the third-party notices (make notices).
+cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$APP_PATH/Contents/Resources/"
+
 # wails.json's productVersion is the bundle version. On a release tag the tag wins.
 v="${VERSION#v}"
 if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then

@@ -75,6 +75,8 @@ hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" "$DMG" >/dev/n
 trap 'hdiutil detach -quiet "$mnt" 2>/dev/null || true; rmdir "$mnt" 2>/dev/null || true' EXIT
 [ -d "$mnt/$PRODUCT_NAME.app" ] || die "the DMG has no $PRODUCT_NAME.app"
 [ -L "$mnt/Applications" ] || die "the DMG has no Applications link"
+[ -f "$mnt/THIRD_PARTY_NOTICES.md" ] || die "the DMG has no THIRD_PARTY_NOTICES.md"
+[ -f "$mnt/$PRODUCT_NAME.app/Contents/Resources/THIRD_PARTY_NOTICES.md" ] || die "the app has no THIRD_PARTY_NOTICES.md"
 codesign --verify --strict --deep "$mnt/$PRODUCT_NAME.app"
 hdiutil detach -quiet "$mnt"
 echo "DMG mounts and its app verifies"

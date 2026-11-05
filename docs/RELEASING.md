@@ -133,6 +133,12 @@ NOTARY_PROFILE=notary make release VERSION=v0.2.0
 4. The release appears with the DMG, `SHA256SUMS.txt`, a line saying whether it is
    notarized, and notes generated from the merged PRs. Edit the text if needed.
 
+The build copies `LICENSE` and `THIRD_PARTY_NOTICES.md` into the app's
+`Contents/Resources` and the DMG's root, and `release.sh` checks both are there. The
+notices file is generated (`make notices`, see `tools/notices`); the CI `notices` job
+fails when a dependency change left it stale, or when a new dependency has no licence
+file or a licence outside the permissive set (MIT, ISC, BSD, Apache-2.0, Zlib, 0BSD).
+
 If notarization fails, the job log has Apple's JSON report under
 `---- notarytool log <id> ----`. It names each file and the problem. The usual ones are
 an unsigned nested binary, a missing secure timestamp, or the hardened runtime not

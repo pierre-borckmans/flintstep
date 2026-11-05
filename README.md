@@ -120,7 +120,11 @@ author's earlier BEAM Mini controller project.
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security
+MIT, see [LICENSE](LICENSE). The licences of the Go modules and frontend packages
+built into the app are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which ships
+inside the app and the DMG; in the app it is under Settings > App > Acknowledgements.
+`make notices` regenerates it after a dependency change, and CI fails until it is
+current. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security
 reports: [SECURITY.md](SECURITY.md).
 
 Spark and Spark Control X are trademarks of Positive Grid; this project is not
