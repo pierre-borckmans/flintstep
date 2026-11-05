@@ -5,7 +5,7 @@
 #   docker build --platform linux/amd64 -t flintstep-linux-build:amd64 build/linux
 FROM ubuntu:22.04
 
-ARG GO_VERSION=1.26.0
+ARG GO_VERSION=1.26.10
 ARG BUN_VERSION=1.3.14
 ARG NFPM_VERSION=v2.48.0
 ARG APPIMAGETOOL_VERSION=1.9.1
