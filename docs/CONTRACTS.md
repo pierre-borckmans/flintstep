@@ -250,7 +250,14 @@ the write worked.
   config.json (only Config's keys allowed, named after the file); the config is normalized,
   must Validate, and loses its pedal.
 
-## internal/ble (macOS CoreBluetooth via tinygo.org/x/bluetooth v0.16 + cbgo)
+## Platform seams
+
+Everything that depends on the OS is listed in `internal/platform` (package doc), with a
+compile-time test pinning each seam's signatures. docs/PORTING.md has the Linux port's
+notes and the Windows plan. macOS is the reference; Linux is experimental and
+hardware-untested; other OSes build with stubs.
+
+## internal/ble (tinygo.org/x/bluetooth v0.16: CoreBluetooth + cbgo on macOS, BlueZ + godbus on Linux)
 
 ```go
 type State string // "off" (bluetooth off/unauthorised) | "idle" | "searching" | "connecting" | "connected"
@@ -288,7 +295,11 @@ func (m *Manager) OnConnected(fn func(Device))   // called after each successful
 
 Finding a pedal: remembered address by identifier -> a SparkX the Mac already holds
 (retrieveConnectedPeripheralsWithServices on the switch service 7BDB8DC0... or the BLE-MIDI
-service) -> scan for a name starting "SparkX". All eight lamps are the caller's (the bridge
+service) -> scan for a name starting "SparkX". On Linux the address is a MAC address, "held"
+means a BlueZ Device1 with Connected=true offering either service, a dial only reaches a
+device BlueZ already knows (seen in a scan or paired), drops come from watching Connected
+on D-Bus, and a pedal connected before Flintstep dialled stays connected when it lets go.
+Addresses are per OS: a remembered pedal from macOS is found on Linux by name. All eight lamps are the caller's (the bridge
 decides Amp and App too); the manager writes them on connect, rewrites them every 3 s, and
 darkens them all on a hang-up. Writes on FFC9 go through one writer goroutine. On connect it
 asks firmware, profile, battery, cables and power (0x11); battery and power again every 15 s.
@@ -296,7 +307,7 @@ USB power also comes from characteristic 90D9A098-… (service 6FACFE71-…), su
 the pedal has it; Powered follows whichever spoke last. Trace every RX/TX
 except the exp stream to ble-trace.log (rotlog, 4 MB) when a trace path is set.
 
-## internal/coremidi (cgo, darwin; stub elsewhere returning ErrUnsupported)
+## internal/coremidi (cgo: CoreMIDI on darwin, ALSA sequencer on linux; stub elsewhere returning ErrUnsupported)
 
 ```go
 var ErrUnsupported = errors.New("coremidi: not available on this platform")
@@ -307,16 +318,23 @@ func (v *Virtual) Close()
 ```
 onDest receives complete messages (parse running status, drop sysex/realtime) on a goroutine.
 The source keeps a stable kMIDIPropertyUniqueID across launches (persist one derived from a
-hash of the name), so DAW mappings survive a restart.
+hash of the name), so DAW mappings survive a restart. On Linux the two endpoints are ports of
+one ALSA sequencer client named after the app (READ|SUBS_READ source, WRITE|SUBS_WRITE LED
+port); ALSA has no unique ID, applications find them again by name. NewVirtual's error says
+how to fix a missing /dev/snd/seq or a permission problem.
 
-## internal/tray (cgo, darwin; no-op stub elsewhere)
+## internal/tray (cgo NSStatusItem on darwin, StatusNotifierItem via fyne.io/systray on linux; no-op stub elsewhere)
 
 ```go
 type Item struct { ID, Title string; Disabled, Separator, Checked bool }
 func Start(templateIconPNG []byte, onClick func(id string)) // call once NSApp exists (Wails OnStartup); dispatches to main queue
 func SetMenu(items []Item)
 func SetTooltip(s string)
+func Available(wait time.Duration) bool // a tray host exists (always on darwin; on linux a StatusNotifierWatcher, waiting up to wait)
 ```
+On Linux the template icon is ignored (the colour app icon is used), unchecked items are
+plain items, and a left click on the icon opens the window. package main makes the window's
+close button quit when Available is false, since a hidden window could not come back.
 The bridge decides the items (status line, battery, "Open Flintstep…", "Launch at Login", "Quit Flintstep").
 
 ## internal/loginitem
@@ -325,7 +343,12 @@ The bridge decides the items (status line, battery, "Open Flintstep…", "Launch
 func Enabled() bool
 func Set(on bool) error // ~/Library/LaunchAgents/com.silversol.flintstep.plist, runs the current executable with --hidden
 func MigrateLegacy() (found bool, err error) // an old com.silversol.sparkxmidi.plist -> Set(true), then delete the old one
+func Render(exe string) []byte               // the plist (darwin) or the .desktop entry (linux)
 ```
+On Linux: `~/.config/autostart/flintstep.desktop` (`$XDG_CONFIG_HOME` respected), `Exec`
+quoted per the Desktop Entry spec, running `$APPIMAGE` when started from an AppImage;
+Enabled ignores an entry with `Hidden=true` or `X-GNOME-Autostart-enabled=false`;
+MigrateLegacy does nothing.
 
 The app calls MigrateLegacy on every startup; with no old agent it does nothing. The old
 agent only exists while "launch at login" was on, so finding one means turning it on under
