@@ -103,6 +103,9 @@ export class Hover {
   snapshot = () => this.value;
 }
 
+/** How long the size or the zoom has to hold before a drag counts as over. */
+export const SETTLE_MS = 250;
+
 /**
  * THE ZOOM, as the few things that care hear it: textures that must be re-baked past
  * their headroom, text that must be re-rasterised, hairlines that must stay one CSS
@@ -111,8 +114,9 @@ export class Hover {
 export class ZoomWatch {
   /** The scale the scene was last drawn at. */
   scale = 1;
-  /** Settled scale: what re-bakes and re-rasterising key on, a beat after a gesture or
-   *  a resize. They only ever go up for it. */
+  /** Settled scale: what re-bakes and re-rasterising key on, SETTLE_MS after a gesture or
+   *  a resize has stopped moving it, so neither ever runs during a drag (shell.tsx makes
+   *  the drawing buffer exact on the same beat). They only ever go up for it. */
   settled = 1;
   private hairlines = new Set<(px: number) => void>();
   private settles = new Set<(scale: number) => void>();
@@ -149,7 +153,7 @@ export class ZoomWatch {
       this.timer = setTimeout(() => {
         this.settled = this.scale;
         for (const fn of this.settles) fn(this.settled);
-      }, 160);
+      }, SETTLE_MS);
     }
   }
 }

@@ -681,14 +681,15 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 0;
   overflow: hidden;
 }
-/* The pedal canvas (canvas/Stage). Always the size of the viewer: Pixi sizes only its
-   drawing buffer, from our own ResizeObserver, and a window drag stretches the one it
-   has until the drag settles (canvas/shell's Resizer). */
+/* The pedal canvas (canvas/Stage). SCREEN-SIZED AND FIXED: allocated once as large as
+   the screen, pinned to the viewer's top-left and clipped by the viewer. A window or
+   divider drag only moves the camera; the canvas element and its drawing buffer never
+   change size, because a WebGL canvas resized during a live window resize flickers in
+   WKWebView (even an empty one). Pixi sizes the element (autoDensity). */
 .viewer-canvas {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 0;
+  left: 0;
   display: block;
   touch-action: none;
 }
@@ -1142,3 +1143,5 @@ input[type="range"]::-webkit-slider-thumb {
     display: none;
   }
 }
+
+

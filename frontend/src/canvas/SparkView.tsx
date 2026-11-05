@@ -181,12 +181,15 @@ function CaseSprite({ w, k }: { w: number; k: number }) {
     zoom: false,
   });
   const crisp = useBaked("spark/crisp", w, (px) => <CaseCrispSvg px={px} />, { unit: k });
+  // Both halves or neither: they bake separately, and a case drawn with its materials but
+  // not yet its trim and legends (or the other way round) is a frame of a different pedal.
+  // A later re-bake only ever swaps the crisp half's texture for a sharper one of the same
+  // drawing, in place, so the two cannot disagree after this.
+  if (!material.texture || !crisp.texture) return null;
   return (
     <>
-      {material.texture && (
-        <pixiSprite ref={material.ref} texture={material.texture} scale={material.scale} />
-      )}
-      {crisp.texture && <pixiSprite ref={crisp.ref} texture={crisp.texture} scale={crisp.scale} />}
+      <pixiSprite ref={material.ref} texture={material.texture} scale={material.scale} />
+      <pixiSprite ref={crisp.ref} texture={crisp.texture} scale={crisp.scale} />
     </>
   );
 }

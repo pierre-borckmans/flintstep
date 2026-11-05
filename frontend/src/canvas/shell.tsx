@@ -9,29 +9,35 @@ import { Repaint } from "./repaint";
 // loop asleep unless something is happening.
 
 /**
- * Keeps the renderer the size of its host.
+ * Gives the renderer a FIXED drawing buffer as large as the screen, and keeps it.
  *
- * NOT Pixi's own `resizeTo`, which listens for `window.resize` and nothing else. The
- * viewer is a grid cell that gets its size from layout (and from the split divider), so
- * the renderer follows our own ResizeObserver, through the rig. The canvas element is
- * CSS 100% of its host; this only sizes its drawing buffer.
- *
- * Each step draws at once, inside the ResizeObserver callback, so the frame the browser
- * paints is the new size and never a cleared canvas.
+ * Why not follow the host: resizing a WebGL canvas while the window is being live-resized
+ * flickers in WKWebView, even an empty one (tested: the plain HTML panel did not flicker,
+ * the empty canvas did, whatever the timing). So the canvas never changes size during a
+ * resize: it is pinned to the viewer's top-left, clipped by the viewer, and the camera
+ * (rig.setView, from our own ResizeObserver in Stage) fits the scene into the visible
+ * part. The buffer only grows, and only if the host outgrows it (a bigger screen).
  */
 export function Resizer({ rig, onReady }: { rig: CameraRig; onReady?: (app: PixiApp) => void }) {
   const { app, isInitialised } = useApplication();
   useEffect(() => {
     if (!isInitialised) return;
     onReady?.(app);
-    const follow = () => {
+    const fit = () => {
       const { w, h } = rig.size;
-      if (w <= 0 || h <= 0) return;
-      app.renderer.resize(w, h);
+      const want = {
+        w: Math.max(w, window.screen.width || 0),
+        h: Math.max(h, window.screen.height || 0),
+      };
+      // app.screen is in CSS pixels, like resize(); renderer.width is device pixels.
+      const have = app.screen;
+      if (want.w > have.width || want.h > have.height) {
+        app.renderer.resize(Math.max(want.w, have.width), Math.max(want.h, have.height));
+      }
       app.ticker.update();
     };
-    follow();
-    return rig.subscribeView(follow);
+    fit();
+    return rig.subscribeView(fit);
   }, [app, isInitialised, rig, onReady]);
   return null;
 }

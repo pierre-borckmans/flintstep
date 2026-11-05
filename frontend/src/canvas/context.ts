@@ -88,6 +88,7 @@ export function useBaked(
       setTex(ready);
       return;
     }
+    // Until it arrives the sprite keeps the texture it has: nothing is cleared first.
     let on = true;
     textureFor(key, drawWidth, live.current.render, b).then((t) => {
       if (on && t) setTex(t);
@@ -109,8 +110,14 @@ export function useBaked(
       textureFor(k, w, r, b).then((t) => {
         const s = sprite.current;
         if (!t || !s || s.destroyed || live.current.key !== k || s.texture === t) return;
+        // The old texture stays on the sprite until this line, and stays in the cache
+        // after it: one assignment swaps a whole, uploaded-on-draw texture for another,
+        // with no frame in between that has neither.
         s.texture = t;
         s.scale.set(live.current.drawWidth / live.current.unit / t.width);
+        // And React is told, so its props agree with the sprite: otherwise the next prop
+        // it does apply is computed from the old texture.
+        setTex(t);
         repaint.mark();
       });
     });

@@ -1,4 +1,4 @@
-import { Texture } from "pixi.js";
+import { ImageSource, Texture } from "pixi.js";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -92,7 +92,15 @@ async function bake(
       // the frame: the case's noise filters at a 4x bake held one frame for 676 ms.
       // createImageBitmap does the same work as its own task, between frames.
       const pixels = typeof createImageBitmap === "function" ? await createImageBitmap(img) : img;
-      const tex = Texture.from(pixels);
+      // MIPMAPPED. A bake is made for the zoom's headroom, so at a fitted view the GPU
+      // draws it two to four times smaller than it is. Sampled with plain bilinear, a
+      // texture that much bigger than its footprint skips texels, and which ones it skips
+      // changes with every step of a resize: the noise in the tolex and the brushed face
+      // crawled and the edges sparkled through the whole drag. With a mip chain the GPU
+      // reads a pre-filtered level that matches the footprint. A third more memory.
+      const tex = new Texture({
+        source: new ImageSource({ resource: pixels, autoGenerateMipmaps: true }),
+      });
       cache.set(id, tex);
       evict(key);
       return tex;

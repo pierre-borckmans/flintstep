@@ -57,6 +57,37 @@ function useFollowHost(host: RefObject<HTMLDivElement | null>, rig: CameraRig) {
   }, [host, rig]);
 }
 
+/** The stage colour from the theme tokens: what the canvas clears to. */
+function stageColour(): string {
+  return (
+    getComputedStyle(document.documentElement).getPropertyValue("--color-stage").trim() || "#20231f"
+  );
+}
+
+/** Keeps the canvas's clear colour on the theme's stage colour when the theme changes:
+ *  the <html data-theme> attribute (forced themes) or the system appearance (System). */
+function StageColour() {
+  const { app, isInitialised } = useApplication();
+  // EFFECT: following the theme.
+  useLayoutEffect(() => {
+    if (!isInitialised) return;
+    const apply = () => {
+      app.renderer.background.color = stageColour();
+      app.ticker.update();
+    };
+    apply();
+    const mo = new MutationObserver(apply);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", apply);
+    return () => {
+      mo.disconnect();
+      mq.removeEventListener("change", apply);
+    };
+  }, [app, isInitialised]);
+  return null;
+}
+
 /** Memoised: the viewer re-renders on every status push, and the Application must not —
  *  re-rendering it re-renders the whole scene in its own root. */
 export const Stage = memo(function Stage({
@@ -82,14 +113,21 @@ export const Stage = memo(function Stage({
       <Application
         autoStart={false}
         antialias
+        autoDensity
         resolution={window.devicePixelRatio || 1}
-        backgroundAlpha={0}
+        // OPAQUE, like Beam's board (its floor paints every pixel). A transparent WebGL
+        // canvas in WKWebView shows its cleared buffer for a frame on every resize step:
+        // the pedal blinked through the whole window drag. Painted with the stage colour
+        // and kept in step with the theme (StageColour).
+        backgroundAlpha={1}
+        background={stageColour()}
         preference="webgl"
         className="viewer-canvas"
       >
         <SceneContext.Provider value={scene}>
           <RepaintContext.Provider value={scene.repaint}>
             <Resizer rig={scene.rig} onReady={onReady} />
+            <StageColour />
             <Idle rig={scene.rig} repaint={scene.repaint} />
             <World />
             <Gestures scene={scene} handlers={handlers} />
