@@ -49,6 +49,17 @@ const appTags = "desktop,production"
 // dependencies are build tools and are not followed.
 var bundledDev = []string{"vite"}
 
+// vendoredLicence names, for an npm package published without its licence file, the copy
+// of that file kept under vendoredDir (a directory per package), fetched from the
+// package's own repository. @pixi/colord (pixi.js's colour parser) ships only its
+// package.json's "MIT"; its repository, pixijs/colord, has the LICENSE.md.
+var vendoredLicence = map[string]string{
+	"@pixi/colord": "pixi-colord",
+}
+
+// vendoredDir is relative to the repo root, where scripts/notices.sh runs this.
+const vendoredDir = "tools/notices/vendored"
+
 // allowed are the licences the notices may contain: permissive, satisfied by shipping
 // this file.
 var allowed = map[string]bool{
@@ -313,6 +324,9 @@ func npmComponents(root string, fail func(string, ...any)) ([]component, error) 
 		// Vite's LICENSE.md goes on to the licences of what Vite itself bundles; only Vite's
 		// own helpers reach our bundle, so only its own licence applies.
 		c.licences, c.text = licenceIn("\n# Licenses of bundled dependencies", dir)
+		if v, ok := vendoredLicence[p.Name]; ok && c.text == "" {
+			c.licences, c.text = licenceIn("", filepath.Join(vendoredDir, v))
+		}
 		declared := spdx(p.License)
 		switch {
 		case c.text == "":

@@ -681,26 +681,57 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 0;
   overflow: hidden;
 }
-/* What zooms: the fitted layout, scaled and moved from its top-left corner. */
-.viewer-zoom {
+/* The pedal canvas (canvas/Stage): Pixi sizes it from our own ResizeObserver. */
+.viewer-canvas {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-  transform-origin: 0 0;
-}
-.pedal-viewer[data-zoomed] .viewer-stage {
-  cursor: grab;
+  display: block;
   touch-action: none;
 }
-.pedal-viewer[data-panning],
-.pedal-viewer[data-panning] * {
-  cursor: grabbing !important;
+/* The keyboard layer over the canvas: invisible buttons kept over the drawing by the
+   camera (a transform written by the rig, never a render). They take no pointer; the
+   canvas does its own hit testing. */
+.canvas-keys {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
 }
-.viewer-object {
-  position: relative;
-  min-width: 0;
+.canvas-key {
+  position: absolute;
+  padding: 0;
+  border-radius: 10px;
+  outline: none;
+  pointer-events: none;
+}
+.canvas-key:focus-visible {
+  outline: 1px solid var(--lamp-key);
+  outline-offset: 2px;
+}
+/* "+ simulate" over an empty jack: there only while the pointer is on the viewer. */
+.exp-sim-hint {
+  position: absolute;
+  translate: -50% 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font: 9px/12px var(--font-mono);
+  color: var(--color-faint);
+  white-space: nowrap;
+  pointer-events: auto;
+  opacity: 0;
+  transition:
+    opacity var(--dur-up) var(--ease-incand),
+    color var(--dur) var(--ease);
+}
+.pedal-viewer:hover .exp-sim-hint {
+  opacity: 0.75;
+}
+.exp-sim-hint:hover,
+.exp-sim-hint:focus-visible {
+  opacity: 1 !important;
+  color: var(--color-cold);
+  outline: none;
 }
 .viewer-divider {
   display: grid;

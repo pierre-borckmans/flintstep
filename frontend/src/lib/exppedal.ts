@@ -9,7 +9,7 @@ import type { ExpConfig } from "../types";
 import { RAW_MAX } from "./exp";
 import { TRIGGER } from "./trigger";
 
-/** The drawn Spark (components/Pedal.tsx): the case's height per unit of width, the
+/** The drawn Spark (canvas/SparkView, lib/sparkgeom): the case's height per unit of width, the
  *  block round it (px-2, pt-1/pb-1, a 72px caption row above and below), and the EXP
  *  jacks on its back edge as fractions of the case width. */
 export const SPARK = {
