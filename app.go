@@ -435,18 +435,16 @@ func presetItems(ps []PresetInfo) []tray.Item {
 	return items
 }
 
-// batteryLine is the menu's battery item, "" when there is no reading. The pedal does
-// not say "charging": that is USB power with the battery below 100 %.
+// batteryLine is the menu's battery item, "" when there is no reading. Powered is the
+// pedal's "charging now" flag: plugged in but done charging reads the same as on
+// battery, so the line never claims either.
 func batteryLine(p ble.Status) string {
 	if p.State != ble.StateConnected || p.Battery < 0 {
 		return ""
 	}
 	s := fmt.Sprintf("Battery %d%%", p.Battery)
-	switch {
-	case p.Powered && p.Battery < 100:
+	if p.Powered {
 		s += " · charging"
-	case p.Powered:
-		s += " · on USB power"
 	}
 	return s
 }

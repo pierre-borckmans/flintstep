@@ -116,10 +116,10 @@
   transition: filter var(--dur-up) var(--ease-incand);
 }
 
-/* POWER while charging: a soft one-second breath, like the pedal's own LED. Steady for
+/* POWER while charging: a slow breath (1.7 s), never fully dark, like the pedal's own LED. Steady for
    anyone who asked for less motion; the colour still follows the level. */
 .pedal-power-blink {
-  animation: pedal-power-blink 1s ease-in-out infinite;
+  animation: pedal-power-blink 1.7s ease-in-out infinite;
 }
 @keyframes pedal-power-blink {
   0%,
@@ -127,7 +127,7 @@
     opacity: 1;
   }
   50% {
-    opacity: 0.12;
+    opacity: 0.25;
   }
 }
 @media (prefers-reduced-motion: reduce) {

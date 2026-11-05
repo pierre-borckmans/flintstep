@@ -78,7 +78,8 @@ func TestBatteryLine(t *testing.T) {
 		want string
 	}{
 		{st(30, true), "Battery 30% · charging"},
-		{st(100, true), "Battery 100% · on USB power"},
+		{st(100, true), "Battery 100% · charging"},
+		{st(61, false), "Battery 61%"},
 		{st(30, false), "Battery 30%"},
 		{st(-1, true), ""},
 		{ble.Status{State: ble.StateSearching}, ""},
