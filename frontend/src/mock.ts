@@ -739,7 +739,7 @@ export function demoScript(name: string): DemoStep[] {
  *  inputs' heel and toe; unset, as swept from the mock pedals, which read raw 256..27500
  *  like an M-Audio EX-P), ?capture=1|2 (a calibration sweep starts on that input once
  *  the pedal is up), ?curve=gentle,custom:0.35 (the inputs' response curves; one name
- *  sets both), ?taper (the mock pedals read like an audio-taper pot). See also demoScript (?demo=). */
+ *  sets both; also s:0.8:0.4 for strength and centre, custom:0.3/0.1_0.7/0.5 for points), ?taper (the mock pedals read like an audio-taper pot). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
   const holdMask = (q.get("hold") ?? "")
@@ -755,10 +755,20 @@ export function createMockBackend(q: URLSearchParams): Backend {
   const simQ = q.get("sim")?.split(",");
   const simStart = (s: string | undefined): SimStart => (s === "sweep" ? "sweep" : pinQ(s));
   const calQ = q.get("cal")?.split(",").map(Number);
-  // ?curve=gentle,custom:0.35
+  // ?curve=gentle,custom:0.35 or s:0.8:0.4 (strength, centre) or custom:0.3/0.1_0.7/0.5 (points)
   const curveQ = (s: string | undefined): ExpCurve => {
-    const [kind, amount] = (s ?? "").split(":");
-    return normalizeCurve({ kind: kind as ExpCurve["kind"], amount: Number(amount ?? 0) || 0 });
+    const [kind, a, b] = (s ?? "").split(":");
+    if (kind === "s" && a) {
+      return normalizeCurve({ kind, amount: 0, strength: Number(a) || 0, centre: Number(b) || 0 });
+    }
+    if (kind === "custom" && a?.includes("/")) {
+      const points = a.split("_").map((xy) => {
+        const [x, y] = xy.split("/").map(Number);
+        return { x, y };
+      });
+      return normalizeCurve({ kind, amount: 0, points });
+    }
+    return normalizeCurve({ kind: kind as ExpCurve["kind"], amount: Number(a ?? 0) || 0 });
   };
   const curvesQ = q.get("curve")?.split(",");
   const cal: [number, number] =

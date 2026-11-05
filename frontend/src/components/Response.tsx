@@ -254,30 +254,6 @@ export function ResponseRow({
         />
         <div className="flex min-w-0 flex-col gap-1.5 pt-0.5">
           <p className="text-ui-xs leading-snug text-faint">{CURVE_TIP[curve.kind]}</p>
-          {curve.kind === "s" && (
-            <div className="grid grid-cols-2 gap-2">
-              <NumField
-                label="Strength"
-                value={Math.round(s.strength * 100)}
-                min={0}
-                max={100}
-                format={pct}
-                suffix="%"
-                hint="How strong the S is: 0 is a straight line, 100 makes both ends flat"
-                onChange={(v, g) => set({ ...curve, strength: v / 100, centre: s.centre }, g)}
-              />
-              <NumField
-                label="Centre"
-                value={Math.round(s.centre * 100)}
-                min={10}
-                max={90}
-                format={pct}
-                suffix="%"
-                hint="Where along the travel the steep, most sensitive part sits"
-                onChange={(v, g) => set({ ...curve, strength: s.strength, centre: v / 100 }, g)}
-              />
-            </div>
-          )}
           {curve.kind === "custom" && (
             <div className="flex items-center gap-2">
               <span className="font-mono text-ui-2xs text-muted tabular-nums">
@@ -304,6 +280,30 @@ export function ResponseRow({
           )}
         </div>
       </div>
+      {curve.kind === "s" && (
+        <div className="grid grid-cols-2 gap-2">
+          <NumField
+            label="Strength"
+            value={Math.round(s.strength * 100)}
+            min={0}
+            max={100}
+            format={pct}
+            suffix="%"
+            hint="How strong the S is: 0 is a straight line, 100 makes both ends flat"
+            onChange={(v, g) => set({ ...curve, strength: v / 100, centre: s.centre }, g)}
+          />
+          <NumField
+            label="Centre"
+            value={Math.round(s.centre * 100)}
+            min={10}
+            max={90}
+            format={pct}
+            suffix="%"
+            hint="Where along the travel the steep, most sensitive part sits"
+            onChange={(v, g) => set({ ...curve, strength: s.strength, centre: v / 100 }, g)}
+          />
+        </div>
+      )}
     </div>
   );
 }

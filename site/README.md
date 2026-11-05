@@ -16,6 +16,9 @@ python3 -m http.server -d site 8765   # http://localhost:8765, ?theme=light|dark
   `&picker=open` and `&theme=light`), taken at 1180x820 and 2x. `app-*` is the whole
   window (PNG at 1x, WebP at 1760 wide); `presets-*` is the 680x280 region at (496, 0)
   of the `&picker=open` shot (PNG at 1x, WebP at 2x).
+  `curve-*` is the Response section of
+  `?still&state=connected&cables=11&exp=62,100&sel=exp1&tuning=open&trigger=off,off&curve=custom:0.3/0.08_0.6/0.35_0.85/0.8`
+  (326x329 at 1x PNG, WebP at 2x).
 
 ## Deploy on Railway
 

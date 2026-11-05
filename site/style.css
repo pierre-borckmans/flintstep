@@ -245,6 +245,7 @@ h3 { font-size: 1.0625rem; letter-spacing: -0.012em; }
 
 .crop { margin-top: 1.1rem; }
 .crop img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--edge); box-shadow: var(--shadow-cast); }
+.crop.narrow img { max-width: 326px; }
 
 /* the app window: a frame drawn round the real screenshot */
 .window-wrap { max-width: calc(var(--wide) + 2rem); margin-top: clamp(3.5rem, 8vw, 5rem); margin-bottom: 0; }
