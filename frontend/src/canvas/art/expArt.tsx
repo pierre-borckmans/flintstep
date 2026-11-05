@@ -1,21 +1,53 @@
-import { ART } from "../../lib/exppedal";
+import { ART, baseTop, STOPS, TREADLE } from "../../lib/exppedal";
 
-// THE EXPRESSION PEDAL'S ART: a generic treadle pedal in side view (no brand's), toe to
-// the right. The DOM version's drawing, cut into the three layers the treadle sits
-// between, so the treadle can be a sprite the scene turns on its axle — free on the GPU —
-// instead of a re-rendered SVG per frame of the spring.
+// THE EXPRESSION PEDAL'S ART: a generic rocker pedal in side view (no brand's), toe to
+// the right. The treadle rocks on an axle through the base's side plate, ~40% of its
+// length from the heel (lib/exppedal's ART and TREADLE), and the base stops it on a
+// rubber pad at each end. Cut into the three layers the treadle sits between, so the
+// treadle can be a sprite the scene turns on its axle — free on the GPU — instead of a
+// re-rendered SVG per frame of the spring.
 //
-//   under    the floor shadow, the feet, the base, the toe stop
-//   treadle  the plate and its rubber tread, in its own box (TREADLE_BOX)
-//   over     the hinge block, the axle bolt and the socket the cable goes into
+//   under    the floor shadow, the feet, the wedge base, its side plate, the two stops
+//   treadle  the plate, its rubber tread and the skirt round the axle (TREADLE_BOX)
+//   over     the axle pin and the socket on the heel end the cable goes into
 //
 // `under` and `over` are drawn in ART's viewBox (1000 x 300 from y0); `px` is the width
 // they are rasterised at.
 
 const box = `0 ${ART.y0} ${ART.w} ${ART.h}`;
 const height = (px: number) => Math.round((px * ART.h) / ART.w);
+const f1 = (v: number) => Math.round(v * 10) / 10;
+
+/** A rubber stop standing on the base: from the base's top up to where the treadle
+ *  lands on it. */
+function Stop({ x, top, foot }: { x: number; top: number; foot: number }) {
+  const w = 46;
+  return (
+    <g>
+      <rect
+        x={f1(x - w / 2)}
+        y={f1(top)}
+        width={w}
+        height={f1(foot - top + 4)}
+        rx="6"
+        fill="#121314"
+        stroke="#000"
+        strokeOpacity="0.6"
+        strokeWidth="2"
+      />
+      <rect x={f1(x - w / 2 + 5)} y={f1(top + 2)} width={w - 10} height="4" rx="2" fill="#2c2f33" />
+    </g>
+  );
+}
 
 export function ExpUnderSvg({ px }: { px: number }) {
+  const b = ART.base;
+  const { x: ax, y: ay } = ART.pivot;
+  // The side plate: a hump rising off the base's top to carry the axle.
+  const l = ax - 120;
+  const r = ax + 120;
+  const plate = `M${l} ${f1(baseTop(l) + 2)} C${l + 40} ${f1(baseTop(l) - 20)} ${ax - 54} ${ay - 12} ${ax} ${ay - 12} C${ax + 54} ${ay - 12} ${r - 40} ${f1(baseTop(r) - 20)} ${r} ${f1(baseTop(r) + 2)} Z`;
+  const wedge = `M${b.x0} ${b.topHeel + 10} Q${b.x0} ${b.topHeel} ${b.x0 + 12} ${b.topHeel} L${b.x1 - 12} ${b.topToe} Q${b.x1} ${b.topToe} ${b.x1} ${b.topToe + 10} V${b.bottom - 8} Q${b.x1} ${b.bottom} ${b.x1 - 8} ${b.bottom} H${b.x0 + 8} Q${b.x0} ${b.bottom} ${b.x0} ${b.bottom - 8} Z`;
   return (
     <svg viewBox={box} width={px} height={height(px)}>
       <defs>
@@ -24,37 +56,57 @@ export function ExpUnderSvg({ px }: { px: number }) {
           <stop offset="0.35" stopColor="#202326" />
           <stop offset="1" stopColor="#0e0f11" />
         </linearGradient>
+        <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#30343a" />
+          <stop offset="1" stopColor="#181a1d" />
+        </linearGradient>
         <radialGradient id="floor" cx="0.5" cy="0.5" r="0.5">
           <stop offset="0" stopColor="#000" stopOpacity="0.5" />
           <stop offset="1" stopColor="#000" stopOpacity="0" />
         </radialGradient>
       </defs>
       <ellipse cx="480" cy="384" rx="490" ry="13" fill="url(#floor)" />
-      <rect x="70" y="368" width="80" height="16" rx="5" fill="#060707" />
-      <rect x="790" y="368" width="80" height="16" rx="5" fill="#060707" />
-      <rect
-        x={ART.base.x0}
-        y="298"
-        width={ART.base.x1 - ART.base.x0}
-        height="74"
-        rx="14"
-        fill="url(#base)"
-        stroke="#000"
-        strokeOpacity="0.65"
-        strokeWidth="2"
+      <rect x="70" y="372" width="80" height="12" rx="5" fill="#060707" />
+      <rect x="810" y="372" width="80" height="12" rx="5" fill="#060707" />
+      <path d={plate} fill="url(#plate)" stroke="#000" strokeOpacity="0.6" strokeWidth="2" />
+      <path d={wedge} fill="url(#base)" stroke="#000" strokeOpacity="0.65" strokeWidth="2" />
+      <line
+        x1={b.x0 + 16}
+        y1={b.topHeel + 3}
+        x2={b.x1 - 16}
+        y2={b.topToe + 3}
+        stroke="#fff"
+        strokeOpacity="0.14"
       />
-      <rect x="74" y="318" width="790" height="36" rx="7" fill="#0c0d0f" opacity="0.55" />
-      <line x1="56" y1="301" x2="884" y2="301" stroke="#fff" strokeOpacity="0.14" />
-      <rect x="812" y="289" width="58" height="11" rx="4" fill="#0a0b0c" />
+      <rect
+        x={b.x0 + 34}
+        y={b.topToe + 6}
+        width={b.x1 - b.x0 - 68}
+        height={b.bottom - b.topToe - 14}
+        rx="6"
+        fill="#0c0d0f"
+        opacity="0.5"
+      />
+      <Stop {...STOPS.heel} />
+      <Stop {...STOPS.toe} />
     </svg>
   );
 }
 
-/** The treadle's own box, in ART units. */
-export const TREADLE_BOX = { x: 60, y: 220, w: 870, h: 76 };
+/** The treadle's own box, in ART units: the plate, and the skirt hanging down round the
+ *  axle. */
+export const TREADLE_BOX = {
+  x: TREADLE.x0 - 4,
+  y: TREADLE.top - 6,
+  w: TREADLE.x1 - TREADLE.x0 + 8,
+  h: ART.pivot.y + 26 - (TREADLE.top - 6),
+};
 
 export function ExpTreadleSvg({ px }: { px: number }) {
   const b = TREADLE_BOX;
+  const t = TREADLE;
+  const { x: ax, y: ay } = ART.pivot;
+  const grip = 24;
   return (
     <svg viewBox={`${b.x} ${b.y} ${b.w} ${b.h}`} width={px} height={Math.round((px * b.h) / b.w)}>
       <defs>
@@ -69,25 +121,54 @@ export function ExpTreadleSvg({ px }: { px: number }) {
           <rect x="2" y="0" width="12" height="2" rx="1" fill="#4a5057" />
         </pattern>
       </defs>
-      <rect
-        x="66"
-        y="246"
-        width="858"
-        height="44"
-        rx="14"
+      {/* the skirt: the treadle's side cheek, hung on the axle */}
+      <path
+        d={`M${ax - 62} ${t.bottom - 4} L${ax - 30} ${ay + 6} Q${ax} ${ay + 24} ${ax + 30} ${ay + 6} L${ax + 62} ${t.bottom - 4} Z`}
         fill="url(#side)"
         stroke="#000"
         strokeOpacity="0.7"
         strokeWidth="2"
       />
-      <line x1="90" y1="270" x2="900" y2="270" stroke="#000" strokeOpacity="0.35" />
-      <line x1="90" y1="272" x2="900" y2="272" stroke="#fff" strokeOpacity="0.05" />
-      <rect x="84" y="226" width="822" height="24" rx="8" fill="url(#grip)" />
       <rect
-        x="84"
-        y="226"
-        width="822"
-        height="24"
+        x={t.x0 + 6}
+        y={t.top + grip - 2}
+        width={t.x1 - t.x0 - 12}
+        height={t.bottom - t.top - grip + 2}
+        rx={t.r}
+        fill="url(#side)"
+        stroke="#000"
+        strokeOpacity="0.7"
+        strokeWidth="2"
+      />
+      <line
+        x1={t.x0 + 30}
+        y1={t.bottom - 16}
+        x2={t.x1 - 30}
+        y2={t.bottom - 16}
+        stroke="#000"
+        strokeOpacity="0.35"
+      />
+      <line
+        x1={t.x0 + 30}
+        y1={t.bottom - 14}
+        x2={t.x1 - 30}
+        y2={t.bottom - 14}
+        stroke="#fff"
+        strokeOpacity="0.05"
+      />
+      <rect
+        x={t.x0 + 24}
+        y={t.top}
+        width={t.x1 - t.x0 - 48}
+        height={grip}
+        rx="8"
+        fill="url(#grip)"
+      />
+      <rect
+        x={t.x0 + 24}
+        y={t.top}
+        width={t.x1 - t.x0 - 48}
+        height={grip}
         rx="8"
         fill="none"
         stroke="#000"
@@ -99,32 +180,23 @@ export function ExpTreadleSvg({ px }: { px: number }) {
 }
 
 export function ExpOverSvg({ px }: { px: number }) {
-  const { x: px0, y: py } = ART.pivot;
+  const { x: ax, y: ay } = ART.pivot;
+  const s = ART.socket;
   return (
     <svg viewBox={box} width={px} height={height(px)}>
       <defs>
-        <linearGradient id="cheek" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2c3035" />
-          <stop offset="1" stopColor="#17191c" />
-        </linearGradient>
         <radialGradient id="bolt" cx="0.38" cy="0.32" r="0.75">
           <stop offset="0" stopColor="#f1eadb" />
           <stop offset="0.5" stopColor="#a8a090" />
           <stop offset="1" stopColor="#4f4a42" />
         </radialGradient>
       </defs>
-      <path
-        d="M60 300 V272 Q60 262 70 262 H156 Q166 262 166 272 V300 Z"
-        fill="url(#cheek)"
-        stroke="#000"
-        strokeOpacity="0.55"
-        strokeWidth="2"
-      />
-      <line x1="66" y1="265" x2="160" y2="265" stroke="#fff" strokeOpacity="0.1" />
-      <circle cx={px0} cy={py} r="14" fill="url(#bolt)" stroke="#2b2925" strokeWidth="2" />
-      <circle cx={px0} cy={py} r="4.5" fill="#26231f" />
-      <rect x="16" y="320" width="28" height="24" rx="4" fill="#8f897b" />
-      <rect x="16" y="320" width="28" height="7" rx="3" fill="#d9d2c2" opacity="0.6" />
+      {/* the axle pin through plate and skirt */}
+      <circle cx={ax} cy={ay} r="15" fill="url(#bolt)" stroke="#2b2925" strokeWidth="2" />
+      <circle cx={ax} cy={ay} r="5" fill="#26231f" />
+      {/* the socket on the base's heel end */}
+      <rect x={s.x - 4} y={s.y - 11} width="30" height="22" rx="4" fill="#8f897b" />
+      <rect x={s.x - 4} y={s.y - 11} width="30" height="6" rx="3" fill="#d9d2c2" opacity="0.6" />
     </svg>
   );
 }

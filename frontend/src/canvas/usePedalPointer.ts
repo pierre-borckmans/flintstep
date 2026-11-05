@@ -2,7 +2,7 @@ import { type RefObject, useMemo } from "react";
 import type { Backend } from "../api";
 import { actionCaption, longCaption } from "../lib/caption";
 import { expFraction, expValue } from "../lib/exp";
-import { dragFraction, jackFraction, readout } from "../lib/exppedal";
+import { artPoint, dragFraction, jackFraction, readout } from "../lib/exppedal";
 import { modeLabel } from "../lib/indicators";
 import { bearing, round1, turn, wheelStep } from "../lib/nuts";
 import { nutAt } from "../lib/sparkgeom";
@@ -157,12 +157,20 @@ export function usePedalPointer(scene: Scene, state: RefObject<PointerState>): P
           const x = d.config?.exp[n];
           const raw = d.status?.expRaw?.[n] ?? -1;
           const f0 = heldTreadle[n] ?? (x && raw >= 0 ? (expFraction(raw, x) ?? 0) : 0);
-          const span = Math.max(60, d.layout.units[n].w * 0.35);
+          // The grabbed point follows the pointer up and down (dragFraction), so the
+          // pointer is taken into the drawing's own units: screen, world, layout, art.
+          const unit = d.layout.units[n];
+          const box = d.layout.box;
+          const toArt = (p: { x: number; y: number }) => {
+            const w = toWorld(rig.current, p);
+            return artPoint(unit, { x: w.x + box.w / 2, y: w.y + box.h / 2 });
+          };
+          const grab = toArt(at);
           let f = f0;
           return {
             cursor: "ns-resize",
-            move(_dx, dy) {
-              f = dragFraction(f0, dy, span);
+            move(_dx, _dy, p) {
+              f = dragFraction(f0, grab, toArt(p).y);
               heldTreadle[n] = f;
               repaint.mark();
               send(n, f);

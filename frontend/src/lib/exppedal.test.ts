@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { expFraction, RAW_MAX } from "./exp";
 import {
+  ART,
+  artPoint,
+  baseTop,
   cableBeside,
   choosePlacement,
   dragFraction,
@@ -14,10 +17,14 @@ import {
   readout,
   rounded,
   SPARK,
+  STOPS,
   socketPoint,
   springStep,
   TILT,
+  TREADLE,
   tiltDeg,
+  tiltFraction,
+  treadleAt,
   UNIT,
   unitHeight,
 } from "./exppedal";
@@ -37,12 +44,100 @@ describe("tiltDeg", () => {
   });
 });
 
-describe("dragFraction", () => {
-  it("goes toward the toe when dragged up", () => {
-    expect(dragFraction(0.5, -50, 100)).toBe(1);
-    expect(dragFraction(0.5, 25, 100)).toBe(0.25);
+describe("the rocker", () => {
+  it("rocks round an axle ~40% of the treadle from the heel", () => {
+    const at = (ART.pivot.x - TREADLE.x0) / (TREADLE.x1 - TREADLE.x0);
+    expect(at).toBeGreaterThan(0.35);
+    expect(at).toBeLessThan(0.45);
+    expect(TILT.heel - TILT.toe).toBeGreaterThanOrEqual(15);
+    expect(TILT.heel - TILT.toe).toBeLessThanOrEqual(20);
   });
-  it("stays in 0..1", () => expect(dragFraction(0.2, 500, 100)).toBe(0));
+
+  it("raises the toe at heel down and the heel at toe down", () => {
+    const heel = { x: TREADLE.x0, y: TREADLE.bottom };
+    const toe = { x: TREADLE.x1, y: TREADLE.bottom };
+    expect(treadleAt(toe, tiltDeg(0)).y).toBeLessThan(toe.y);
+    expect(treadleAt(heel, tiltDeg(0)).y).toBeGreaterThan(heel.y);
+    expect(treadleAt(toe, tiltDeg(1)).y).toBeGreaterThan(toe.y);
+    expect(treadleAt(heel, tiltDeg(1)).y).toBeLessThan(heel.y);
+    expect(treadleAt(ART.pivot, 7)).toEqual(ART.pivot);
+  });
+
+  it("lands on its stops, and the stops stand on the base", () => {
+    const r = TREADLE.r;
+    const heel = treadleAt({ x: TREADLE.x0 + r, y: TREADLE.bottom }, TILT.heel);
+    const toe = treadleAt({ x: TREADLE.x1 - r, y: TREADLE.bottom }, TILT.toe);
+    expect(STOPS.heel.top).toBeCloseTo(heel.y, 6);
+    expect(STOPS.toe.top).toBeCloseTo(toe.y, 6);
+    for (const s of [STOPS.heel, STOPS.toe]) {
+      expect(s.foot - s.top).toBeGreaterThan(8);
+      expect(s.foot).toBeCloseTo(baseTop(s.x), 6);
+    }
+  });
+
+  it("stays inside the drawing at both ends of its travel", () => {
+    for (const deg of [TILT.heel, TILT.toe]) {
+      for (const x of [TREADLE.x0, TREADLE.x1]) {
+        for (const y of [TREADLE.top, TREADLE.bottom]) {
+          const p = treadleAt({ x, y }, deg);
+          expect(p.x).toBeGreaterThanOrEqual(0);
+          expect(p.x).toBeLessThanOrEqual(ART.w);
+          expect(p.y).toBeGreaterThanOrEqual(ART.y0);
+          expect(p.y).toBeLessThanOrEqual(ART.y0 + ART.h);
+        }
+      }
+    }
+  });
+
+  it("reads a tilt back as the position it came from", () => {
+    for (const f of [0, 0.3, 1]) expect(tiltFraction(tiltDeg(f))).toBeCloseTo(f, 9);
+    expect(tiltFraction(TILT.heel + 5)).toBe(0);
+    expect(tiltFraction(TILT.toe - 5)).toBe(1);
+  });
+});
+
+describe("dragFraction: the grabbed point follows the pointer", () => {
+  const toeGrab = { x: 800, y: 230 };
+  const heelGrab = { x: 120, y: 230 };
+
+  it("pushes the toe down when dragged down on the toe half", () => {
+    expect(dragFraction(0.5, toeGrab, toeGrab.y + 20)).toBeGreaterThan(0.5);
+    expect(dragFraction(0.5, toeGrab, toeGrab.y - 20)).toBeLessThan(0.5);
+  });
+
+  it("pushes the heel down when dragged down on the heel half", () => {
+    expect(dragFraction(0.5, heelGrab, heelGrab.y + 20)).toBeLessThan(0.5);
+    expect(dragFraction(0.5, heelGrab, heelGrab.y - 20)).toBeGreaterThan(0.5);
+  });
+
+  it("keeps the grabbed point under the pointer", () => {
+    const f0 = 0.5;
+    const flat = { x: toeGrab.x, y: TREADLE.top }; // a point on the tread, flat
+    const grab = treadleAt(flat, tiltDeg(f0));
+    const f = dragFraction(f0, grab, grab.y + 30);
+    expect(treadleAt(flat, tiltDeg(f)).y).toBeCloseTo(grab.y + 30, 0);
+  });
+
+  it("is still with no movement, and clamps to the travel", () => {
+    expect(dragFraction(0.3, toeGrab, toeGrab.y)).toBeCloseTo(0.3, 9);
+    expect(dragFraction(0.5, toeGrab, toeGrab.y + 500)).toBe(1);
+    expect(dragFraction(0.5, heelGrab, heelGrab.y + 500)).toBe(0);
+  });
+
+  it("does not fling a grab right over the axle", () => {
+    const over = { x: ART.pivot.x + 2, y: 230 };
+    const f = dragFraction(0.5, over, over.y + 5);
+    expect(f - 0.5).toBeLessThan(0.3);
+  });
+
+  it("works on a mirrored pedal in the drawing's own units", () => {
+    const u = { x: 100, y: 50, w: 200, mirror: true };
+    const k = u.w / ART.w;
+    // the toe end of a mirrored pedal is on the left
+    const p = artPoint(u, { x: u.x + 10 * k, y: u.y });
+    expect(p.x).toBeCloseTo(ART.w - 10, 6);
+    expect(p.y).toBeCloseTo(ART.y0, 6);
+  });
 });
 
 describe("jackFraction", () => {

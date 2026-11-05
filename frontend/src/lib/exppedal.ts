@@ -34,23 +34,32 @@ export const UNIT = 0.4;
 export const ART_ASPECT = 0.3;
 export const LABEL = 56;
 
-/** The drawing's own coordinates (viewBox x 0..1000, y y0..y0+h), drawn toe to
- *  the right: the pivot the treadle turns round, and the socket on the heel end where
- *  the cable goes in. */
+/** The drawing's own coordinates (viewBox x 0..1000, y y0..y0+h), drawn toe to the
+ *  right.
+ *
+ *  A ROCKER, like the real thing (FC7, EV-5, a wah): the treadle does not hinge at the
+ *  heel, it rocks on an axle through the base's side plate about 40% of its length from
+ *  the heel end. Toe down lifts the heel end, heel down lifts the toe, and the base
+ *  stops it at both ends on a rubber pad. The cable leaves the base's heel end. */
 export const ART = {
   w: 1000,
   y0: 92,
   h: 300,
-  pivot: { x: 112, y: 284 },
-  socket: { x: 22, y: 332 },
-  /** The base's ends. */
-  base: { x0: 40, x1: 900 },
+  /** The axle, ~40% of the treadle's length from its heel end. */
+  pivot: { x: 410, y: 276 },
+  /** Where the cable goes into the base, on its back (heel) end. */
+  socket: { x: 18, y: 356 },
+  /** The base: a low wedge, a little taller at the heel, `top` at each end. */
+  base: { x0: 40, x1: 920, topHeel: 330, topToe: 350, bottom: 376 },
 };
 
-/** Treadle angle in degrees, toe up positive: rocked back on the heel the toe rises,
- *  pushed down it rests nearly flat on the base. A little more swing than a real pedal
- *  so the position reads at a glance. */
-export const TILT = { heel: 9, toe: -0.5 };
+/** The treadle plate in ART units, flat (at angle 0): its ends, its top (the tread)
+ *  and its underside, and the radius of its rounded corners. */
+export const TREADLE = { x0: 60, x1: 930, top: 204, bottom: 262, r: 14 };
+
+/** Treadle angle in degrees, toe up positive: heel down raises the toe, toe down
+ *  raises the heel. 16 degrees of travel, rest pad to toe stop. */
+export const TILT = { heel: 8, toe: -8 };
 
 /** The treadle's angle for a calibrated position (0 heel .. 1 toe, expFraction). */
 export function tiltDeg(f: number): number {
@@ -58,11 +67,73 @@ export function tiltDeg(f: number): number {
   return TILT.heel + (TILT.toe - TILT.heel) * c;
 }
 
-/** The position a treadle dragged by dy px (down positive) from f0 lands on: up is
- *  toward the toe, and `span` px of travel goes from heel to toe. */
-export function dragFraction(f0: number, dy: number, span: number): number {
-  if (span <= 0) return f0;
-  return Math.min(1, Math.max(0, f0 - dy / span));
+/** The calibrated position (0..1) for a treadle angle, tiltDeg run backwards. */
+export function tiltFraction(deg: number): number {
+  return Math.min(1, Math.max(0, (TILT.heel - deg) / (TILT.heel - TILT.toe)));
+}
+
+/** Point `p` of the flat treadle, with the treadle turned to `deg` (toe up positive)
+ *  on its axle. Screen axes: y grows downward. */
+export function treadleAt(p: Pt, deg: number): Pt {
+  const a = (deg * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const dx = p.x - ART.pivot.x;
+  const dy = p.y - ART.pivot.y;
+  return { x: ART.pivot.x + dx * c + dy * s, y: ART.pivot.y + dy * c - dx * s };
+}
+
+/** The base's top surface at x: the wedge's slope from heel to toe. */
+export function baseTop(x: number): number {
+  const b = ART.base;
+  const t = Math.min(1, Math.max(0, (x - b.x0) / (b.x1 - b.x0)));
+  return b.topHeel + (b.topToe - b.topHeel) * t;
+}
+
+/** The rubber stops on the base, each under the end of the treadle that comes down on
+ *  it: `x` its centre, `top` where the treadle's underside corner lands at that end of
+ *  the travel, `foot` the base's top under it. Worked out from the geometry, so the
+ *  drawing and the travel cannot disagree. */
+export const STOPS = (() => {
+  const { x0, x1, bottom, r } = TREADLE;
+  const heel = treadleAt({ x: x0 + r, y: bottom }, TILT.heel);
+  const toe = treadleAt({ x: x1 - r, y: bottom }, TILT.toe);
+  return {
+    heel: { x: heel.x + 18, top: heel.y, foot: baseTop(heel.x + 18) },
+    toe: { x: toe.x - 18, top: toe.y, foot: baseTop(toe.x - 18) },
+  };
+})();
+
+/** Arms shorter than this (ART units, either side of the axle) are taken as this long
+ *  when dragging, so a grab right over the axle does not swing the treadle wildly. */
+const MIN_ARM = 80;
+
+/**
+ * DIRECT MANIPULATION: the position a treadle at `f0` lands on when the point grabbed
+ * at `grab` is dragged to height `y`, all in ART units of the unmirrored drawing.
+ *
+ * The grabbed point follows the pointer up and down: it turns the treadle round the
+ * axle by the angle between where it was grabbed and where the pointer is, seen from
+ * the axle along the grabbed arm. So dragging down on the toe half pushes the toe
+ * down (toward 1), and dragging down on the heel half pushes the heel down (toward 0).
+ * Clamped to the travel.
+ */
+export function dragFraction(f0: number, grab: Pt, y: number): number {
+  const raw = grab.x - ART.pivot.x;
+  const arm = Math.abs(raw) < MIN_ARM ? (raw < 0 ? -MIN_ARM : MIN_ARM) : raw;
+  // atan, not atan2: the heel side would wrap through ±180° as the pointer crossed the
+  // axle's height. Differences of atan are the same turn without the wrap.
+  const from = Math.atan((grab.y - ART.pivot.y) / arm);
+  const to = Math.atan((y - ART.pivot.y) / arm);
+  return tiltFraction(tiltDeg(f0) - ((to - from) * 180) / Math.PI);
+}
+
+/** A point of the layout (px) in the ART units of unit `u`'s drawing, unmirrored: what
+ *  dragFraction takes. */
+export function artPoint(u: UnitBox, p: Pt): Pt {
+  const k = u.w / ART.w;
+  const lx = p.x - u.x;
+  return { x: (u.mirror ? u.w - lx : lx) / k, y: (p.y - u.y) / k + ART.y0 };
 }
 
 /** Where on the jack (0..1 of its raw range, what SetSimExp takes) a simulated pedal
