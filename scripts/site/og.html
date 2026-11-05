@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- The Open Graph card (site/og.png, 1200x630). Serve the repo root and screenshot this
+     page at 1200x630; it borrows the pedal and the styles from site/index.html.
+       python3 -m http.server 8770   # from the repo root
+       open http://localhost:8770/scripts/site/og.html -->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../site/style.css">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body { display: grid; grid-template-columns: 470px 1fr; align-items: center; gap: 24px; padding: 0 64px 0 72px; box-sizing: border-box; }
+  .brand { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand img { width: 34px; height: 34px; }
+  h1 { font-size: 54px; line-height: 1.04; letter-spacing: -0.035em; margin: 34px 0 22px; }
+  p { margin: 0; color: var(--muted); font-size: 22px; line-height: 1.4; }
+  .right { display: grid; gap: 14px; width: 530px; justify-self: end; }
+  .pedal { max-width: none; }
+  .log { font-size: 15px; }
+  .log-rows { height: auto; }
+  .log-rows li { height: 34px; }
+</style>
+</head>
+<body>
+  <div>
+    <div class="brand"><img src="../../site/favicon.svg" alt=""><span>Flint</span></div>
+    <h1>Use your Spark Control X as a MIDI foot controller.</h1>
+    <p>A free menu-bar app for macOS.</p>
+  </div>
+  <div class="right" id="right"></div>
+  <script>
+    fetch("../../site/index.html").then((r) => r.text()).then((html) => {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const right = document.getElementById("right");
+      right.append(doc.querySelector(".pedal"));
+      const log = doc.querySelector(".log");
+      [...log.querySelectorAll(".log-rows li")].slice(3).forEach((li) => li.remove());
+      right.append(log);
+      document.body.dataset.ready = "1";
+    });
+  </script>
+</body>
+</html>

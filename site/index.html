@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en" data-repo="https://github.com/pierre-borckmans/spark-control-x-midi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flint: Spark Control X to MIDI for macOS</title>
+<meta name="description" content="Flint is a free, open-source macOS menu-bar app that turns a Spark Control X Bluetooth footswitch into a MIDI controller for Logic, Ableton, MainStage or any MIDI app.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#141514" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#e6e3da" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Flint: Spark Control X to MIDI for macOS">
+<meta property="og:description" content="A free macOS menu-bar app that turns a Spark Control X footswitch into a MIDI controller.">
+<meta property="og:image" content="og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A Spark Control X pedal drawing next to a list of MIDI messages it sends.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script>
+  // ?theme=light|dark forces a theme (for screenshots); otherwise the system decides.
+  (function () {
+    var t = new URLSearchParams(location.search).get("theme");
+    if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+  })();
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="./" aria-label="Flint, home">
+    <img src="favicon.svg" alt="" width="22" height="22">
+    <span>Flint</span>
+  </a>
+  <nav aria-label="Site">
+    <a href="#how">How it works</a>
+    <a data-repo-path="">GitHub</a>
+  </nav>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <h1 id="hero-title">Use your Spark Control X as a MIDI foot controller.</h1>
+    <div class="hero-side">
+      <p class="lede">Flint is a free menu-bar app for macOS. It connects to the pedal over Bluetooth and shows up in Logic, Ableton, MainStage or any other MIDI app as a device called Spark Control X.</p>
+      <div class="actions">
+        <a class="btn" data-repo-path="/releases/latest"><span class="btn-led" aria-hidden="true"></span>Download for macOS</a>
+        <a class="quiet" data-repo-path="">Source on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <figure class="stage" aria-labelledby="stage-caption">
+    <div class="stage-body">
+      <div class="pedal" role="img" aria-label="A drawing of the Spark Control X with six footswitches. Switch II is held down and its LED is lit; switch A is toggled on.">
+<!-- pedal:start -->
+<svg class="pedal-case" viewBox="0 -96 1000 749" aria-hidden="true" focusable="false">
+<defs>
+<filter id="pc-tolex" x="0" y="0" width="1" height="1"><feTurbulence type="turbulence" baseFrequency="0.11" numOctaves="2" seed="4"/><feDiffuseLighting surfaceScale="1.4" lighting-color="#1f1f1f"><feDistantLight azimuth="235" elevation="58"/></feDiffuseLighting><feComposite in2="SourceGraphic" operator="in"/></filter>
+<filter id="pc-brush" x="0" y="0" width="1" height="1"><feTurbulence type="fractalNoise" baseFrequency="0.0025 0.75" numOctaves="2" seed="9"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.16 0 0 0 -0.03"/><feComposite in2="SourceGraphic" operator="in"/></filter>
+<radialGradient id="pc-key" cx="0.2" cy="0" r="1"><stop offset="0" stop-color="#fff4e4" stop-opacity="0.07"/><stop offset="0.7" stop-color="#fff4e4" stop-opacity="0"/></radialGradient>
+<linearGradient id="pc-shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.05"/><stop offset="0.5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/></linearGradient>
+<linearGradient id="pc-trim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a6136"/><stop offset="0.45" stop-color="#e9cf96"/><stop offset="1" stop-color="#8d7142"/></linearGradient>
+<linearGradient id="pc-tile" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#ead7a8"/><stop offset="0.55" stop-color="#d2b882"/><stop offset="1" stop-color="#b49967"/></linearGradient>
+</defs>
+<filter id="pc-drop" x="-0.1" y="-0.1" width="1.2" height="1.3"><feGaussianBlur stdDeviation="16"/></filter>
+<rect x="20" y="34" width="960" height="537" rx="49.9" fill="#000" filter="url(#pc-drop)" class="pedal-drop"/>
+<rect width="1000" height="557" rx="49.9" fill="#121110"/>
+<rect width="1000" height="557" rx="49.9" fill="#000" filter="url(#pc-tolex)"/>
+<rect width="1000" height="557" rx="49.9" fill="url(#pc-shade)"/>
+<rect x="1" y="1" width="998" height="555" rx="48.9" fill="none" stroke="#fff4e4" stroke-opacity="0.07" stroke-width="2"/>
+<rect x="42.3" y="9.3" width="10.6" height="527.1" rx="4.2" fill="url(#pc-trim)"/>
+<rect x="947.2" y="9.3" width="10.6" height="527.1" rx="4.2" fill="url(#pc-trim)"/>
+<rect x="54.8" y="53.5" width="891.7" height="439.2" rx="3" fill="#0d0d0e"/>
+<rect x="54.8" y="53.5" width="891.7" height="439.2" rx="3" fill="#000" filter="url(#pc-brush)"/>
+<rect x="54.8" y="53.5" width="891.7" height="439.2" rx="3" fill="url(#pc-key)"/>
+<rect x="55.3" y="54" width="890.7" height="438.2" rx="3" fill="none" stroke="#000" stroke-opacity="0.8" stroke-width="2"/>
+<g font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="17" fill="#e2cfa5" fill-opacity="0.88" text-anchor="middle">
+<text x="648" y="247.7" textLength="48.2" lengthAdjust="spacingAndGlyphs">POWER</text>
+<text x="749.7" y="247.7" textLength="64.1" lengthAdjust="spacingAndGlyphs">CONNECT</text>
+<text x="720.9" y="305.8" textLength="29.7" lengthAdjust="spacingAndGlyphs">AMP</text>
+<text x="777.7" y="305.8" textLength="27.1" lengthAdjust="spacingAndGlyphs">APP</text>
+</g>
+<rect x="310" y="-2" width="26" height="9" rx="4" fill="#050505"/>
+<rect x="670" y="-2" width="26" height="9" rx="4" fill="#050505"/>
+<path d="M86.8 239.8A9.9 9.9 0 0 1 77 229.9V74.3A11.2 11.2 0 0 1 88.2 63H136.9A11.2 11.2 0 0 1 148.1 74.3V229.9A9.9 9.9 0 0 1 138.2 239.8" fill="none" stroke="#c8a96b" stroke-opacity="0.62" stroke-width="2" stroke-linecap="round"/>
+<path d="M108.7 223.4h7.6V250.8h-7.6Z" fill="#e2cfa5" fill-opacity="0.82"/>
+<path d="M92.7 189.9Q112.5 193.8 132.4 189.9" stroke="#0a0b0c" stroke-width="22.5" stroke-linecap="round" fill="none"/>
+<path d="M92.7 189.9Q112.5 193.8 132.4 189.9" stroke="#323a42" stroke-width="18.5" stroke-linecap="round" fill="none"/>
+<path d="M475 239.8A9.9 9.9 0 0 1 465.1 229.9V74.3A11.2 11.2 0 0 1 476.3 63H525A11.2 11.2 0 0 1 536.2 74.3V229.9A9.9 9.9 0 0 1 526.3 239.8" fill="none" stroke="#c8a96b" stroke-opacity="0.62" stroke-width="2" stroke-linecap="round"/>
+<path d="M490.8 223.4h7.6V250.8h-7.6ZM503 223.4h7.6V250.8h-7.6Z" fill="#e2cfa5" fill-opacity="0.82"/>
+<path d="M480.8 189.9Q500.7 193.8 520.5 189.9" stroke="#0a0b0c" stroke-width="22.5" stroke-linecap="round" fill="none"/>
+<path d="M480.8 189.9Q500.7 193.8 520.5 189.9" stroke="#323a42" stroke-width="18.5" stroke-linecap="round" fill="none"/>
+<rect x="852.8" y="60.1" width="72" height="186.3" rx="10.6" fill="url(#pc-tile)" stroke="#fff3d6" stroke-opacity="0.35"/>
+<text x="888.8" y="236.2" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="39.2" textLength="23.8" lengthAdjust="spacingAndGlyphs" fill="#241b10">A</text>
+<path d="M869 189.9Q888.8 193.8 908.6 189.9" stroke="#0a0b0c" stroke-width="22.5" stroke-linecap="round" fill="none"/>
+<path d="M869 189.9Q888.8 193.8 908.6 189.9" stroke="#323a42" stroke-width="18.5" stroke-linecap="round" fill="none"/>
+<path d="M86.8 306.5A9.9 9.9 0 0 0 77 316.4V472A11.2 11.2 0 0 0 88.2 483.2H136.9A11.2 11.2 0 0 0 148.1 472V316.4A9.9 9.9 0 0 0 138.2 306.5" fill="none" stroke="#c8a96b" stroke-opacity="0.62" stroke-width="2" stroke-linecap="round"/>
+<path d="M96.5 295.5h7.6V322.8h-7.6ZM108.7 295.5h7.6V322.8h-7.6ZM121 295.5h7.6V322.8h-7.6Z" fill="#e2cfa5" fill-opacity="0.82"/>
+<path d="M92.7 356.3Q112.5 352.4 132.4 356.3" stroke="#0a0b0c" stroke-width="22.5" stroke-linecap="round" fill="none"/>
+<path d="M92.7 356.3Q112.5 352.4 132.4 356.3" stroke="#323a42" stroke-width="18.5" stroke-linecap="round" fill="none"/>
+<path d="M475 306.5A9.9 9.9 0 0 0 465.1 316.4V472A11.2 11.2 0 0 0 476.3 483.2H525A11.2 11.2 0 0 0 536.2 472V316.4A9.9 9.9 0 0 0 526.3 306.5" fill="none" stroke="#c8a96b" stroke-opacity="0.62" stroke-width="2" stroke-linecap="round"/>
+<path d="M480.7 295.5h7.6V322.8h-7.6ZM492.9 295.5H500.8L506.8 311.9L512.7 295.5H520.6L511.4 322.8H502.1Z" fill="#e2cfa5" fill-opacity="0.82"/>
+<path d="M480.8 356.3Q500.7 352.4 520.5 356.3" stroke="#0a0b0c" stroke-width="22.5" stroke-linecap="round" fill="none"/>
+<path d="M480.8 356.3Q500.7 352.4 520.5 356.3" stroke="#323a42" stroke-width="18.5" stroke-linecap="round" fill="none"/>
+<rect x="852.8" y="299.9" width="72" height="186.3" rx="10.6" fill="url(#pc-tile)" stroke="#fff3d6" stroke-opacity="0.35"/>
+<text x="888.8" y="337.8" text-anchor="middle" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="39.2" textLength="19.8" lengthAdjust="spacingAndGlyphs" fill="#241b10">B</text>
+<path d="M869 356.3Q888.8 352.4 908.6 356.3" stroke="#0a0b0c" stroke-width="22.5" stroke-linecap="round" fill="none"/>
+<path d="M869 356.3Q888.8 352.4 908.6 356.3" stroke="#323a42" stroke-width="18.5" stroke-linecap="round" fill="none"/>
+<path d="M631.5 273.1h31" stroke="#0a0b0c" stroke-width="23.8" stroke-linecap="round"/>
+<circle cx="721.3" cy="273.1" r="10.5" fill="#0a0b0c"/><circle cx="721.3" cy="273.1" r="8.5" fill="#323a42"/>
+<circle cx="778.1" cy="273.1" r="10.5" fill="#0a0b0c"/><circle cx="778.1" cy="273.1" r="8.5" fill="#323a42"/>
+<g class="pedal-captions" font-family="'SF Mono', ui-monospace, Menlo, monospace" font-size="25" text-anchor="middle">
+<g class="cap-label" data-sw="0"><text x="112.5" y="-54">CC 80</text><path d="M112.5 -36V-8" stroke-width="1.5"/></g>
+<g class="cap-label on" data-sw="1"><text x="500.7" y="-54">CC 81</text><path d="M500.7 -36V-8" stroke-width="1.5"/></g>
+<g class="cap-label" data-sw="2"><text x="888.8" y="-54">CC 82<tspan class="opt"> · toggle</tspan></text><path d="M888.8 -36V-8" stroke-width="1.5"/></g>
+<g class="cap-label" data-sw="3"><text x="112.5" y="633">Note C3</text><path d="M112.5 575V603" stroke-width="1.5"/></g>
+<g class="cap-label" data-sw="4"><text x="500.7" y="633">CC 84</text><path d="M500.7 575V603" stroke-width="1.5"/></g>
+<g class="cap-label" data-sw="5"><text x="888.8" y="633">Program 4</text><path d="M888.8 575V603" stroke-width="1.5"/></g>
+</g>
+</svg>
+<svg class="pedal-lights" viewBox="0 -96 1000 749" aria-hidden="true" focusable="false">
+<defs>
+<radialGradient id="pl-cap" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#fbf6ea"/><stop offset="0.45" stop-color="#d9d0bd"/><stop offset="0.85" stop-color="#9d9483"/><stop offset="1" stop-color="#6f685c"/></radialGradient>
+<radialGradient id="pl-captop" cx="0.42" cy="0.36" r="0.7"><stop offset="0" stop-color="#fffaf0"/><stop offset="0.6" stop-color="#e3dac6"/><stop offset="1" stop-color="#b8ae99"/></radialGradient>
+<filter id="pl-lampglow" filterUnits="userSpaceOnUse" x="567" y="213.1" width="291.1" height="120"><feGaussianBlur stdDeviation="7"/></filter>
+<filter id="pl-glow-0" filterUnits="userSpaceOnUse" x="2.5" y="120.9" width="220" height="140"><feGaussianBlur stdDeviation="9"/></filter>
+<filter id="pl-glow-1" filterUnits="userSpaceOnUse" x="390.7" y="120.9" width="220" height="140"><feGaussianBlur stdDeviation="9"/></filter>
+<filter id="pl-glow-2" filterUnits="userSpaceOnUse" x="778.8" y="120.9" width="220" height="140"><feGaussianBlur stdDeviation="9"/></filter>
+<filter id="pl-glow-3" filterUnits="userSpaceOnUse" x="2.5" y="285.3" width="220" height="140"><feGaussianBlur stdDeviation="9"/></filter>
+<filter id="pl-glow-4" filterUnits="userSpaceOnUse" x="390.7" y="285.3" width="220" height="140"><feGaussianBlur stdDeviation="9"/></filter>
+<filter id="pl-glow-5" filterUnits="userSpaceOnUse" x="778.8" y="285.3" width="220" height="140"><feGaussianBlur stdDeviation="9"/></filter>
+</defs>
+<g fill="none" stroke-linecap="round">
+<g class="lamp lamp-power"><path d="M631.5 273.1h31" stroke="#28ff5a" stroke-width="63.3" filter="url(#pl-lampglow)" opacity="0.55"/><path d="M631.5 273.1h31" stroke="#28ff5a" stroke-width="19.8"/></g>
+<g class="lamp lamp-amp"><path d="M721.3 273.1h0.01" stroke="#00ff73" stroke-width="54.2" filter="url(#pl-lampglow)" opacity="0.55"/><path d="M721.3 273.1h0.01" stroke="#00ff73" stroke-width="16.9"/></g>
+<g class="lamp lamp-app"><path d="M778.1 273.1h0.01" stroke="#5a2dff" stroke-width="54.2" filter="url(#pl-lampglow)" opacity="0.55"/><path d="M778.1 273.1h0.01" stroke="#5a2dff" stroke-width="16.9"/></g>
+<g class="led" data-sw="0"><path d="M92.7 189.9Q112.5 193.8 132.4 189.9" stroke="#ff9600" stroke-width="59.1" filter="url(#pl-glow-0)" opacity="0.55"/><path d="M92.7 189.9Q112.5 193.8 132.4 189.9" stroke="#ff9600" stroke-width="18.5"/><path d="M92.7 189.9Q112.5 193.8 132.4 189.9" stroke="#fff" stroke-opacity="0.72" stroke-width="7.8"/></g>
+<g class="led on" data-sw="1"><path d="M480.8 189.9Q500.7 193.8 520.5 189.9" stroke="#ff5000" stroke-width="59.1" filter="url(#pl-glow-1)" opacity="0.55"/><path d="M480.8 189.9Q500.7 193.8 520.5 189.9" stroke="#ff5000" stroke-width="18.5"/><path d="M480.8 189.9Q500.7 193.8 520.5 189.9" stroke="#fff" stroke-opacity="0.72" stroke-width="7.8"/></g>
+<g class="led on" data-sw="2"><path d="M869 189.9Q888.8 193.8 908.6 189.9" stroke="#ff00aa" stroke-width="59.1" filter="url(#pl-glow-2)" opacity="0.55"/><path d="M869 189.9Q888.8 193.8 908.6 189.9" stroke="#ff00aa" stroke-width="18.5"/><path d="M869 189.9Q888.8 193.8 908.6 189.9" stroke="#fff" stroke-opacity="0.72" stroke-width="7.8"/></g>
+<g class="led" data-sw="3"><path d="M92.7 356.3Q112.5 352.4 132.4 356.3" stroke="#00dcff" stroke-width="59.1" filter="url(#pl-glow-3)" opacity="0.55"/><path d="M92.7 356.3Q112.5 352.4 132.4 356.3" stroke="#00dcff" stroke-width="18.5"/><path d="M92.7 356.3Q112.5 352.4 132.4 356.3" stroke="#fff" stroke-opacity="0.72" stroke-width="7.8"/></g>
+<g class="led" data-sw="4"><path d="M480.8 356.3Q500.7 352.4 520.5 356.3" stroke="#0078ff" stroke-width="59.1" filter="url(#pl-glow-4)" opacity="0.55"/><path d="M480.8 356.3Q500.7 352.4 520.5 356.3" stroke="#0078ff" stroke-width="18.5"/><path d="M480.8 356.3Q500.7 352.4 520.5 356.3" stroke="#fff" stroke-opacity="0.72" stroke-width="7.8"/></g>
+<g class="led" data-sw="5"><path d="M869 356.3Q888.8 352.4 908.6 356.3" stroke="#9600ff" stroke-width="59.1" filter="url(#pl-glow-5)" opacity="0.55"/><path d="M869 356.3Q888.8 352.4 908.6 356.3" stroke="#9600ff" stroke-width="18.5"/><path d="M869 356.3Q888.8 352.4 908.6 356.3" stroke="#fff" stroke-opacity="0.72" stroke-width="7.8"/></g>
+</g>
+<linearGradient id="pl-nut-0" gradientUnits="userSpaceOnUse" x1="70.8" y1="65" x2="154.3" y2="161.5"><stop offset="0" stop-color="#f1eadb"/><stop offset="0.35" stop-color="#bfb6a3"/><stop offset="0.7" stop-color="#8e8676"/><stop offset="1" stop-color="#5f594f"/></linearGradient>
+<ellipse cx="112.5" cy="113.2" rx="44.8" ry="50.2" transform="translate(3 6) rotate(9 112.5 113.2)" fill="#000" opacity="0.45"/>
+<path d="M120.1 65.6 L157.6 96 L150 143.6 L105 160.9 L67.5 130.5 L75 82.9Z" fill="url(#pl-nut-0)" stroke="#4b463e" stroke-width="2" stroke-linejoin="round"/>
+<rect x="108.6" y="75.3" width="7.9" height="4.5" rx="1.5" fill="#2a2723"/>
+<g class="fs" data-sw="0"><circle cx="113.5" cy="116.2" r="34.7" fill="#000" opacity="0.45"/><circle cx="112.5" cy="113.2" r="33.7" fill="url(#pl-cap)" stroke="#5d574d" stroke-width="1.5"/><circle cx="112.5" cy="113.2" r="27.1" fill="url(#pl-captop)"/><circle cx="112.5" cy="113.2" r="27.1" fill="none" stroke="#fff" stroke-opacity="0.35"/></g>
+<linearGradient id="pl-nut-1" gradientUnits="userSpaceOnUse" x1="458.9" y1="65" x2="542.4" y2="161.5"><stop offset="0" stop-color="#f1eadb"/><stop offset="0.35" stop-color="#bfb6a3"/><stop offset="0.7" stop-color="#8e8676"/><stop offset="1" stop-color="#5f594f"/></linearGradient>
+<ellipse cx="500.7" cy="113.2" rx="44.8" ry="50.2" transform="translate(3 6) rotate(24 500.7 113.2)" fill="#000" opacity="0.45"/>
+<path d="M520.3 69.2 L548.6 108.2 L529 152.3 L481 157.3 L452.7 118.3 L472.3 74.2Z" fill="url(#pl-nut-1)" stroke="#4b463e" stroke-width="2" stroke-linejoin="round"/>
+<rect x="496.7" y="75.3" width="7.9" height="4.5" rx="1.5" fill="#2a2723"/>
+<g class="fs held" data-sw="1"><circle cx="501.7" cy="116.2" r="34.7" fill="#000" opacity="0.45"/><circle cx="500.7" cy="113.2" r="33.7" fill="url(#pl-cap)" stroke="#5d574d" stroke-width="1.5"/><circle cx="500.7" cy="113.2" r="27.1" fill="url(#pl-captop)"/><circle cx="500.7" cy="113.2" r="27.1" fill="none" stroke="#fff" stroke-opacity="0.35"/></g>
+<linearGradient id="pl-nut-2" gradientUnits="userSpaceOnUse" x1="847" y1="65" x2="930.6" y2="161.5"><stop offset="0" stop-color="#f1eadb"/><stop offset="0.35" stop-color="#bfb6a3"/><stop offset="0.7" stop-color="#8e8676"/><stop offset="1" stop-color="#5f594f"/></linearGradient>
+<ellipse cx="888.8" cy="113.2" rx="44.8" ry="50.2" transform="translate(3 6) rotate(41 888.8 113.2)" fill="#000" opacity="0.45"/>
+<path d="M920.5 76.8 L936.2 122.4 L904.5 158.9 L857.2 149.6 L841.5 104 L873.1 67.6Z" fill="url(#pl-nut-2)" stroke="#4b463e" stroke-width="2" stroke-linejoin="round"/>
+<rect x="884.8" y="75.3" width="7.9" height="4.5" rx="1.5" fill="#2a2723"/>
+<g class="fs" data-sw="2"><circle cx="889.8" cy="116.2" r="34.7" fill="#000" opacity="0.45"/><circle cx="888.8" cy="113.2" r="33.7" fill="url(#pl-cap)" stroke="#5d574d" stroke-width="1.5"/><circle cx="888.8" cy="113.2" r="27.1" fill="url(#pl-captop)"/><circle cx="888.8" cy="113.2" r="27.1" fill="none" stroke="#fff" stroke-opacity="0.35"/></g>
+<linearGradient id="pl-nut-3" gradientUnits="userSpaceOnUse" x1="70.8" y1="384.8" x2="154.3" y2="481.2"><stop offset="0" stop-color="#f1eadb"/><stop offset="0.35" stop-color="#bfb6a3"/><stop offset="0.7" stop-color="#8e8676"/><stop offset="1" stop-color="#5f594f"/></linearGradient>
+<ellipse cx="112.5" cy="433" rx="44.8" ry="50.2" transform="translate(3 6) rotate(16 112.5 433)" fill="#000" opacity="0.45"/>
+<path d="M125.8 386.6 L159.3 421.3 L146 467.7 L99.2 479.4 L65.7 444.7 L79 398.3Z" fill="url(#pl-nut-3)" stroke="#4b463e" stroke-width="2" stroke-linejoin="round"/>
+<rect x="108.6" y="395.1" width="7.9" height="4.5" rx="1.5" fill="#2a2723"/>
+<g class="fs" data-sw="3"><circle cx="113.5" cy="436" r="34.7" fill="#000" opacity="0.45"/><circle cx="112.5" cy="433" r="33.7" fill="url(#pl-cap)" stroke="#5d574d" stroke-width="1.5"/><circle cx="112.5" cy="433" r="27.1" fill="url(#pl-captop)"/><circle cx="112.5" cy="433" r="27.1" fill="none" stroke="#fff" stroke-opacity="0.35"/></g>
+<linearGradient id="pl-nut-4" gradientUnits="userSpaceOnUse" x1="458.9" y1="384.8" x2="542.4" y2="481.2"><stop offset="0" stop-color="#f1eadb"/><stop offset="0.35" stop-color="#bfb6a3"/><stop offset="0.7" stop-color="#8e8676"/><stop offset="1" stop-color="#5f594f"/></linearGradient>
+<ellipse cx="500.7" cy="433" rx="44.8" ry="50.2" transform="translate(3 6) rotate(33 500.7 433)" fill="#000" opacity="0.45"/>
+<path d="M526.9 392.5 L548.8 435.5 L522.6 476 L474.4 473.4 L452.5 430.5 L478.8 390Z" fill="url(#pl-nut-4)" stroke="#4b463e" stroke-width="2" stroke-linejoin="round"/>
+<rect x="496.7" y="395.1" width="7.9" height="4.5" rx="1.5" fill="#2a2723"/>
+<g class="fs" data-sw="4"><circle cx="501.7" cy="436" r="34.7" fill="#000" opacity="0.45"/><circle cx="500.7" cy="433" r="33.7" fill="url(#pl-cap)" stroke="#5d574d" stroke-width="1.5"/><circle cx="500.7" cy="433" r="27.1" fill="url(#pl-captop)"/><circle cx="500.7" cy="433" r="27.1" fill="none" stroke="#fff" stroke-opacity="0.35"/></g>
+<linearGradient id="pl-nut-5" gradientUnits="userSpaceOnUse" x1="847" y1="384.8" x2="930.6" y2="481.2"><stop offset="0" stop-color="#f1eadb"/><stop offset="0.35" stop-color="#bfb6a3"/><stop offset="0.7" stop-color="#8e8676"/><stop offset="1" stop-color="#5f594f"/></linearGradient>
+<ellipse cx="888.8" cy="433" rx="44.8" ry="50.2" transform="translate(3 6) rotate(4 888.8 433)" fill="#000" opacity="0.45"/>
+<path d="M892.2 384.9 L932.2 411.8 L928.8 460 L885.4 481.1 L845.5 454.1 L848.8 406Z" fill="url(#pl-nut-5)" stroke="#4b463e" stroke-width="2" stroke-linejoin="round"/>
+<rect x="884.8" y="395.1" width="7.9" height="4.5" rx="1.5" fill="#2a2723"/>
+<g class="fs" data-sw="5"><circle cx="889.8" cy="436" r="34.7" fill="#000" opacity="0.45"/><circle cx="888.8" cy="433" r="33.7" fill="url(#pl-cap)" stroke="#5d574d" stroke-width="1.5"/><circle cx="888.8" cy="433" r="27.1" fill="url(#pl-captop)"/><circle cx="888.8" cy="433" r="27.1" fill="none" stroke="#fff" stroke-opacity="0.35"/></g>
+</svg>
+<!-- pedal:end -->
+      </div>
+      <div class="wire" aria-hidden="true"><span class="pulse"></span></div>
+      <div class="log" aria-hidden="true">
+        <div class="log-head">
+          <span class="log-lamp"></span>
+          <span>MIDI out</span>
+          <span class="log-port">Spark Control X</span>
+        </div>
+        <ol class="log-rows">
+          <li class="fresh"><span class="msg">CC 81 = 127 · ch 1</span><span class="sw">II</span></li>
+          <li><span class="msg">CC 82 = 127 · ch 1</span><span class="sw">A</span></li>
+          <li><span class="msg">CC 84 = 0 · ch 1</span><span class="sw">IV</span></li>
+          <li><span class="msg">CC 84 = 127 · ch 1</span><span class="sw">IV</span></li>
+          <li><span class="msg">Program 4 · ch 1</span><span class="sw">B</span></li>
+          <li><span class="msg">Note C3 off · ch 1</span><span class="sw">III</span></li>
+        </ol>
+      </div>
+    </div>
+    <figcaption>
+      <p id="stage-caption">Press II and your DAW gets <code>CC 81 = 127</code>. Let go and it gets <code>0</code>.</p>
+      <button class="pause" type="button" aria-pressed="false" hidden>
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path class="i-pause" d="M3 2h2v8H3zM7 2h2v8H7z"/><path class="i-play" d="M3 2l7 4-7 4z"/></svg>
+        <span>Pause</span>
+      </button>
+    </figcaption>
+  </figure>
+
+  <section class="block" aria-labelledby="what">
+    <h2 id="what">What it does</h2>
+    <ul class="features">
+      <li>
+        <h3>Six switches, any message</h3>
+        <div>
+          <p>Each switch sends a CC, momentary or toggle, a note or a program change. Holding a switch can send something else, and pressing two switches together is a trigger of its own.</p>
+          <p class="eg"><code>II</code><span aria-hidden="true">→</span><code>CC 81 = 127 · ch 1</code></p>
+        </div>
+      </li>
+      <li>
+        <h3>Two expression inputs</h3>
+        <div>
+          <p>Plug TRS expression pedals into EXP 1 and EXP 2. Set heel and toe in Flint and invert the direction if you need to. Each input can also act as a switch: it fires when the pedal leaves the heel, or when you click the toe down.</p>
+          <p class="eg"><code>EXP 1</code><span aria-hidden="true">→</span><code>CC 11 = 0 to 127 · ch 1</code></p>
+        </div>
+      </li>
+      <li>
+        <h3>LEDs your DAW can drive</h3>
+        <div>
+          <p>A switch lights while you hold it and while its toggle is on. Or turn on MIDI feedback: send the same CC back to the <code>Spark Control X LEDs</code> port and the LED shows the real state, like a plugin bypassed or a track armed. The AMP and APP lamps can show MIDI traffic, the connection or USB power.</p>
+        </div>
+      </li>
+      <li>
+        <h3>Presets</h3>
+        <div>
+          <p>Keep a mapping per DAW or per gig and switch between them from the menu bar. Each preset has its own undo history. Export one as a file to use it on another Mac.</p>
+          <picture class="crop t-dark">
+            <source srcset="img/presets-dark.webp" type="image/webp">
+            <img src="img/presets-dark.png" width="620" height="280" loading="lazy" decoding="async" alt="Flint's preset menu listing My mapping, Ableton live, Logic tracking and MainStage gig, with buttons to rename, duplicate, export and delete.">
+          </picture>
+          <picture class="crop t-light">
+            <source srcset="img/presets-light.webp" type="image/webp">
+            <img src="img/presets-light.png" width="620" height="280" loading="lazy" decoding="async" alt="Flint's preset menu listing My mapping, Ableton live, Logic tracking and MainStage gig, with buttons to rename, duplicate, export and delete.">
+          </picture>
+        </div>
+      </li>
+      <li>
+        <h3>Nothing else to install</h3>
+        <div>
+          <p>No Spark app, no amp, no firmware update. Flint never writes to the profiles stored on the pedal. It remembers your pedal, reconnects on its own, and shows the battery level and charging in the menu bar.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <figure class="window-wrap">
+    <div class="window">
+      <span class="traffic" aria-hidden="true"><i></i><i></i><i></i></span>
+      <picture class="t-dark">
+        <source srcset="img/app-dark.webp" type="image/webp">
+        <img src="img/app-dark.png" width="1180" height="820" loading="lazy" decoding="async" alt="Flint's editor. A drawing of the pedal shows each switch's message, CC 80 to CC 85, two expression pedals send CC 11 and CC 7, and a panel on the right sets switch I to CC 80, momentary, with an amber LED.">
+      </picture>
+      <picture class="t-light">
+        <source srcset="img/app-light.webp" type="image/webp">
+        <img src="img/app-light.png" width="1180" height="820" loading="lazy" decoding="async" alt="Flint's editor. A drawing of the pedal shows each switch's message, CC 80 to CC 85, two expression pedals send CC 11 and CC 7, and a panel on the right sets switch I to CC 80, momentary, with an amber LED.">
+      </picture>
+    </div>
+    <figcaption>The editor. Click a switch on the drawing to choose what it sends.</figcaption>
+  </figure>
+
+  <section class="block" id="how" aria-labelledby="how-title">
+    <h2 id="how-title">How it works</h2>
+    <ol class="steps">
+      <li>
+        <h3>Turn the pedal on</h3>
+        <p>Keep the Spark app closed. The pedal talks to one app at a time.</p>
+      </li>
+      <li>
+        <h3>Open Flint</h3>
+        <p>It finds the pedal and connects. macOS asks for Bluetooth access the first time. After that Flint stays in the menu bar.</p>
+      </li>
+      <li>
+        <h3>Map it in your DAW</h3>
+        <p>Pick Spark Control X as a MIDI input and use MIDI learn, or change the messages in Flint to match what your DAW expects.</p>
+      </li>
+    </ol>
+  </section>
+
+  <div class="pair">
+  <section class="block get" id="get" aria-labelledby="get-title">
+    <h2 id="get-title">Download</h2>
+    <p class="req">macOS · a Spark Control X · expression pedals optional, on TRS cables</p>
+    <div class="actions">
+      <a class="btn" data-repo-path="/releases/latest"><span class="btn-led" aria-hidden="true"></span>Download for macOS</a>
+    </div>
+    <p class="note">Flint isn't notarized yet, so the first time you open it, right-click the app in Applications and choose Open.</p>
+  </section>
+
+  <section class="block" aria-labelledby="src-title">
+    <h2 id="src-title">Open source</h2>
+    <p>Flint is free and MIT licensed. The code, issues and releases are <a data-repo-path="">on GitHub</a>. The protocol work started from Paul Hamshere's <a href="https://github.com/paulhamsh/Spark-Control-X">Spark-Control-X notes</a>.</p>
+  </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <p>Spark and Spark Control X are trademarks of Positive Grid. Flint is not affiliated with or endorsed by Positive Grid.</p>
+  <p>MIT License · <a data-repo-path="">GitHub</a></p>
+</footer>
+
+<script>
+  // Every GitHub link comes from <html data-repo>, so renaming the repo is one edit.
+  (function () {
+    var repo = document.documentElement.dataset.repo;
+    document.querySelectorAll("[data-repo-path]").forEach(function (a) {
+      a.href = repo + a.dataset.repoPath;
+    });
+  })();
+</script>
+<script src="main.js" defer></script>
+</body>
+</html>
