@@ -137,3 +137,15 @@ POWER LED colours seen: blinking yellow at ~30 % (charging), steady green at 61 
 charging), blinking green at 61 % (charging). Green therefore starts somewhere in 31..61 %.
 
 `2BEA` read `02 13` while charging and `02 10` when not: bits 0-1 track charging too.
+
+## Expression pedals that work, and one that does not (2026-11-05)
+
+- **M-Audio EX-P** (TRS, built-in cable, polarity switch): works. Raw values on jack 1 ran
+  from about 80 (heel) to 27280 (toe), about 42 % of the 16-bit range, so software
+  heel/toe calibration matters. `0x0c` arrived at ~20-30 per second while moving and not at
+  all at rest.
+- **Line 6 EX-1**: does NOT work, with any cable. It is a 2-wire pedal (a 10 kΩ pot read
+  as a variable resistor between tip and sleeve, meant for a mono cable into Line 6 gear).
+  The Spark Control X expects a 3-wire TRS expression pedal (reference voltage + wiper),
+  so it detects the plug and reads a constant 0. The same goes for other TS-only
+  "expression" pedals.
