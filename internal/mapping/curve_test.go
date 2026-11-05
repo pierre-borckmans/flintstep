@@ -37,6 +37,12 @@ var goldenCurves = []ExpCurve{
 	{Kind: CurveCustom, Amount: -0.35},
 	{Kind: CurveCustom, Amount: 1},
 	{Kind: CurveCustom, Amount: -1},
+	{Kind: CurveS, Strength: 1, Centre: 0.5},
+	{Kind: CurveS, Strength: 0.8, Centre: 0.3},
+	{Kind: CurveS, Strength: 0.4, Centre: 0.7},
+	{Kind: CurveCustom, Points: []CurvePoint{{X: 0.5, Y: 0.25}}},
+	{Kind: CurveCustom, Points: []CurvePoint{{X: 0.2, Y: 0.05}, {X: 0.5, Y: 0.5}, {X: 0.8, Y: 0.95}}},
+	{Kind: CurveCustom, Points: []CurvePoint{{X: 0.3, Y: 0.4}, {X: 0.6, Y: 0.4}}}, // a flat stretch
 }
 
 func buildGolden() golden {
@@ -80,7 +86,7 @@ func TestCurveGolden(t *testing.T) {
 	}
 	for i, r := range want.Rows {
 		g := got.Rows[i]
-		if g.Curve != r.Curve {
+		if !g.Curve.Equal(r.Curve) {
 			t.Fatalf("row %d is %+v, want %+v", i, g.Curve, r.Curve)
 		}
 		for j := range r.Out {
@@ -189,18 +195,21 @@ func TestCurveShapes(t *testing.T) {
 }
 
 func TestCurveNormalize(t *testing.T) {
+	// Zero strength and centre mean "the default S" and stay zero.
+	d := func(c ExpCurve) ExpCurve { return c }
 	cases := []struct {
 		in, want ExpCurve
 	}{
-		{ExpCurve{}, ExpCurve{Kind: CurveLinear}},
-		{ExpCurve{Kind: "wobbly", Amount: 0.2}, ExpCurve{Kind: CurveLinear, Amount: 0.2}},
-		{ExpCurve{Kind: CurveCustom, Amount: 3}, ExpCurve{Kind: CurveCustom, Amount: 1}},
-		{ExpCurve{Kind: CurveCustom, Amount: -3}, ExpCurve{Kind: CurveCustom, Amount: -1}},
-		{ExpCurve{Kind: CurveCustom, Amount: math.NaN()}, ExpCurve{Kind: CurveCustom}},
-		{ExpCurve{Kind: CurveGentle, Amount: 0.4}, ExpCurve{Kind: CurveGentle, Amount: 0.4}}, // kept for Custom
+		{ExpCurve{}, d(ExpCurve{Kind: CurveLinear})},
+		{ExpCurve{Kind: "wobbly", Amount: 0.2}, d(ExpCurve{Kind: CurveLinear, Amount: 0.2})},
+		{ExpCurve{Kind: CurveCustom, Amount: 3}, d(ExpCurve{Kind: CurveCustom, Amount: 1})},
+		{ExpCurve{Kind: CurveCustom, Amount: -3}, d(ExpCurve{Kind: CurveCustom, Amount: -1})},
+		{ExpCurve{Kind: CurveCustom, Amount: math.NaN()}, d(ExpCurve{Kind: CurveCustom})},
+		{ExpCurve{Kind: CurveGentle, Amount: 0.4}, d(ExpCurve{Kind: CurveGentle, Amount: 0.4})}, // kept for Custom
+		{ExpCurve{Kind: CurveS, Strength: 2, Centre: 0.95}, ExpCurve{Kind: CurveS, Strength: 1, Centre: 0.9}},
 	}
 	for _, c := range cases {
-		if got := c.in.normalize(); got != c.want {
+		if got := c.in.normalize(); !got.Equal(c.want) {
 			t.Errorf("%+v -> %+v, want %+v", c.in, got, c.want)
 		}
 	}
@@ -216,7 +225,7 @@ func TestOldConfigGetsLinearCurves(t *testing.T) {
 	}
 	c = c.Normalize()
 	for n, x := range c.Exp {
-		if x.Curve != (ExpCurve{Kind: CurveLinear}) {
+		if want := (ExpCurve{Kind: CurveLinear}).normalize(); !x.Curve.Equal(want) {
 			t.Errorf("exp %d curve %+v", n+1, x.Curve)
 		}
 	}
@@ -251,7 +260,7 @@ func TestCurveJSON(t *testing.T) {
 	if err := json.Unmarshal(b, &back); err != nil {
 		t.Fatal(err)
 	}
-	if back.Exp[0].Curve != c.Exp[0].Curve || back.Normalize().Exp[0].Curve != c.Exp[0].Curve {
+	if !back.Exp[0].Curve.Equal(c.Exp[0].Curve) || !back.Normalize().Exp[0].Curve.Equal(c.Exp[0].Curve) {
 		t.Errorf("curve lost in the round trip: %+v", back.Exp[0].Curve)
 	}
 }
@@ -301,5 +310,62 @@ func TestCurvedHysteresis(t *testing.T) {
 		if out := e.Exp(0, raw, at.Add(time.Duration(i+1)*time.Millisecond)).Msgs(); len(out) != 0 {
 			t.Fatalf("resting at %d flickered: %v", raw, out)
 		}
+	}
+}
+
+func TestCurvesNeverGoBack(t *testing.T) {
+	for _, c := range goldenCurves {
+		c = c.normalize()
+		prev := 0.0
+		for i := 1; i <= 1000; i++ {
+			y := c.Apply(float64(i) / 1000)
+			if y < prev-1e-12 {
+				t.Fatalf("%+v goes back at %v: %v < %v", c, float64(i)/1000, y, prev)
+			}
+			prev = y
+		}
+		if c.Apply(0) != 0 || c.Apply(1) != 1 {
+			t.Errorf("%+v ends at %v..%v", c, c.Apply(0), c.Apply(1))
+		}
+	}
+}
+
+func TestCustomPassesThroughItsPoints(t *testing.T) {
+	c := ExpCurve{Kind: CurveCustom, Points: []CurvePoint{{X: 0.2, Y: 0.05}, {X: 0.5, Y: 0.5}, {X: 0.8, Y: 0.95}}}
+	for _, p := range c.Points {
+		if got := c.Apply(p.X); math.Abs(got-p.Y) > 1e-9 {
+			t.Errorf("Apply(%v) = %v, want %v", p.X, got, p.Y)
+		}
+	}
+}
+
+func TestNormalizePoints(t *testing.T) {
+	got := normalizePoints([]CurvePoint{
+		{X: 0.8, Y: 0.6}, {X: 0.5, Y: 0.7}, // out of order, and y going back down
+		{X: 0.505, Y: 0.1},             // too close to 0.5: dropped
+		{X: 0, Y: 0.3}, {X: 1, Y: 0.9}, // on the ends: dropped
+		{X: 0.3, Y: 2}, // y clamped
+	})
+	want := []CurvePoint{{X: 0.3, Y: 1}, {X: 0.5, Y: 1}, {X: 0.8, Y: 1}}
+	if len(got) != len(want) {
+		t.Fatalf("normalizePoints = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("point %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestSDefaultsForOldPresets(t *testing.T) {
+	old := ExpCurve{Kind: CurveS}.normalize()
+	if old.Strength != 0 || old.Centre != 0 {
+		t.Errorf("old S normalised to %+v, want zeros (the default S)", old)
+	}
+	if y, z := old.Apply(0.3), (ExpCurve{Kind: CurveS, Strength: sStrength, Centre: sCentre}).Apply(0.3); y != z {
+		t.Errorf("zeros apply as %v, the default S as %v", y, z)
+	}
+	if y := old.Apply(0.5); math.Abs(y-0.5) > 1e-9 {
+		t.Errorf("centred S at half travel = %v, want 0.5", y)
 	}
 }

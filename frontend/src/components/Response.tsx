@@ -1,125 +1,148 @@
 import { useRef, useState } from "react";
 import type { Apply } from "../lib/config";
 import {
+  addPoint,
   CURVE_SHORT,
   CURVE_TIP,
   curvePath,
-  dragAmount,
-  formatAmount,
-  keyAmount,
+  editPoints,
+  movePoint,
   pickCurve,
+  removePoint,
 } from "../lib/curve";
-import { applyCurve, CURVE_KINDS, LINEAR } from "../lib/exp";
+import { applyCurve, CURVE_KINDS, LINEAR, sControls } from "../lib/exp";
 import { nextGesture } from "../lib/scrub";
-import type { CurveKind, ExpConfig, ExpCurve } from "../types";
+import type { CurveKind, CurvePoint, ExpConfig, ExpCurve } from "../types";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
+import { NumField } from "../ui/NumField";
 import { Seg } from "../ui/Seg";
 
 // THE RESPONSE CURVE: how the pedal's travel bends on its way out (mapping/curve.go).
-// A segmented control for the kind and a small graph of it, with a dot that follows
-// the pedal. On Custom the graph is the control: drag it up or down.
+// A segmented control for the kind, a graph with a dot that follows the pedal, and the
+// kind's own controls: Strength and Centre for S, draggable points for Custom.
 
-const W = 120;
-const H = 80;
-const PAD = 4;
-const IW = W - PAD * 2;
-const IH = H - PAD * 2;
+const SMALL = { w: 120, h: 80 };
+const LARGE = { w: 220, h: 150 };
+const PAD = 6;
 
-// Short labels fit a card; the tooltip names each in full and says what it is for.
 const OPTIONS = CURVE_KINDS.map((k) => ({ value: k, label: CURVE_SHORT[k], title: CURVE_TIP[k] }));
 
+type Gesture = { id: number; done: boolean };
+
 /** The curve, the identity diagonal faintly, and the pedal now: a dot at (travel,
- *  output). On Custom, a vertical drag (Shift for fine) or the arrow keys shape it; one
- *  drag is one history entry and one save. */
+ *  output). With `onPoints` (Custom) the points are handles: drag to move, click an
+ *  empty spot to add, double-click a point to remove. One drag is one history entry. */
 export function CurveGraph({
   curve,
   travel,
   label,
-  onAmount,
+  onPoints,
 }: {
   curve: ExpCurve;
   /** The pedal's calibrated travel 0..1, or null with no reading. */
   travel: number | null;
   label: string;
-  /** Custom only: a new amount, with the drag it belongs to (none for a key). */
-  onAmount?: (amount: number, gesture?: { id: number; done: boolean }) => void;
+  onPoints?: (points: CurvePoint[], gesture?: Gesture) => void;
 }) {
-  const custom = curve.kind === "custom" && !!onAmount;
-  const drag = useRef<{ id: number; y: number; start: number; last: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
+  const edit = curve.kind === "custom" && !!onPoints;
+  const { w: W, h: H } = edit ? LARGE : SMALL;
+  const IW = W - PAD * 2;
+  const IH = H - PAD * 2;
+  const svg = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ id: number; i: number; pts: CurvePoint[] } | null>(null);
+  const [active, setActive] = useState(-1);
+  const pts = edit ? editPoints(curve) : [];
   const out = travel === null ? null : applyCurve(curve, travel);
   const path = curvePath(curve, IW, IH);
 
-  const move = (clientY: number, fine: boolean, done: boolean) => {
-    const d = drag.current;
-    if (!d || !onAmount) return;
-    const a = dragAmount(d.start, clientY - d.y, fine);
-    if (a === d.last && !done) return;
-    d.last = a;
-    onAmount(a, { id: d.id, done });
+  // Pointer position as travel/output, 0..1 (heel bottom-left).
+  const at = (clientX: number, clientY: number) => {
+    const r = svg.current?.getBoundingClientRect();
+    if (!r) return { x: 0, y: 0 };
+    const x = ((clientX - r.left) / r.width) * W - PAD;
+    const y = ((clientY - r.top) / r.height) * H - PAD;
+    return { x: Math.min(1, Math.max(0, x / IW)), y: Math.min(1, Math.max(0, 1 - y / IH)) };
   };
-  const end = (e: React.PointerEvent) => {
-    if (!drag.current) return;
-    move(e.clientY, e.shiftKey, true);
+  const hit = (x: number, y: number) => {
+    let best = -1;
+    let bd = (10 / IW) ** 2; // within ~10 px
+    pts.forEach((p, i) => {
+      const d = (p.x - x) ** 2 + ((p.y - y) * (IH / IW)) ** 2;
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    });
+    return best;
+  };
+
+  const onDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!edit || !onPoints || e.button !== 0) return;
+    e.preventDefault();
+    const p = at(e.clientX, e.clientY);
+    let i = hit(p.x, p.y);
+    let list = pts;
+    if (i < 0) {
+      [list, i] = addPoint(pts, p.x, p.y);
+      if (i < 0) return;
+    }
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { id: nextGesture(), i, pts: list };
+    setActive(i);
+    onPoints(list, { id: drag.current.id, done: false });
+  };
+  const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const d = drag.current;
+    if (!d || !onPoints) return;
+    const p = at(e.clientX, e.clientY);
+    d.pts = movePoint(d.pts, d.i, p.x, p.y);
+    onPoints(d.pts, { id: d.id, done: false });
+  };
+  const onUp = () => {
+    const d = drag.current;
+    if (!d || !onPoints) return;
+    onPoints(d.pts, { id: d.id, done: true });
     drag.current = null;
-    setDragging(false);
+    setActive(-1);
+  };
+  const onDouble = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!edit || !onPoints) return;
+    const p = at(e.clientX, e.clientY);
+    const i = hit(p.x, p.y);
+    if (i >= 0) onPoints(removePoint(pts, i));
   };
 
   return (
     <svg
+      ref={svg}
       width={W}
       height={H}
       viewBox={`0 0 ${W} ${H}`}
+      role="img"
       aria-label={label}
-      {...(custom
-        ? {
-            role: "slider",
-            tabIndex: 0,
-            "aria-valuemin": -1,
-            "aria-valuemax": 1,
-            "aria-valuenow": curve.amount,
-            "aria-valuetext": `amount ${formatAmount(curve.amount)}`,
-          }
-        : { role: "img" })}
       className={cx(
         "curve-graph shrink-0 touch-none rounded-[3px] bg-sunken inset-shadow-deep outline-none",
-        custom && (dragging ? "cursor-ns-resize" : "cursor-grab"),
-        custom && "focus-visible:ring-1 focus-visible:ring-cold/70",
+        edit && "cursor-crosshair",
       )}
-      onPointerDown={(e) => {
-        if (!custom || e.button !== 0) return;
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        e.currentTarget.focus({ preventScroll: true });
-        drag.current = { id: nextGesture(), y: e.clientY, start: curve.amount, last: curve.amount };
-        setDragging(true);
-      }}
-      onPointerMove={(e) => move(e.clientY, e.shiftKey, false)}
-      onPointerUp={end}
-      onPointerCancel={end}
-      onKeyDown={(e) => {
-        if (!custom || !onAmount) return;
-        const a = keyAmount(curve.amount, e.key, e.shiftKey);
-        if (a === null) return;
-        e.preventDefault();
-        if (a !== curve.amount) onAmount(a);
-      }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      onDoubleClick={onDouble}
     >
       <title>
-        {custom
-          ? `${label}: amount ${formatAmount(curve.amount)}\nDrag up for a gentler heel, down for a faster one (Shift: fine)`
+        {edit
+          ? `${label}\nDrag a point to move it. Click an empty spot to add one, double-click a point to remove it.`
           : `${label}\nAcross: the pedal, heel to toe. Up: the value sent, 0 to 127`}
       </title>
       <g transform={`translate(${PAD} ${PAD})`}>
-        {/* quarter grid */}
         {[0.25, 0.5, 0.75].map((f) => (
           <g key={f} stroke="var(--color-edge)" strokeWidth={1}>
             <line x1={f * IW} x2={f * IW} y1={0} y2={IH} />
             <line x1={0} x2={IW} y1={f * IH} y2={f * IH} />
           </g>
         ))}
-        {/* linear, for comparison */}
         <line
           x1={0}
           y1={IH}
@@ -141,6 +164,20 @@ export function CurveGraph({
             filter: "drop-shadow(0 0 3px color-mix(in srgb, var(--color-cold) 35%, transparent))",
           }}
         />
+        {pts.map((p, i) => (
+          <circle
+            key={i}
+            cx={p.x * IW}
+            cy={IH - p.y * IH}
+            r={i === active ? 5 : 4}
+            fill={i === active ? "var(--color-cold)" : "var(--color-sunken)"}
+            stroke="var(--color-cold)"
+            strokeWidth={1.5}
+            className="cursor-grab"
+          >
+            <title>{`${Math.round(p.x * 100)}% → ${Math.round(p.y * 127)}`}</title>
+          </circle>
+        ))}
         {travel !== null && out !== null && (
           <g
             className="curve-dot"
@@ -157,7 +194,7 @@ export function CurveGraph({
             />
             <circle
               r={3.25}
-              fill="var(--color-cold)"
+              fill="var(--color-beam)"
               stroke="var(--color-sunken)"
               strokeWidth={1}
             />
@@ -168,7 +205,9 @@ export function CurveGraph({
   );
 }
 
-/** The Response row of an Expression card: kind, graph, and a line on what it does. */
+const pct = (v: number) => `${Math.round(v)}`;
+
+/** The Response row of an Expression card: kind, graph, and the kind's controls. */
 export function ResponseRow({
   n,
   x,
@@ -181,9 +220,9 @@ export function ResponseRow({
   apply: Apply;
 }) {
   const curve = x.curve ?? LINEAR;
-  const set = (c: ExpCurve, g?: { id: number; done: boolean }) =>
-    apply({ type: "exp", n, patch: { curve: c } }, g);
+  const set = (c: ExpCurve, g?: Gesture) => apply({ type: "exp", n, patch: { curve: c } }, g);
   const out = travel === null ? null : Math.round(applyCurve(curve, travel) * 127);
+  const s = sControls(curve);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
@@ -206,19 +245,62 @@ export function ResponseRow({
         value={curve.kind}
         onChange={(kind: CurveKind) => set(pickCurve(curve, kind))}
       />
-      <div className="flex items-start gap-3">
+      <div className={cx("flex gap-3", curve.kind === "custom" ? "flex-col" : "items-start")}>
         <CurveGraph
           curve={curve}
           travel={travel}
           label={`EXP ${n + 1} response curve`}
-          onAmount={(amount, g) => set({ kind: "custom", amount }, g)}
+          onPoints={(points, g) => set({ ...curve, kind: "custom", points }, g)}
         />
         <div className="flex min-w-0 flex-col gap-1.5 pt-0.5">
           <p className="text-ui-xs leading-snug text-faint">{CURVE_TIP[curve.kind]}</p>
+          {curve.kind === "s" && (
+            <div className="grid grid-cols-2 gap-2">
+              <NumField
+                label="Strength"
+                value={Math.round(s.strength * 100)}
+                min={0}
+                max={100}
+                format={pct}
+                suffix="%"
+                hint="How strong the S is: 0 is a straight line, 100 makes both ends flat"
+                onChange={(v, g) => set({ ...curve, strength: v / 100, centre: s.centre }, g)}
+              />
+              <NumField
+                label="Centre"
+                value={Math.round(s.centre * 100)}
+                min={10}
+                max={90}
+                format={pct}
+                suffix="%"
+                hint="Where along the travel the steep, most sensitive part sits"
+                onChange={(v, g) => set({ ...curve, strength: s.strength, centre: v / 100 }, g)}
+              />
+            </div>
+          )}
           {curve.kind === "custom" && (
-            <p className="font-mono text-ui-2xs text-muted tabular-nums">
-              amount {formatAmount(curve.amount)}
-            </p>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-ui-2xs text-muted tabular-nums">
+                {editPoints(curve).length} points
+              </span>
+              <button
+                type="button"
+                className="rounded border border-edge px-1.5 py-0.5 text-ui-2xs text-muted hover:text-text"
+                title="Back to three points on a straight line"
+                onClick={() =>
+                  set({
+                    ...curve,
+                    points: [
+                      { x: 0.25, y: 0.25 },
+                      { x: 0.5, y: 0.5 },
+                      { x: 0.75, y: 0.75 },
+                    ],
+                  })
+                }
+              >
+                Reset
+              </button>
+            </div>
           )}
         </div>
       </div>

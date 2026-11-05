@@ -2,7 +2,7 @@ import { ChevronRight, Eye, EyeOff, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { errorText } from "../api";
 import type { Apply } from "../lib/config";
-import { CURVE_LABEL, CURVE_TIP, formatAmount, type TaperHint, taperText } from "../lib/curve";
+import { CURVE_LABEL, CURVE_TIP, curveWords, type TaperHint, taperText } from "../lib/curve";
 import { expFraction, expOutput, expValue, LINEAR, rawFraction } from "../lib/exp";
 import { cableLabel } from "../lib/expsim";
 import { calibrationHint, sweepProgress, sweepPrompt } from "../lib/sweep";
@@ -268,7 +268,7 @@ function tuningSummary(x: ExpConfig): string {
   const parts: string[] = [];
   const c = x.curve ?? LINEAR;
   if (c.kind !== "linear") {
-    parts.push(c.kind === "custom" ? `custom ${formatAmount(c.amount)}` : CURVE_LABEL[c.kind]);
+    parts.push(c.kind === "gentle" || c.kind === "fast" ? CURVE_LABEL[c.kind] : curveWords(c));
   }
   if (x.invert) parts.push("inverted");
   return parts.join(" · ");

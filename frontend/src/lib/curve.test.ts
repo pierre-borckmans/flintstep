@@ -1,49 +1,57 @@
 import { describe, expect, it } from "vitest";
 import { readFlags } from "../useStoredFlags";
 import {
+  addPoint,
   curvePath,
   curveWords,
-  dragAmount,
   formatAmount,
-  keyAmount,
+  movePoint,
   pickCurve,
+  removePoint,
   taperHint,
   taperText,
 } from "./curve";
 import { applyCurve, PRESET_AMOUNT } from "./exp";
 
 describe("pickCurve", () => {
-  it("keeps the custom shape when switching away and back", () => {
-    const c = pickCurve({ kind: "custom", amount: 0.35 }, "s");
-    expect(c).toEqual({ kind: "s", amount: 0.35 });
-    expect(pickCurve(c, "custom")).toEqual({ kind: "custom", amount: 0.35 });
+  it("keeps the custom points when switching away and back", () => {
+    const pts = [{ x: 0.3, y: 0.1 }];
+    const c = pickCurve({ kind: "custom", amount: 0, points: pts }, "s");
+    expect(c.kind).toBe("s");
+    expect(pickCurve(c, "custom").points).toEqual(pts);
   });
-  it("starts Custom where Gentle or Fast was, so the graph does not jump", () => {
-    expect(pickCurve({ kind: "gentle", amount: 0 }, "custom")).toEqual({
-      kind: "custom",
-      amount: PRESET_AMOUNT,
-    });
-    expect(pickCurve({ kind: "fast", amount: 0 }, "custom").amount).toBe(-PRESET_AMOUNT);
-    expect(pickCurve({ kind: "linear", amount: 0 }, "custom").amount).toBe(0);
-    const g = { kind: "gentle", amount: 0 } as const;
-    const c = { kind: "custom", amount: PRESET_AMOUNT } as const;
-    expect(applyCurve(c, 0.4)).toBeCloseTo(applyCurve(g, 0.4), 12);
+  it("starts Custom on the curve that was picked, so the graph does not jump", () => {
+    for (const kind of ["gentle", "fast", "s", "linear"] as const) {
+      const from = { kind, amount: 0 };
+      const c = pickCurve(from, "custom");
+      expect(c.points).toHaveLength(3);
+      for (const p of c.points ?? []) expect(p.y).toBeCloseTo(applyCurve(from, p.x), 2);
+    }
+    const old = { kind: "custom", amount: PRESET_AMOUNT } as const;
+    const c = pickCurve(old, "custom");
+    expect(applyCurve(c, 0.5)).toBeCloseTo(applyCurve(old, 0.5), 2);
   });
 });
 
-describe("dragging the graph", () => {
-  it("goes gentler upwards, clamped and rounded", () => {
-    expect(dragAmount(0, -40)).toBe(0.5);
-    expect(dragAmount(0, 40)).toBe(-0.5);
-    expect(dragAmount(0.9, -400)).toBe(1);
-    expect(dragAmount(0, -40, true)).toBe(0.13);
+describe("editing points", () => {
+  const pts = [
+    { x: 0.25, y: 0.25 },
+    { x: 0.5, y: 0.5 },
+    { x: 0.75, y: 0.75 },
+  ];
+  it("moves a point but not past its neighbours or below the one before", () => {
+    const m = movePoint(pts, 1, 0.9, 0.1);
+    expect(m[1].x).toBeLessThan(0.75);
+    expect(m[1].y).toBeGreaterThanOrEqual(m[0].y);
   });
-  it("takes keys", () => {
-    expect(keyAmount(0.3, "ArrowUp")).toBe(0.35);
-    expect(keyAmount(0.3, "ArrowDown", true)).toBe(0.2);
-    expect(keyAmount(0.3, "0")).toBe(0);
-    expect(keyAmount(0.3, "End")).toBe(1);
-    expect(keyAmount(0.3, "a")).toBeNull();
+  it("adds a point in order and says where", () => {
+    const [next, i] = addPoint(pts, 0.6, 0.4);
+    expect(i).toBe(2);
+    expect(next.map((p) => p.x)).toEqual([0.25, 0.5, 0.6, 0.75]);
+    expect(addPoint(pts, 0.505, 0.5)[1]).toBe(-1);
+  });
+  it("removes a point", () => {
+    expect(removePoint(pts, 0)).toEqual(pts.slice(1));
   });
 });
 

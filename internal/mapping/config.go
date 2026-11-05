@@ -2,6 +2,7 @@ package mapping
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"flintstep/internal/sparkx"
@@ -282,7 +283,7 @@ func (c Config) Normalize() Config {
 
 	for n := range c.Exp {
 		e := &c.Exp[n]
-		if fresh && *e == (ExpConfig{}) {
+		if fresh && e.isZero() {
 			*e = defaultExp(n)
 		}
 		e.Channel = clamp(orDefault(e.Channel, 1), 1, 16)
@@ -398,4 +399,16 @@ func orDefault(v, def int) int {
 		return def
 	}
 	return v
+}
+
+// isZero reports an ExpConfig with nothing set (the struct holds a slice in its curve,
+// so == is not available).
+func (x ExpConfig) isZero() bool {
+	z := ExpConfig{}
+	return x.sameAs(z)
+}
+
+// sameAs reports whether two expression configs are identical.
+func (x ExpConfig) sameAs(o ExpConfig) bool {
+	return reflect.DeepEqual(x, o)
 }

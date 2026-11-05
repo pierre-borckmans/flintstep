@@ -1,5 +1,12 @@
-import type { CurveKind, ExpCurve } from "../types";
-import { applyCurve, clampAmount, PRESET_AMOUNT } from "./exp";
+import type { CurveKind, CurvePoint, ExpCurve } from "../types";
+import {
+  applyCurve,
+  MAX_CURVE_POINTS,
+  MIN_POINT_GAP,
+  normalizePoints,
+  PRESET_AMOUNT,
+  sControls,
+} from "./exp";
 
 // RESPONSE CURVE UI. The words, the graph's path, the drag that shapes Custom, and the
 // hint a calibration sweep can give. The maths of the curves is exp.ts (Go's twin).
@@ -26,15 +33,66 @@ export const CURVE_TIP: Record<CurveKind, string> = {
   gentle:
     "Gentle start: finer control near the heel. Good for pedals that jump at the bottom and crawl at the top.",
   fast: "Fast start: quick off the heel, finer control near the toe.",
-  s: "S-curve: fine at both ends, quicker through the middle.",
-  custom: "Custom: drag up or down on the graph to shape it. Up is gentler at the heel.",
+  s: "S-curve: fine at both ends, quicker through the middle. Strength sets how much; Centre moves the steep part along the travel.",
+  custom:
+    "Custom: drag the points. Click an empty spot to add one, double-click a point to remove it. The curve never goes back down.",
 };
 
 /** "linear", "gentle", ..., "custom 0.35": the history label's words. */
 export function curveWords(c: ExpCurve): string {
-  return c.kind === "custom"
-    ? `custom ${formatAmount(c.amount)}`
-    : CURVE_LABEL[c.kind].toLowerCase();
+  if (c.kind === "custom") {
+    return c.points?.length
+      ? `custom, ${c.points.length} points`
+      : `custom ${formatAmount(c.amount)}`;
+  }
+  if (c.kind === "s" && (c.strength || c.centre)) {
+    const { strength, centre } = sControls(c);
+    return `S ${Math.round(strength * 100)}% at ${Math.round(centre * 100)}%`;
+  }
+  return CURVE_LABEL[c.kind].toLowerCase();
+}
+
+/** Three points sampled from a curve: how Custom starts from whatever was picked, so
+ *  the graph does not jump. */
+export function seedPoints(c: ExpCurve): CurvePoint[] {
+  return [0.25, 0.5, 0.75].map((x) => ({ x, y: Math.round(applyCurve(c, x) * 1000) / 1000 }));
+}
+
+/** Custom's points as the editor shows them: its own, or seeded from its amount. */
+export function editPoints(c: ExpCurve): CurvePoint[] {
+  return c.points?.length ? c.points : seedPoints({ kind: "custom", amount: c.amount });
+}
+
+const r3 = (v: number) => Math.round(v * 1000) / 1000;
+
+/** Moves point i to (x, y), kept between its neighbours (MIN_POINT_GAP away) and
+ *  inside the box; the rest stay, then the whole set is made non-decreasing. */
+export function movePoint(
+  pts: readonly CurvePoint[],
+  i: number,
+  x: number,
+  y: number,
+): CurvePoint[] {
+  const lo = (i > 0 ? pts[i - 1].x : 0) + MIN_POINT_GAP;
+  const hi = (i < pts.length - 1 ? pts[i + 1].x : 1) - MIN_POINT_GAP;
+  const next = pts.map((p, j) =>
+    j === i ? { x: r3(Math.min(hi, Math.max(lo, x))), y: r3(Math.min(1, Math.max(0, y))) } : p,
+  );
+  return normalizePoints(next) ?? [];
+}
+
+/** Adds a point at (x, y) unless one is too close or the curve is full; returns the
+ *  new list and the new point's index (-1 when nothing was added). */
+export function addPoint(pts: readonly CurvePoint[], x: number, y: number): [CurvePoint[], number] {
+  if (pts.length >= MAX_CURVE_POINTS || x < MIN_POINT_GAP || x > 1 - MIN_POINT_GAP)
+    return [[...pts], -1];
+  if (pts.some((p) => Math.abs(p.x - x) < MIN_POINT_GAP)) return [[...pts], -1];
+  const next = normalizePoints([...pts, { x: r3(x), y: r3(y) }]) ?? [];
+  return [next, next.findIndex((p) => Math.abs(p.x - r3(x)) < 1e-9)];
+}
+
+export function removePoint(pts: readonly CurvePoint[], i: number): CurvePoint[] {
+  return pts.filter((_, j) => j !== i);
 }
 
 export function formatAmount(a: number): string {
@@ -45,46 +103,19 @@ export function formatAmount(a: number): string {
 /** The curve after picking `kind`. Going to Custom from Gentle or Fast with no shape of
  *  its own starts where that preset is, so the graph does not jump back to a line. */
 export function pickCurve(c: ExpCurve, kind: CurveKind): ExpCurve {
-  if (kind !== "custom" || c.amount !== 0) return { ...c, kind };
-  const seed = c.kind === "gentle" ? PRESET_AMOUNT : c.kind === "fast" ? -PRESET_AMOUNT : 0;
-  return { kind, amount: seed };
-}
-
-/** Amount per px of vertical drag on the graph: its whole height spans -1..1 twice
- *  over would be too twitchy; one height is a full swing of 1. */
-export const AMOUNT_PER_PX = 1 / 80;
-
-/** The amount after dragging `dy` px (down positive, as pointer events count) from
- *  `start`, rounded to 0.01 so the label and history read clean. Up makes it gentler. */
-export function dragAmount(start: number, dy: number, fine = false): number {
-  const v = clampAmount(start - dy * AMOUNT_PER_PX * (fine ? 0.25 : 1));
-  return Math.round(v * 100) / 100;
-}
-
-/** The amount after a key on the focused graph, or null for keys it ignores. */
-export function keyAmount(a: number, key: string, shift = false): number | null {
-  const step = shift ? 0.1 : 0.05;
-  const r = (v: number) => Math.round(clampAmount(v) * 100) / 100;
-  switch (key) {
-    case "ArrowUp":
-    case "ArrowRight":
-      return r(a + step);
-    case "ArrowDown":
-    case "ArrowLeft":
-      return r(a - step);
-    case "PageUp":
-      return r(a + 0.25);
-    case "PageDown":
-      return r(a - 0.25);
-    case "Home":
-      return -1;
-    case "End":
-      return 1;
-    case "0":
-      return 0;
-    default:
-      return null;
-  }
+  if (kind !== "custom") return { ...c, kind };
+  // Custom keeps its own points if it has some; otherwise it starts as three points on
+  // the curve that was picked (or on its old amount), so the graph does not jump.
+  if (c.points?.length) return { ...c, kind };
+  const from: ExpCurve =
+    c.kind === "custom" || c.kind === "linear"
+      ? { kind: "custom", amount: c.amount }
+      : c.kind === "gentle"
+        ? { kind: "custom", amount: PRESET_AMOUNT }
+        : c.kind === "fast"
+          ? { kind: "custom", amount: -PRESET_AMOUNT }
+          : c;
+  return { ...c, kind, points: seedPoints(from) };
 }
 
 /** An SVG path of the curve in a w × h box (heel bottom-left, toe top-right). */

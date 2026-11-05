@@ -33,7 +33,7 @@ func TestDefault(t *testing.T) {
 	}
 	for n, wantCC := range []int{11, 7} {
 		want := ExpConfig{Enabled: true, Channel: 1, CC: wantCC, Min: 0, Max: 65535, Curve: ExpCurve{Kind: CurveLinear}, Trigger: ExpTrigger{Mode: TriggerOff, Action: Action{Kind: KindCC, Channel: 1, Number: 102 + n, Value: 127, Mode: Momentary}, Threshold: 4, OffDelayMS: 400}}
-		if c.Exp[n] != want {
+		if !reflect.DeepEqual(c.Exp[n], want) {
 			t.Errorf("exp %d = %+v, want %+v", n+1, c.Exp[n], want)
 		}
 	}
@@ -146,7 +146,7 @@ func TestNormalize(t *testing.T) {
 			c.Exp[0] = ExpConfig{Enabled: true, Channel: 0, CC: 300, Min: -5, Max: 99999}
 		}, func(t *testing.T, c Config) {
 			want := ExpConfig{Enabled: true, Channel: 1, CC: 127, Min: 0, Max: 65535, Curve: ExpCurve{Kind: CurveLinear}, Trigger: defaultTrigger(0)}
-			if c.Exp[0] != want {
+			if !reflect.DeepEqual(c.Exp[0], want) {
 				t.Fatalf("got %+v", c.Exp[0])
 			}
 		}},

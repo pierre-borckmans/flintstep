@@ -43,10 +43,21 @@ export interface ExpConfig {
 /** mapping.CurveKind. */
 export type CurveKind = "linear" | "gentle" | "fast" | "s" | "custom";
 
-/** mapping.ExpCurve: amount shapes "custom" only, -1..1 (0 linear, >0 gentle, <0 fast). */
+/** mapping.CurvePoint: a point a Custom curve passes through (travel x, output y, 0..1). */
+export interface CurvePoint {
+  x: number;
+  y: number;
+}
+
+/** mapping.ExpCurve. amount shapes "custom" without points, -1..1 (0 linear, >0 gentle,
+ *  <0 fast). strength (0..1) and centre (0.1..0.9) shape "s"; both absent or 0 is the
+ *  default S (0.6, 0.5). points shape "custom" when present. */
 export interface ExpCurve {
   kind: CurveKind;
   amount: number;
+  strength?: number;
+  centre?: number;
+  points?: CurvePoint[];
 }
 
 /** mapping.TriggerMode: "engage" is auto-engage (leave the heel), "toe" a toe click. */

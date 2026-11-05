@@ -110,7 +110,7 @@ func (e *Engine) SetConfig(cfg Config) Outs {
 	}
 	e.comboOn = kept
 	for n := range e.cfg.Exp {
-		if e.cfg.Exp[n] != cfg.Exp[n] {
+		if !e.cfg.Exp[n].sameAs(cfg.Exp[n]) {
 			e.exp.Reset(n)
 		}
 	}
