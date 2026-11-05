@@ -114,6 +114,10 @@ export interface State {
   activePreset: string; // the id of the preset that runs
   libraryError: string; // what went wrong opening the preset library, "" = nothing
   expTrigger: boolean[]; // 2: each input's trigger engaged now
+  /** 2: each input's simulated pedal is on; pedal.cables/expRaw then report it. */
+  expSim: boolean[];
+  /** 2: each simulated pedal is sweeping heel to toe on its own. */
+  expSweep: boolean[];
 }
 
 /** presets.Info: a preset as the picker lists it. */
