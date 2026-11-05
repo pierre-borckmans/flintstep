@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"sparkbridge/internal/bridge"
@@ -146,5 +147,107 @@ func TestPresetItems(t *testing.T) {
 	got := presetItems([]PresetInfo{{ID: "a", Name: "A", Active: true}, {ID: "b", Name: "B"}})
 	if len(got) != 3 || !got[0].Separator || got[1].ID != "preset:a" || !got[1].Checked || got[2].Checked {
 		t.Fatalf("items = %+v", got)
+	}
+}
+
+func TestSaveConfigIntoInactiveLeavesTheBridgeAlone(t *testing.T) {
+	a, _ := testApp(t)
+	_ = a.lib.SetPedal(mapping.PedalRef{Address: "aaaa", Name: "SparkX"})
+	first := a.lib.ActiveID()
+	other, _ := a.CreatePreset("Other", presets.FromDefault)
+	before := a.bridge.Config().Switches[0].Tap.Number
+
+	c := mapping.Default()
+	c.Switches[0].Tap.Number = 42
+	if err := a.SaveConfigInto(other.ID, c); err != nil {
+		t.Fatal(err)
+	}
+	if a.lib.ActiveID() != first {
+		t.Fatalf("saving into another preset switched to it")
+	}
+	if a.bridge.Config().Switches[0].Tap.Number != before {
+		t.Fatalf("the bridge runs a mapping saved into an inactive preset")
+	}
+	got, err := a.SelectPreset(other.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Switches[0].Tap.Number != 42 || got.Pedal.Address != "aaaa" {
+		t.Fatalf("the inactive preset = %+v", got)
+	}
+}
+
+func TestSaveConfigIntoActiveRunsIt(t *testing.T) {
+	a, _ := testApp(t)
+	_ = a.lib.SetPedal(mapping.PedalRef{Address: "aaaa", Name: "SparkX"})
+	a.bridge = bridge.New(a.lib.Active(), nil, bridge.Options{})
+	t.Cleanup(a.bridge.Close)
+	c := mapping.Default()
+	c.Brightness = 10
+	c.Pedal = mapping.PedalRef{Address: "zzzz"} // the UI does not own the pedal
+	if err := a.SaveConfigInto(a.lib.ActiveID(), c); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.bridge.Config(); got.Brightness != 10 || got.Pedal.Address != "aaaa" {
+		t.Fatalf("bridge = %+v", got)
+	}
+	if got := a.lib.Active(); got.Brightness != 10 || got.Pedal.Address != "aaaa" {
+		t.Fatalf("active preset = %+v", got)
+	}
+}
+
+func TestSaveConfigIntoRefuses(t *testing.T) {
+	a, _ := testApp(t)
+	if err := a.SaveConfigInto("nope", mapping.Default()); err == nil {
+		t.Fatalf("saved into a missing preset")
+	}
+	other, _ := a.CreatePreset("Other", presets.FromDefault)
+	bad := mapping.Default()
+	bad.Combos = []mapping.Combo{{A: 0, B: 0, Action: bad.Switches[0].Tap}}
+	if err := a.SaveConfigInto(other.ID, bad); err == nil {
+		t.Fatalf("saved an invalid mapping into an inactive preset")
+	}
+}
+
+// A menu-bar switch racing saves never lands a save in the wrong preset, and the
+// bridge ends up running what the active preset holds.
+func TestSaveConfigIntoRacesSelectPreset(t *testing.T) {
+	a, _ := testApp(t)
+	ids := []string{a.lib.ActiveID(), ""}
+	other, _ := a.CreatePreset("Other", presets.FromDefault)
+	ids[1] = other.ID
+
+	const rounds = 200
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < rounds; i++ {
+			_, _ = a.SelectPreset(ids[i%2])
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < rounds; i++ {
+			c := mapping.Default()
+			c.Brightness = 10 + i%2 // the first preset only ever gets 10, the other 11
+			if err := a.SaveConfigInto(ids[i%2], c); err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+	wg.Wait()
+
+	if got, want := a.bridge.Config().Brightness, a.lib.Active().Brightness; got != want {
+		t.Fatalf("bridge runs brightness %d, the active preset holds %d", got, want)
+	}
+	for want, id := range ids {
+		got, err := a.SelectPreset(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Brightness != 10+want {
+			t.Fatalf("preset %d holds brightness %d, want %d", want, got.Brightness, 10+want)
+		}
 	}
 }

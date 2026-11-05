@@ -1,19 +1,16 @@
-// SAVING INTO A PRESET. Go saves a mapping into whichever preset it runs, and the
-// menu-bar menu can switch that at any moment, so a save is tagged with the preset that
-// owns the edit and routed here: when Go still runs it, the save goes straight in;
-// when Go has moved on (a menu-bar switch landed before the save), the router selects
-// the edit's preset, saves into it, and selects the running one again. An edit always
-// lands in its own preset, never in the one that happens to be running.
+// SAVING INTO A PRESET. The menu-bar menu can switch the preset Go runs at any moment,
+// so a save is tagged with the preset that owns the edit and Go's SaveConfigInto writes
+// it there. Go checks, under the same lock as a switch, whether that preset runs and
+// only then applies the mapping live: an edit always lands in its own preset, never in
+// the one that happens to be running, and the pedal never runs it by accident.
 //
-// Every call that changes what Go runs or holds goes through one queue, so a routed
-// save never interleaves with a switch, a reset or a calibration.
+// Every call that changes what Go runs or holds goes through one queue, so saves reach
+// Go in the order they were made and never interleave with a switch, a reset or a
+// calibration made from the window.
 
 export interface PresetIO<C> {
-  /** The preset Go runs now. */
-  active(): Promise<string>;
-  select(id: string): Promise<unknown>;
-  /** Saves into the preset Go runs. */
-  save(c: C): Promise<void>;
+  /** Saves `c` into preset `preset`; Go runs it only if that preset is the active one. */
+  saveInto(preset: string, c: C): Promise<void>;
 }
 
 export interface SaveRouter<C> {
@@ -41,17 +38,7 @@ export function createSaveRouter<C>(io: PresetIO<C>): SaveRouter<C> {
     return p;
   }
 
-  const saveInto = (preset: string, c: C) =>
-    run(async () => {
-      const running = await io.active();
-      if (running === preset) return io.save(c);
-      await io.select(preset);
-      try {
-        await io.save(c);
-      } finally {
-        await io.select(running);
-      }
-    });
+  const saveInto = (preset: string, c: C) => run(() => io.saveInto(preset, c));
 
   async function idle() {
     while (queued > 0) await tail;

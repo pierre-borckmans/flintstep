@@ -199,10 +199,12 @@ type Info struct { ID string `json:"id"`; Name string `json:"name"`; UpdatedAt i
 func Open(dir string) (*Library, error) // always returns a usable library; the error says what went wrong
 func (l *Library) Active() mapping.Config    // the active preset's, with the global pedal
 func (l *Library) ActiveID() string
+func (l *Library) Has(id string) bool
 func (l *Library) List() []Info              // library order
 func (l *Library) Pedal() mapping.PedalRef
 func (l *Library) SetPedal(p mapping.PedalRef) error
 func (l *Library) SaveActive(c mapping.Config) error // c.Pedal ignored
+func (l *Library) SaveInto(id string, c mapping.Config) error // active or not; c.Pedal ignored; unknown id → error
 func (l *Library) Select(id string) (mapping.Config, error)
 func (l *Library) Create(name, from string) (Info, error) // from "current" | "default"; "" name = "New preset", made unique
 func (l *Library) Rename(id, name string) error
@@ -353,7 +355,10 @@ lock held) on every on/off/sweep change and each value fed.
 
 ```ts
 GetState(): Promise<State>
-SaveConfig(cfg: Config): Promise<void>      // validates, persists, applies live
+SaveConfig(cfg: Config): Promise<void>      // validates, persists, applies live (the active preset)
+SaveConfigInto(id: string, cfg: Config): Promise<void> // validates, persists into preset id; applies
+                                            // live only if id is active (checked under cfgMu, the
+                                            // same lock as SelectPreset); unknown id → error
 ResetConfig(): Promise<Config>
 Scan(): Promise<Device[]>                   // ~4 s
 ChoosePedal(address: string, name: string): Promise<void> // saves the pedal and calls SetTarget under one lock
@@ -369,7 +374,8 @@ RevealLogs(): Promise<void>
 SetTheme(mode: "system" | "dark" | "light"): Promise<void> // native window appearance + background,
                                                            // saved to prefs.json; errors on another mode
 
-// Presets. SaveConfig, ResetConfig and CalibrateExp write into the active preset.
+// Presets. SaveConfig, ResetConfig and CalibrateExp write into the active preset;
+// SaveConfigInto into the one named. The pedal stays global in all of them.
 ListPresets(): Promise<PresetInfo[]>
 SelectPreset(id: string): Promise<Config>          // activates and runs it (pedal re-applied)
 CreatePreset(name: string, from: "current" | "default"): Promise<PresetInfo> // not activated; "" = "New preset"

@@ -222,6 +222,37 @@ func TestSaveActiveWritesIntoTheActivePreset(t *testing.T) {
 	}
 }
 
+func TestSaveIntoAnInactivePreset(t *testing.T) {
+	l := open(t, t.TempDir())
+	first := l.ActiveID()
+	other, err := l.Create("Other", FromDefault)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := custom()
+	c.Pedal = pedal
+	if err := l.SaveInto(other.ID, c); err != nil {
+		t.Fatal(err)
+	}
+	if l.ActiveID() != first || !sameConfig(l.Active(), mapping.Default()) {
+		t.Fatalf("SaveInto touched the active preset")
+	}
+	if l.Pedal() != (mapping.PedalRef{}) {
+		t.Fatalf("SaveInto set the global pedal")
+	}
+	got, err := reopen(t, l).Select(other.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Pedal = mapping.PedalRef{}
+	if !sameConfig(got, c) {
+		t.Fatalf("not persisted: %+v", got)
+	}
+	if err := l.SaveInto("nope", c); err == nil || l.Has("nope") || !l.Has(first) {
+		t.Fatalf("SaveInto a missing preset: %v", err)
+	}
+}
+
 func TestPedalIsGlobal(t *testing.T) {
 	l := open(t, t.TempDir())
 	if err := l.SetPedal(pedal); err != nil {

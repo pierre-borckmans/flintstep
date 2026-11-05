@@ -61,9 +61,7 @@ export function useBridge(backend: Backend) {
   const busy = useRef(false);
   const router = useRef(
     createSaveRouter<Config>({
-      active: async () => (await backend.GetState()).activePreset,
-      select: (id) => backend.SelectPreset(id),
-      save: (c) => backend.SaveConfig({ ...c, pedal: pedal.current }),
+      saveInto: (id, c) => backend.SaveConfigInto(id, { ...c, pedal: pedal.current }),
     }),
   ).current;
 
@@ -195,16 +193,16 @@ export function useBridge(backend: Backend) {
   );
 
   /** Go switched preset on its own (the menu-bar menu), or seems to. The event may be
-   *  older than a switch made here, or come from a routed save visiting another preset,
-   *  so wait for the queue and ask Go again before believing it. What the old preset
-   *  still had waiting is saved into it, never into the new one. */
+   *  older than a switch made here, so wait for the queue and ask Go again before
+   *  believing it. What the old preset still had waiting is saved into it, never into
+   *  the new one. */
   const checkExternal = useCallback(async () => {
     await router.idle();
     if (busy.current) return;
     const first = await backend.GetState();
     if (first.activePreset === stacks.current?.active) return;
     await exclusive(async () => {
-      // Each waiting save visits its own preset and comes back.
+      // Each waiting save goes into its own preset, which Go no longer runs.
       await flushAll();
       await router.idle();
       follow(await backend.GetState());
@@ -222,7 +220,7 @@ export function useBridge(backend: Backend) {
       boot(s);
       setState(s);
       const moved = s.activePreset !== stacks.current?.active;
-      if (moved && !busy.current && !router.busy()) void checkExternal();
+      if (moved && !busy.current) void checkExternal();
     });
     const offAct = backend.onActivity((a) => {
       const row = { ...a, id: ++seq.current };
@@ -233,7 +231,7 @@ export function useBridge(backend: Backend) {
       offState();
       offAct();
     };
-  }, [backend, boot, checkExternal, router]);
+  }, [backend, boot, checkExternal]);
 
   // Never lose an edit: save what is waiting when the window goes away or loses focus.
   useEffect(() => {

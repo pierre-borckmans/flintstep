@@ -2,20 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { browserTimers, createAutosave } from "./autosave";
 import { createSaveRouter, type PresetIO } from "./saveinto";
 
-/** Go's preset library in miniature: a value per preset, SaveConfig into the active
- *  one, and a log of the calls in order. */
+/** Go's preset library in miniature: a value per preset, SaveConfigInto any of them,
+ *  SelectPreset, and a log of the calls in order. */
 function fakeGo(presets: Record<string, number>, active: string) {
   const values = { ...presets };
   const calls: string[] = [];
   const io: PresetIO<number> = {
-    active: async () => active,
-    select: async (id) => {
-      calls.push(`select ${id}`);
-      active = id;
-    },
-    save: async (v) => {
-      calls.push(`save ${v} into ${active}`);
-      values[active] = v;
+    saveInto: async (id, v) => {
+      calls.push(`SaveConfigInto ${id} ${v}`);
+      values[id] = v;
     },
   };
   return {
@@ -23,6 +18,11 @@ function fakeGo(presets: Record<string, number>, active: string) {
     values,
     calls,
     active: () => active,
+    /** SelectPreset, called from the window. */
+    select: async (id: string) => {
+      calls.push(`SelectPreset ${id}`);
+      active = id;
+    },
     /** The menu-bar menu: Go switches on its own. */
     menu: (id: string) => {
       active = id;
@@ -35,32 +35,22 @@ const settle = async () => {
 };
 
 describe("save router", () => {
-  it("saves straight into the preset when Go runs it", async () => {
-    const go = fakeGo({ a: 0, b: 0 }, "a");
+  it("saves into the preset it is tagged with", async () => {
+    const go = fakeGo({ a: 0, b: 0 }, "b");
     const r = createSaveRouter(go.io);
-    await r.saveInto("a", 5);
-    expect(go.values).toEqual({ a: 5, b: 0 });
-    expect(go.calls).toEqual(["save 5 into a"]);
-  });
-
-  it("saves an edit into its own preset after Go switched, then goes back", async () => {
-    const go = fakeGo({ a: 0, b: 0 }, "a");
-    const r = createSaveRouter(go.io);
-    go.menu("b");
     await r.saveInto("a", 5);
     expect(go.values).toEqual({ a: 5, b: 0 });
     expect(go.active()).toBe("b");
-    expect(go.calls).toEqual(["select a", "save 5 into a", "select b"]);
+    expect(go.calls).toEqual(["SaveConfigInto a 5"]);
   });
 
-  it("goes back to the running preset even when the save fails", async () => {
-    const go = fakeGo({ a: 0, b: 0 }, "b");
-    go.io.save = async () => {
+  it("passes a refused save on", async () => {
+    const go = fakeGo({ a: 0 }, "a");
+    go.io.saveInto = async () => {
       throw new Error("invalid");
     };
     const r = createSaveRouter(go.io);
     await expect(r.saveInto("a", 5)).rejects.toThrow("invalid");
-    expect(go.active()).toBe("b");
   });
 
   it("runs one task at a time, saves and other calls alike", async () => {
@@ -115,7 +105,7 @@ describe("autosave tagged with its preset", () => {
       errorText: String,
     });
 
-  it("a pending edit from A saves into A when Go switches to B before the delay ends", async () => {
+  it("a pending edit from A saves into A when B became active 100 ms after the edit", async () => {
     const go = fakeGo({ a: 0, b: 0 }, "a");
     const r = createSaveRouter(go.io);
     const a = autosaveFor(r, "a");
@@ -126,6 +116,8 @@ describe("autosave tagged with its preset", () => {
     await settle();
     expect(go.values).toEqual({ a: 7, b: 0 });
     expect(go.active()).toBe("b");
+    expect(go.calls).toEqual(["SaveConfigInto a 7"]);
+    expect(go.calls.some((c) => c.startsWith("SelectPreset"))).toBe(false);
     expect(a.status().kind).toBe("saved");
   });
 
@@ -143,14 +135,14 @@ describe("autosave tagged with its preset", () => {
     expect(go.active()).toBe("b");
   });
 
-  it("a flush before the switch saves into A without leaving it", async () => {
+  it("a flush before a switch from the window saves into A first", async () => {
     const go = fakeGo({ a: 0, b: 0 }, "a");
     const r = createSaveRouter(go.io);
     const a = autosaveFor(r, "a");
     a.change(4);
     await a.flush();
-    await r.run(() => go.io.select("b"));
+    await r.run(() => go.select("b"));
     expect(go.values).toEqual({ a: 4, b: 0 });
-    expect(go.calls).toEqual(["save 4 into a", "select b"]);
+    expect(go.calls).toEqual(["SaveConfigInto a 4", "SelectPreset b"]);
   });
 });

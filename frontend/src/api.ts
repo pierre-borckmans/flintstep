@@ -5,7 +5,10 @@ import type { Activity, Config, Device, ExpEdge, PresetInfo, PresetSource, State
  *  binding of `App` in package main; in a plain browser it is the mock. */
 export interface Backend {
   GetState(): Promise<State>;
+  /** Saves into the active preset. */
   SaveConfig(cfg: Config): Promise<void>;
+  /** Saves into preset `id`; Go runs it only if `id` is the active preset at that moment. */
+  SaveConfigInto(id: string, cfg: Config): Promise<void>;
   ResetConfig(): Promise<Config>;
   Scan(): Promise<Device[]>;
   ChoosePedal(address: string, name: string): Promise<void>;
@@ -71,6 +74,7 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
   return {
     GetState: () => app.GetState(),
     SaveConfig: (cfg) => app.SaveConfig(cfg),
+    SaveConfigInto: (id, cfg) => app.SaveConfigInto(id, cfg),
     ResetConfig: () => app.ResetConfig(),
     Scan: () => app.Scan(),
     ChoosePedal: (address, name) => app.ChoosePedal(address, name),

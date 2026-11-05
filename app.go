@@ -270,19 +270,42 @@ func (a *App) GetState() State {
 func (a *App) SaveConfig(cfg mapping.Config) error {
 	a.cfgMu.Lock()
 	defer a.cfgMu.Unlock()
-	return a.saveLocked(cfg)
+	return a.saveIntoLocked(a.lib.ActiveID(), cfg)
 }
 
-// saveLocked is SaveConfig with cfgMu held.
-func (a *App) saveLocked(cfg mapping.Config) error {
+// SaveConfigInto validates and stores a mapping into preset id, whichever preset runs.
+// The bridge only gets it when id is the active preset, checked under the same lock as
+// the write, so a switch landing at the same moment can neither run the mapping nor
+// have it written into the preset it switched to. The pedal is kept from the current
+// config, as in SaveConfig.
+func (a *App) SaveConfigInto(id string, cfg mapping.Config) error {
+	a.cfgMu.Lock()
+	defer a.cfgMu.Unlock()
+	return a.saveIntoLocked(id, cfg)
+}
+
+// saveIntoLocked is SaveConfigInto with cfgMu held.
+func (a *App) saveIntoLocked(id string, cfg mapping.Config) error {
+	if !a.lib.Has(id) {
+		return errNoPreset
+	}
 	cfg.Pedal = a.bridge.Config().Pedal
-	applied, err := a.bridge.Apply(cfg)
-	if err != nil {
+	cfg = cfg.Normalize()
+	if err := cfg.Validate(); err != nil {
 		return err
 	}
+	if id == a.lib.ActiveID() {
+		applied, err := a.bridge.Apply(cfg)
+		if err != nil {
+			return err
+		}
+		cfg = applied
+	}
 	defer a.changed()
-	return a.lib.SaveActive(applied)
+	return a.lib.SaveInto(id, cfg)
 }
+
+var errNoPreset = errors.New("that preset no longer exists")
 
 // ResetConfig puts the default mapping back into the active preset, keeping the
 // remembered pedal.
@@ -361,7 +384,7 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	if cfg.Exp[n].Min == cfg.Exp[n].Max {
 		return a.bridge.Config(), errors.New("heel and toe read the same value; move the pedal and try again")
 	}
-	if err := a.saveLocked(cfg); err != nil {
+	if err := a.saveIntoLocked(a.lib.ActiveID(), cfg); err != nil {
 		return a.bridge.Config(), err
 	}
 	return a.bridge.Config(), nil

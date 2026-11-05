@@ -318,7 +318,29 @@ func (l *Library) SetPedal(p mapping.PedalRef) error {
 func (l *Library) SaveActive(cfg mapping.Config) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	i := index(l.f.Presets, l.f.Active)
+	return l.saveLocked(index(l.f.Presets, l.f.Active), cfg)
+}
+
+// SaveInto stores cfg as preset id's mapping, active or not. Its pedal is ignored.
+func (l *Library) SaveInto(id string, cfg mapping.Config) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	i := index(l.f.Presets, id)
+	if i < 0 {
+		return errNoPreset
+	}
+	return l.saveLocked(i, cfg)
+}
+
+// Has says whether preset id exists.
+func (l *Library) Has(id string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return index(l.f.Presets, id) >= 0
+}
+
+// saveLocked stores cfg as preset i's mapping, with l.mu held.
+func (l *Library) saveLocked(i int, cfg mapping.Config) error {
 	cfg = stored(cfg)
 	if sameConfig(cfg, l.f.Presets[i].Config) {
 		return nil

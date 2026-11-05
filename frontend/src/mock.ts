@@ -527,7 +527,10 @@ export function createMockLibrary(first: Config, extra: { name: string; config: 
     activeId: () => active,
     active: () => structuredClone(find(active).config),
     saveActive(c: Config) {
-      const p = find(active);
+      this.saveInto(active, c);
+    },
+    saveInto(pid: string, c: Config) {
+      const p = find(pid);
       p.config = mappingOf(structuredClone(c));
       p.updatedAt = now();
     },
@@ -701,6 +704,18 @@ export function createMockBackend(q: URLSearchParams): Backend {
   const run = (c: Config) => sim.setConfig({ ...c, pedal: sim.config.pedal });
   const midiError = q.get("midi") === "error";
   const saveError = q.get("save") === "error";
+  /** Go's SaveConfigInto: stores into preset `id`, runs it only if `id` is active now. */
+  const saveInto = async (id: string, cfg: Config) => {
+    // Counted for browser checks (a scrub must save once).
+    const w = window as unknown as { __mockSaves?: number };
+    w.__mockSaves = (w.__mockSaves ?? 0) + 1;
+    await sleep(120);
+    if (saveError) throw new Error("could not write config.json: read-only file system");
+    const err = validate(cfg);
+    if (err) throw new Error(err);
+    lib.saveInto(id, cfg);
+    if (id === lib.activeId()) run(cfg);
+  };
   const stateCbs = new Set<(s: State) => void>();
   const actCbs = new Set<(a: Activity) => void>();
 
@@ -758,17 +773,8 @@ export function createMockBackend(q: URLSearchParams): Backend {
 
   return {
     GetState: async () => state(),
-    SaveConfig: async (cfg) => {
-      // Counted for browser checks (a scrub must save once).
-      const w = window as unknown as { __mockSaves?: number };
-      w.__mockSaves = (w.__mockSaves ?? 0) + 1;
-      await sleep(120);
-      if (saveError) throw new Error("could not write config.json: read-only file system");
-      const err = validate(cfg);
-      if (err) throw new Error(err);
-      sim.setConfig(cfg);
-      lib.saveActive(cfg);
-    },
+    SaveConfig: (cfg) => saveInto(lib.activeId(), cfg),
+    SaveConfigInto: (id, cfg) => saveInto(id, cfg),
     ResetConfig: async () => {
       const c = defaultConfig();
       c.pedal = sim.config.pedal;
