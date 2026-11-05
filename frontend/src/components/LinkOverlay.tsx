@@ -6,18 +6,12 @@ import {
   Radar,
   Unplug,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Backend } from "../api";
 import { openURL } from "../api";
-import {
-  BLUETOOTH_SETTINGS,
-  type LinkAction,
-  type LinkView,
-  linkView,
-  SWEEP_MS,
-  sweepLamps,
-} from "../lib/linkview";
-import type { Colour, Config, Status } from "../types";
+import type { LinkPhase } from "../canvas/store";
+import { BLUETOOTH_SETTINGS, type LinkAction, type LinkView, linkView } from "../lib/linkview";
+import type { Config, Status } from "../types";
 import { Button } from "../ui/Button";
 import { ScanResults, usePedalScan } from "./PedalScan";
 import "./LinkOverlay.css";
@@ -26,7 +20,8 @@ import "./LinkOverlay.css";
 // with sonar going out from it (searching) or closing in on it (connecting), and a card
 // over its lower edge says what is happening and what to do. When the link comes up the
 // rings fall into the case, the colour comes back and the LEDs sweep once, left to right.
-// Only the card takes the pointer: the pedal's switches stay clickable behind it.
+// The rings and the sweep are drawn by the canvas (canvas/Rings, canvas/SparkView); this
+// is their clock and the card. Only the card takes the pointer.
 
 /** How long the card and rings take to leave once the pedal connects (ms). */
 const LEAVE_MS = 620;
@@ -38,7 +33,7 @@ function devParam(name: string): string | null {
   if (typeof document === "undefined" || !document.documentElement.dataset.mock) return null;
   return new URLSearchParams(window.location.search).get(name);
 }
-const freezeMs = () => {
+export const freezeMs = () => {
   const v = devParam("freeze");
   return v !== null && /^\d+$/.test(v) ? Number(v) : null;
 };
@@ -46,16 +41,15 @@ const freezeMs = () => {
 const reducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export type LinkPhase = "in" | "leaving" | "gone";
+export type { LinkPhase };
 
-/** The overlay's life: what it shows, whether it is arriving, leaving or gone, and the
- *  lamps to draw (the pedal's own, or the power-up sweep over them). */
+/** The overlay's life: what it shows, whether it is arriving, leaving or gone, and when
+ *  the power-up sweep started (the canvas runs it on its own clock). */
 export function useLink(status: Status | null, config: Config | null) {
   const view = linkView(status, config?.pedal ?? { address: "", name: "" });
   const [shown, setShown] = useState<LinkView | null>(view.visible ? view : null);
   const [phase, setPhase] = useState<LinkPhase>(view.visible ? "in" : "gone");
   const [sweepAt, setSweepAt] = useState<number | null>(null);
-  const [now, setNow] = useState(0);
   const was = useRef(status?.state ?? null);
 
   // Keep the card's words current while it is up; freeze them while it leaves.
@@ -80,63 +74,7 @@ export function useLink(status: Status | null, config: Config | null) {
     return () => clearTimeout(t);
   }, [state]);
 
-  // The sweep's clock: a frame at a time while it runs.
-  useEffect(() => {
-    if (sweepAt === null) return;
-    let raf = 0;
-    const tick = () => {
-      const t = performance.now() - sweepAt;
-      setNow(t);
-      if (t < SWEEP_MS + 260) raf = requestAnimationFrame(tick);
-      else setSweepAt(null);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [sweepAt]);
-
-  // The rings rest a beat before the LEDs light, so the sweep follows the collapse.
-  const lamps = (base: Colour[]): Colour[] =>
-    sweepAt === null || state !== "connected" ? base : sweepLamps(now - 260, base, config);
-
-  return { view: shown, phase: shown ? phase : "gone", lamps };
-}
-
-/** The rings round the case, drawn behind it. `rect` is the case in the stage's px. */
-export function LinkRings({
-  view,
-  phase,
-  rect,
-}: {
-  view: LinkView | null;
-  phase: LinkPhase;
-  rect: { x: number; y: number; w: number; h: number } | null;
-}) {
-  if (!rect || !view || phase === "gone" || view.rings === "none") return null;
-  const FREEZE = freezeMs();
-  const mode = phase === "leaving" ? "collapse" : view.rings;
-  return (
-    <div
-      aria-hidden
-      className="link-rings"
-      data-rings={mode}
-      data-frozen={FREEZE !== null || undefined}
-      style={
-        {
-          left: rect.x,
-          top: rect.y,
-          width: rect.w,
-          height: rect.h,
-          "--case-r": `${rect.w * 0.05}px`,
-          "--freeze": FREEZE === null ? undefined : `${-FREEZE}ms`,
-        } as CSSProperties
-      }
-    >
-      {[0, 1, 2].map((i) => (
-        <span key={i} className="link-ring" style={{ "--i": i } as CSSProperties} />
-      ))}
-      {mode === "collapse" && <span className="link-bloom" />}
-    </div>
-  );
+  return { view: shown, phase: shown ? phase : "gone", sweepAt };
 }
 
 const ICON = {
