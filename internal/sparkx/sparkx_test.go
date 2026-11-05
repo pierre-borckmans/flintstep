@@ -182,3 +182,64 @@ func TestExpScaleHysteresis(t *testing.T) {
 		t.Fatal("reset input did not report its first reading")
 	}
 }
+
+func TestModelForName(t *testing.T) {
+	for name, want := range map[string]string{
+		"SparkX v4.1.23 fbfc":   IDSparkControlX,
+		"  sparkx":              IDSparkControlX,
+		"REACTOR Control 1a2b":  IDReactorControl,
+		"reactorcontrol":        IDReactorControl,
+		"RCTR v1.0":             IDReactorControl,
+		"REACTOR 50 BT Control": "", // the amp, not the pedal
+		"REACTOR 100 BT Audio":  "",
+		"BT500S-2":              "",
+		"Spark 40 Audio":        "",
+		"":                      "",
+	} {
+		m, ok := ModelForName(name)
+		if ok != (want != "") || m.ID != want {
+			t.Errorf("ModelForName(%q) = %q %v, want %q", name, m.ID, ok, want)
+		}
+	}
+	if _, ok := ModelForName("compatible"); ok {
+		t.Error("Compatible must not be recognised by name")
+	}
+}
+
+func TestModelsAreConsistent(t *testing.T) {
+	seen := map[string]bool{}
+	for _, m := range append(Models, Compatible) {
+		if m.ID == "" || m.DisplayName == "" || seen[m.ID] {
+			t.Errorf("bad or duplicate model %+v", m)
+		}
+		seen[m.ID] = true
+		if got, ok := ModelByID(m.ID); !ok || got.ID != m.ID {
+			t.Errorf("ModelByID(%q) = %+v %v", m.ID, got, ok)
+		}
+		if m.Info() != (ModelInfo{ID: m.ID, Name: m.DisplayName}) {
+			t.Errorf("Info() = %+v", m.Info())
+		}
+	}
+	if len(Compatible.NamePrefixes) != 0 {
+		t.Error("Compatible has name prefixes")
+	}
+}
+
+func TestHasServices(t *testing.T) {
+	sw := "7bdb8dc0-6c95-11e3-981f-0800200c9a66"
+	midi := "03b80e5a-ede8-4b33-a751-6ce34ec4c700"
+	for _, c := range []struct {
+		uuids []string
+		want  bool
+	}{
+		{[]string{sw, CommandServiceUUID}, true},
+		{[]string{SwitchService, "0000FFC8-0000-1000-8000-00805F9B34FB", midi}, true},
+		{[]string{sw, midi}, false}, // an AirTurn BT500S: the switch service, no FFC8
+		{[]string{CommandServiceUUID}, false},
+		{nil, false},
+	} {
+		if got := HasServices(c.uuids); got != c.want {
+			t.Errorf("HasServices(%v) = %v, want %v", c.uuids, got, c.want)
+		}
+	}
+}

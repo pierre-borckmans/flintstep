@@ -105,14 +105,16 @@ func TestHeldPedals(t *testing.T) {
 		"/org/bluez/hci0/dev_AA_00_00_00_00_02":      deviceObj("SparkX-B", "AA:00:00:00:00:02", true, midi),
 		"/org/bluez/hci0/dev_AA_00_00_00_00_01":      deviceObj("SparkX-A", "aa:00:00:00:00:01", true, "0000180f-0000-1000-8000-00805f9b34fb", switchSvc),
 		"/org/bluez/hci0/dev_AA_00_00_00_00_03":      deviceObj("SparkX-C", "AA:00:00:00:00:03", false, switchSvc), // not connected
-		"/org/bluez/hci0/dev_AA_00_00_00_00_04":      deviceObj("Headphones", "AA:00:00:00:00:04", true, midi),     // not a pedal
-		"/org/bluez/hci0/dev_AA_00_00_00_00_05":      deviceObj("SparkX-E", "AA:00:00:00:00:05", true),             // no UUIDs yet
-		"/org/bluez/hci1/dev_AA_00_00_00_00_06":      deviceObj("SparkX-F", "AA:00:00:00:00:06", true, switchSvc),  // other adapter
+		"/org/bluez/hci0/dev_AA_00_00_00_00_04":      deviceObj("Keys", "AA:00:00:00:00:04", true, midi),           // maybe a pedal: the Manager decides
+		"/org/bluez/hci0/dev_AA_00_00_00_00_08":      deviceObj("Headphones", "AA:00:00:00:00:08", true, "0000110b-0000-1000-8000-00805f9b34fb"),
+		"/org/bluez/hci0/dev_AA_00_00_00_00_05":      deviceObj("SparkX-E", "AA:00:00:00:00:05", true),            // no UUIDs yet
+		"/org/bluez/hci1/dev_AA_00_00_00_00_06":      deviceObj("SparkX-F", "AA:00:00:00:00:06", true, switchSvc), // other adapter
 		"/org/bluez/hci0/dev_AA_00_00_00_00_01/svc1": {"org.bluez.GattService1": {}},
 	}
 	want := []Device{
-		{Name: "SparkX-A", Address: "AA:00:00:00:00:01", System: true},
-		{Name: "SparkX-B", Address: "AA:00:00:00:00:02", System: true},
+		{Name: "SparkX-A", Address: "AA:00:00:00:00:01", System: true, services: []string{"0000180f-0000-1000-8000-00805f9b34fb", switchSvc}},
+		{Name: "SparkX-B", Address: "AA:00:00:00:00:02", System: true, services: []string{midi}},
+		{Name: "Keys", Address: "AA:00:00:00:00:04", System: true, services: []string{midi}},
 	}
 	if got := heldPedals(objs, "/org/bluez/hci0"); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v\nwant %+v", got, want)

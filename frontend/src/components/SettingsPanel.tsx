@@ -77,9 +77,7 @@ function PedalPicker({ backend, state }: { backend: Backend; state: State }) {
       <div className="flex items-center gap-2.5">
         <Lamp on={!!connected} colour="live" size={6} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-ui-md text-text">
-            {remembered.name || "Any Spark Control X"}
-          </span>
+          <span className="truncate text-ui-md text-text">{remembered.name || "Any pedal"}</span>
           <span className="truncate font-mono text-ui-2xs text-faint">
             {remembered.address || "connects to the first pedal it finds"}
           </span>
@@ -89,7 +87,7 @@ function PedalPicker({ backend, state }: { backend: Backend; state: State }) {
           onClick={scan.scan}
           disabled={scan.scanning}
           icon={<Radar size={12} />}
-          title="Look for Spark Control X pedals nearby"
+          title="Look for pedals nearby"
         >
           {scan.scanning ? "Scanning…" : "Scan"}
         </Button>

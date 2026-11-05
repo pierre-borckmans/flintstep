@@ -4,6 +4,7 @@ import { expFraction, expValue, RAW_MAX } from "./lib/exp";
 import { fractionRaw, sweepFraction, sweepOffset } from "./lib/expsim";
 import { indicatorLit } from "./lib/indicators";
 import { describeMidi } from "./lib/midi";
+import { pedalLabel } from "./lib/pedalname";
 import {
   checkName,
   copyName,
@@ -21,6 +22,7 @@ import type {
   Colour,
   Config,
   Device,
+  PedalModel,
   PresetInfo,
   PresetSource,
   State,
@@ -390,25 +392,31 @@ export function createSim(opts: SimOptions = {}) {
       });
     }
     // Go's words: a scan, then a countdown to the next one (ble/loop.go).
+    const model = mockModel(
+      config.pedal.name || (live || connState === "connecting" ? MOCK_PEDAL : ""),
+    );
+    const label = pedalLabel(config.pedal.name, model);
     const since = t - searchFrom;
     const searching =
       lost && since < 1500
         ? "Connection lost, reconnecting"
         : since % 6000 < 2000
-          ? `Looking for ${config.pedal.name || "a Spark Control X"}`
+          ? `Looking for ${config.pedal.address ? label : "your pedal"}`
           : `Not found, trying again in ${Math.ceil((6000 - (since % 6000)) / 1000)} s`;
     const detail: Record<BleState, string> = {
       off: "Bluetooth is off",
       idle: "",
       searching,
-      connecting: `Connecting to ${config.pedal.name || "the Spark Control X"}`,
-      connected: `Connected to ${config.pedal.name || "the Spark Control X"}`,
+      connecting: `Connecting to ${pedalLabel(config.pedal.name || MOCK_PEDAL, model)}`,
+      connected: `Connected to ${pedalLabel(config.pedal.name || MOCK_PEDAL, model)}`,
     };
     return {
       state: connState,
       detail: detail[connState],
-      name: live || connState === "connecting" ? config.pedal.name || "SparkX v4.1.23 fbfc" : "",
+      name:
+        live || connState === "connecting" ? config.pedal.name || MOCK_PEDAL : config.pedal.name,
       address: live ? config.pedal.address : "",
+      model,
       firmware: live ? "4.1.23" : "",
       profile: live ? 2 : -1,
       profileName: live ? "Live Set" : "",
@@ -821,9 +829,15 @@ export function createMockBackend(q: URLSearchParams): Backend {
     },
     Scan: async (): Promise<Device[]> => {
       await sleep(1500);
+      const found = (name: string, address: string, rssi: number, system: boolean): Device => {
+        const model = mockModel(name);
+        return { name, address, rssi, system, model, verified: model.id !== "" };
+      };
       return [
-        { name: "SparkX v4.1.23 fbfc", address: "4F1A-SPARKX-MOCK", rssi: -48, system: true },
-        { name: "SparkX v4.1.20 a01e", address: "9C02-SPARKX-MOCK", rssi: -77, system: false },
+        found(MOCK_PEDAL, "4F1A-SPARKX-MOCK", -48, true),
+        found("REACTOR Control 3c9e", "7B10-REACTOR-MOCK", -61, false),
+        found("SparkX v4.1.20 a01e", "9C02-SPARKX-MOCK", -77, false),
+        found("BT500S-2", "D7E4-AIRTURN-MOCK", -70, false), // unverified: only the switch service
       ];
     },
     ChoosePedal: async (address, name) => {
@@ -893,4 +907,15 @@ export function createMockBackend(q: URLSearchParams): Backend {
       return () => actCbs.delete(cb);
     },
   };
+}
+
+/** The mock's pedal, as a Spark Control X advertises itself. */
+const MOCK_PEDAL = "SparkX v4.1.23 fbfc";
+
+/** sparkx.ModelForName for the mock: the two known models' prefixes. */
+function mockModel(name: string): PedalModel {
+  const n = name.trim().toLowerCase();
+  if (n.startsWith("sparkx")) return { id: "spark-control-x", name: "Spark Control X" };
+  if (n.startsWith("reactor control")) return { id: "reactor-control", name: "REACTOR Control" };
+  return { id: "", name: "" };
 }

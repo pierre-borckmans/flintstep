@@ -9,10 +9,10 @@ const (
 	Name = "Flintstep"
 	// BundleID is the CFBundleIdentifier, the LaunchAgent label and the MIDI UID seed.
 	BundleID = "com.silversol.flintstep"
-	// MIDIPortName is the virtual MIDI source DAWs see.
-	MIDIPortName = "Flintstep (Spark Control X)"
+	// MIDIPortName is the virtual MIDI source DAWs see. The same for every pedal model.
+	MIDIPortName = "Flintstep"
 	// MIDILEDPortName is the virtual MIDI destination a DAW sends LED feedback to.
-	MIDILEDPortName = "Flintstep LEDs (Spark Control X)"
+	MIDILEDPortName = "Flintstep LEDs"
 	// DataDirName is the data folder under ~/Library/Application Support.
 	DataDirName = "Flintstep"
 	// CLIName is the headless bridge's binary (cmd/flintstep-cli).

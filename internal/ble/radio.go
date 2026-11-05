@@ -24,7 +24,8 @@ import (
 // not found by address on the other, and the name fallback takes over.
 
 // midiService is the BLE-MIDI service, which the Spark Control X advertises too. The
-// radios use it with the switch service to recognise a pedal the system already holds.
+// radios use it with the switch service to find pedals the system already holds, and
+// Scan lists devices that advertise either as possible pedals.
 const midiService = "03B80E5A-EDE8-4B33-A751-6CE34EC4C700"
 
 // radio is the adapter as the Manager sees it.
@@ -35,10 +36,13 @@ type radio interface {
 	// enable readies the adapter. Called before every connect attempt and scan; the
 	// real one does the work once and then returns nil.
 	enable() error
-	// held lists the Spark Control X pedals macOS already holds a connection to. They
-	// are not advertising, so a scan would miss them. Each has System set.
+	// held lists the devices the system already holds a connection to that offer the
+	// switch or the BLE-MIDI service, whatever their name, with the services it knows
+	// they offer. They are not advertising, so a scan would miss them. Each has System
+	// set. The Manager decides which are pedals (classify).
 	held() ([]Device, error)
-	// scan calls visit for each advertisement for at most timeout, or until ctx is
+	// scan calls visit for each advertisement, with its advertised service UUIDs in
+	// services, for at most timeout, or until ctx is
 	// done; visit returning true stops it early. visit may run on CoreBluetooth's
 	// thread: it must be cheap.
 	scan(ctx context.Context, timeout time.Duration, visit func(Device) bool) error
@@ -103,7 +107,7 @@ func findServices[U comparable, S any](required, optional []U, discover func([]U
 	for i, u := range required {
 		s, ok := byID[u]
 		if !ok {
-			return nil, nil, fmt.Errorf("service %v missing", u)
+			return nil, nil, fmt.Errorf("%w: service %v missing", errIncompatible, u)
 		}
 		req[i] = s
 	}

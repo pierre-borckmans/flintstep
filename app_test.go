@@ -9,7 +9,30 @@ import (
 
 	"flintstep/internal/ble"
 	"flintstep/internal/mapping"
+	"flintstep/internal/sparkx"
 )
+
+// The menu says which model it is connected to, and what it looks for.
+func TestStatusLine(t *testing.T) {
+	rc := sparkx.ReactorControl.Info()
+	for _, c := range []struct {
+		st   ble.Status
+		want string
+	}{
+		{ble.Status{State: ble.StateConnected, Name: "REACTOR Control 7f", Model: rc}, "Connected to REACTOR Control"},
+		{ble.Status{State: ble.StateConnected, Name: "SparkX v4", Model: sparkx.SparkControlX.Info()}, "Connected to Spark Control X"},
+		{ble.Status{State: ble.StateConnected, Name: "AT-FS6", Model: sparkx.Compatible.Info()}, "Connected to AT-FS6"},
+		{ble.Status{State: ble.StateSearching}, "Looking for your pedal…"},
+		{ble.Status{State: ble.StateSearching, Name: "REACTOR Control 7f", Model: rc}, "Looking for REACTOR Control…"},
+		{ble.Status{State: ble.StateConnecting, Name: "Mystery"}, "Connecting to Mystery…"},
+		{ble.Status{State: ble.StateOff, Detail: "Bluetooth is off"}, "Bluetooth is off"},
+		{ble.Status{State: ble.StateIdle}, "Not connected"},
+	} {
+		if got := statusLine(c.st); got != c.want {
+			t.Errorf("statusLine(%+v) = %q, want %q", c.st, got, c.want)
+		}
+	}
+}
 
 // Wails calls OnShutdown after it has released the window. Bridge activity (the
 // releases Stop sends) and the state loop keep emitting from their own goroutines; once

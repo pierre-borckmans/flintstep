@@ -8,7 +8,7 @@ section: sound
 priority: optional
 maintainer: Pierre Borckmans <pborckmans@gmail.com>
 description: |
-  Turns a Positive Grid Spark Control X into a MIDI foot controller.
+  Turns a Positive Grid Spark Control X or REACTOR Control into a MIDI foot controller.
   Connects to the pedal over Bluetooth LE (BlueZ) and publishes it as ALSA
   sequencer ports. Experimental on Linux. Not affiliated with Positive Grid.
 vendor: silversol

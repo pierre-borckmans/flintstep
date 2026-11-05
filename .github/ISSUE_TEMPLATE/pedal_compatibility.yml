@@ -1,0 +1,115 @@
+name: Pedal compatibility report
+description: You tried Flintstep with a REACTOR Control or another pedal it doesn't know yet. Tell us how it went.
+labels: [compatibility]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying this. Nothing below changes the pedal's profiles or settings: the
+        commands only list devices, read values and send the info requests Flintstep itself
+        sends. Close the Spark app and switch off any REACTOR amp first: a pedal talks to one
+        host at a time.
+
+        The commands need a clone of the repository
+        (`git clone https://github.com/pierre-borckmans/flintstep && cd flintstep`) and Go
+        1.25+ for the scan; the macOS probe needs Xcode's command-line tools.
+  - type: input
+    id: model
+    attributes:
+      label: Pedal model
+      description: As printed on the pedal or its box.
+      placeholder: REACTOR Control
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Pedal firmware
+      description: >
+        Shown in the Spark or REACTOR app. If Flintstep connected, it is also in its
+        header tooltip and in app.log ("firmware ...").
+      placeholder: 4.1.23
+  - type: dropdown
+    id: result
+    attributes:
+      label: Did it work?
+      options:
+        - Connected, switches and LEDs work
+        - Connected, but something doesn't work (say what below)
+        - Listed by Scan but would not connect
+        - Not found at all
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: App version and system
+      description: The app version is at the bottom of Settings.
+      placeholder: v0.3.0, macOS 15.3 on Apple silicon
+    validations:
+      required: true
+  - type: textarea
+    id: scan
+    attributes:
+      label: Scan output
+      description: |
+        With the pedal on and nothing else connected to it, run the command-line bridge's
+        scan from the repository and paste what it prints. Press a switch first if the pedal
+        has gone to sleep.
+
+        ```sh
+        go run ./cmd/flintstep-cli -scan
+        ```
+
+        Each line is an address, the advertised name, the signal and the model. A pedal it
+        doesn't know shows as "unverified".
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: probe
+    attributes:
+      label: Bluetooth services
+      description: |
+        Which Bluetooth services and characteristics the pedal has, and the values it reads.
+
+        **macOS**: take the pedal's address (a UUID) from the scan above and run the probe
+        for 20 seconds. It connects, lists every service and characteristic, reads what is
+        readable and sends only the battery and power info requests (`0f`, `10`, `11`).
+
+        ```sh
+        swift tools/probe/power.swift 963A48E7-FA93-CABE-A00B-59D7693DF2A9 20
+        ```
+
+        macOS may ask your terminal for Bluetooth access the first time.
+
+        **Linux**, with the pedal's address from the scan above:
+
+        ```sh
+        bluetoothctl connect AA:BB:CC:DD:EE:FF
+        bluetoothctl info AA:BB:CC:DD:EE:FF
+        bluetoothctl disconnect AA:BB:CC:DD:EE:FF
+        ```
+      render: text
+  - type: textarea
+    id: usb
+    attributes:
+      label: USB
+      description: >
+        Optional. With the pedal plugged into the computer by USB, does it show up as
+        anything? On macOS: Audio MIDI Setup > MIDI Studio, and `system_profiler
+        SPUSBDataType`. On Linux: `lsusb` and `aconnect -l`.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        If Flintstep tried to connect: Settings > Logs and Bluetooth trace > Reveal in Finder
+        (~/Library/Application Support/Flintstep/ on macOS, ~/.config/Flintstep/ on Linux).
+        Attach app.log and ble-trace.log. Look through them first for anything you'd rather
+        not share.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else

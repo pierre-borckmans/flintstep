@@ -7,6 +7,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"flintstep/internal/sparkx"
 )
 
 // KEEPING THE PEDAL CONNECTED.
@@ -79,7 +81,10 @@ func (m *Manager) loop(ctx context.Context, prev <-chan struct{}, done chan stru
 			wait := backoff(failures, m.tm.backoffMin, m.tm.backoffMax)
 			failures++
 			why := "Not found"
-			if !errors.Is(err, errNotFound) {
+			switch {
+			case errors.Is(err, errIncompatible):
+				why = err.Error() // "<name>: not a compatible pedal"
+			case !errors.Is(err, errNotFound):
 				why = "Could not connect"
 			}
 			log.Printf("ble: %s: %v; again in %v", describe(tg), err, wait)
@@ -134,10 +139,15 @@ func (m *Manager) sleep(ctx context.Context, d time.Duration) {
 
 // adopt makes s the connected pedal, found for tg.
 func (m *Manager) adopt(s *session, path connectPath, tg Target) {
+	// The dial checked its services, so whatever its name it is a pedal now.
+	s.dev.Verified = true
+	if s.dev.Model.ID == "" {
+		s.dev.Model = sparkx.Compatible.Info()
+	}
 	m.trace.note("connect " + s.dev.Address + " " + s.dev.Name)
 	m.mu.Lock()
 	m.cur = s
-	m.name, m.addr = s.dev.Name, s.dev.Address
+	m.name, m.addr, m.model = s.dev.Name, s.dev.Address, s.dev.Model
 	lamps := m.lamps
 	fn := m.onConn
 	if m.target != tg {
@@ -148,8 +158,8 @@ func (m *Manager) adopt(s *session, path connectPath, tg Target) {
 	}
 	m.mu.Unlock()
 	s.start(s.c, lamps)
-	log.Printf("ble: connected %s %s", describe(Target{s.dev.Address, s.dev.Name}), path)
-	m.setState(StateConnected, "Connected to "+shortName(s.dev.Name))
+	log.Printf("ble: connected %s %s, %s", describe(Target{s.dev.Address, s.dev.Name}), path, s.dev.Model.Name)
+	m.setState(StateConnected, "Connected to "+Label(s.dev.Name, s.dev.Model))
 	if fn != nil {
 		fn(s.dev)
 	}

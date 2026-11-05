@@ -6,9 +6,9 @@ package coremidi
 // CoreMIDI client in coremidi_darwin.go. The package keeps its historical name; on
 // Linux it binds libasound (cgo, -lasound; build with libasound2-dev or alsa-lib-devel).
 //
-// The source port is readable and subscribable ("Flintstep (Spark Control X)"): every
+// The source port is readable and subscribable ("Flintstep"): every
 // message is sent direct to whoever subscribed. The LED port is writable and
-// subscribable ("Flintstep LEDs (Spark Control X)"): a reader goroutine decodes what
+// subscribable ("Flintstep LEDs"): a reader goroutine decodes what
 // arrives back into MIDI bytes and feeds the same parser CoreMIDI's packets go through.
 // PipeWire (with its ALSA sequencer bridge) and JACK (a2jmidid, or Ardour's own ALSA
 // backend) show these ports to their clients too.
@@ -115,7 +115,7 @@ import (
 // properties; they are kept so the package's API is the same everywhere.
 const (
 	Manufacturer = product.Name
-	Model        = "Spark Control X"
+	Model        = "Footswitch" // not the pedal's model: the ports stay the same for every one
 )
 
 // maxMsg bounds Send; channel messages are 3 bytes, the room is for short sysex.

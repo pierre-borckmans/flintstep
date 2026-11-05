@@ -9,6 +9,7 @@ const status = (state: BleState, detail = "", name = ""): Status => ({
   detail,
   name,
   address: "",
+  model: { id: "", name: "" },
   firmware: "",
   profile: -1,
   profileName: "",
@@ -36,7 +37,7 @@ describe("linkView", () => {
       visible: true,
       tone: "searching",
       rings: "expand",
-      title: "Looking for your Spark Control X…",
+      title: "Looking for SparkX v4.1.23 fbfc…",
       detail: "Not found, trying again in 4 s",
       pedal: "SparkX v4.1.23 fbfc",
     });
@@ -44,8 +45,19 @@ describe("linkView", () => {
     expect(ids(v)).toEqual(["scan", "forget"]);
   });
 
+  it("searching names the remembered pedal's model when Go knows it", () => {
+    const st = {
+      ...status("searching", "", "REACTOR Control 7f"),
+      model: { id: "reactor-control", name: "REACTOR Control" },
+    };
+    expect(linkView(st, { address: "7F", name: "REACTOR Control 7f" }).title).toBe(
+      "Looking for REACTOR Control…",
+    );
+  });
+
   it("searching with no remembered pedal has nothing to forget", () => {
     const v = linkView(status("searching", "Connection lost, reconnecting"), none);
+    expect(v.title).toBe("Looking for your pedal…");
     expect(v.detail).toBe("Connection lost, reconnecting");
     expect(v.pedal).toBe("");
     expect(ids(v)).toEqual(["scan"]);
@@ -61,7 +73,7 @@ describe("linkView", () => {
     expect(v).toMatchObject({ tone: "connecting", rings: "converge" });
     expect(v.title).toBe("Connecting to SparkX v4.1.20 a01e…");
     expect(v.actions).toEqual([]);
-    expect(linkView(status("connecting"), none).title).toBe("Connecting to your Spark Control X…");
+    expect(linkView(status("connecting"), none).title).toBe("Connecting to your pedal…");
   });
 
   it("off: no rings, Go's words as the title, a way to System Settings", () => {

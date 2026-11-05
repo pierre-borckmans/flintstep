@@ -15,6 +15,6 @@
     "productName": "Flintstep",
     "productVersion": "0.1.0",
     "copyright": "© 2026 Pierre Borckmans",
-    "comments": "Flintstep turns a Spark Control X into a MIDI foot controller. Not affiliated with Positive Grid."
+    "comments": "Flintstep turns a Spark Control X or REACTOR Control into a MIDI foot controller. Not affiliated with Positive Grid."
   }
 }

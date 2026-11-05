@@ -4,7 +4,8 @@ import (
 	"strings"
 )
 
-// POSITIVE GRID SPARK CONTROL X, THE PROTOCOL HALF.
+// POSITIVE GRID SPARK CONTROL X, THE PROTOCOL HALF. The REACTOR Control is the same
+// AirTurn hardware and is assumed to speak the same protocol (models.go).
 //
 // The Spark Control X advertises the BLE-MIDI service but never sends a MIDI message.
 // Its switches, expression inputs, battery and lamps all go through two vendor services
@@ -25,13 +26,7 @@ import (
 // here can build those: the only things this file encodes are info requests and 0x01
 // lamp messages, and lamp state is volatile (a power cycle clears it).
 //
-// namePrefix starts the name the pedal advertises: " v4.1.23 fbfc".
-const namePrefix = "SparkX"
-
-// IsName reports whether an advertised name is a Spark Control X.
-func IsName(name string) bool {
-	return strings.HasPrefix(strings.TrimSpace(name), namePrefix)
-}
+// Which pedals speak it, and how they are recognised, is models.go.
 
 // GATT identifiers.
 const (
@@ -321,7 +316,7 @@ func (s *ExpScale) Feed(n, raw int) (int, bool) {
 // Reset forgets input n's reading: its cable came out.
 func (s *ExpScale) Reset(n int) { s.last[n] = -1 }
 
-// Status is what the app knows of one connected Spark Control X, for the UI.
+// Status is what the app knows of one connected pedal, for the UI.
 type Status struct {
 	Firmware    string `json:"firmware"`
 	Profile     int    `json:"profile"` // -1 until read

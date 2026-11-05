@@ -43,7 +43,7 @@ jq --arg name "$PRODUCT_NAME" '
   .name = $name
   | .outputfilename = $name
   | .info.productName = $name
-  | .info.comments = ($name + " turns a Spark Control X into a MIDI foot controller. Not affiliated with Positive Grid.")
+  | .info.comments = ($name + " turns a Spark Control X or REACTOR Control into a MIDI foot controller. Not affiliated with Positive Grid.")
 ' "$ROOT/wails.json" > "$tmp/out"
 update wails.json
 

@@ -26,7 +26,7 @@
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
         <key>NSBluetoothAlwaysUsageDescription</key>
-        <string>{{.Info.ProductName}} connects to your Spark Control X over Bluetooth so its footswitches can send MIDI.</string>
+        <string>{{.Info.ProductName}} connects to your pedal over Bluetooth so its footswitches can send MIDI.</string>
         {{if .Info.FileAssociations}}
         <key>CFBundleDocumentTypes</key>
         <array>

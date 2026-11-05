@@ -121,10 +121,11 @@ func devicePath(adapterPath dbus.ObjectPath, addr string) dbus.ObjectPath {
 	return dbus.ObjectPath(string(adapterPath) + "/dev_" + strings.ReplaceAll(strings.ToUpper(addr), ":", "_"))
 }
 
-// heldPedals lists the Spark Control X pedals connected to this computer now, by anyone:
-// devices under adapterPath with Connected set that offer the switch service or BLE-MIDI
-// (BlueZ fills UUIDs from the advertisement and, once connected, from discovery) and
-// carry a SparkX name. The address is spelled as tinygo spells a scan result's.
+// heldPedals lists the possible pedals connected to this computer now, by anyone: devices
+// under adapterPath with Connected set that offer the switch service or BLE-MIDI (BlueZ
+// fills UUIDs from the advertisement and, once connected, from discovery), whatever their
+// name, with their UUIDs. The Manager decides which are pedals (classify). The address is
+// spelled as tinygo spells a scan result's.
 func heldPedals(objs bluezObjects, adapterPath dbus.ObjectPath) []Device {
 	want := map[string]bool{strings.ToLower(sparkx.SwitchService): true, strings.ToLower(midiService): true}
 	var out []Device
@@ -138,8 +139,10 @@ func heldPedals(objs bluezObjects, adapterPath dbus.ObjectPath) []Device {
 		}
 		uuids, _ := props["UUIDs"].Value().([]string)
 		offers := false
+		services := make([]string, 0, len(uuids))
 		for _, u := range uuids {
 			offers = offers || want[strings.ToLower(u)]
+			services = append(services, strings.ToLower(u))
 		}
 		if !offers {
 			continue
@@ -149,10 +152,10 @@ func heldPedals(objs bluezObjects, adapterPath dbus.ObjectPath) []Device {
 			name, _ = props["Alias"].Value().(string)
 		}
 		addr, _ := props["Address"].Value().(string)
-		if !sparkx.IsName(name) || addr == "" {
+		if addr == "" {
 			continue
 		}
-		out = append(out, Device{Name: name, Address: strings.ToUpper(addr), System: true})
+		out = append(out, Device{Name: name, Address: strings.ToUpper(addr), System: true, services: services})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Address < out[j].Address })
 	return out

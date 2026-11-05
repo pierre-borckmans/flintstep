@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"tinygo.org/x/bluetooth"
@@ -61,6 +62,10 @@ func (g *pedalGATT) setup(dev bluetooth.Device) error {
 	if err != nil {
 		return err
 	}
+	// The switch and the command service are required: a device without both is not a
+	// pedal this app can drive (an AirTurn page turner has the switch service alone),
+	// and findServices says so with errIncompatible.
+	//
 	// One discovery for everything: tinygo clears its cache on each, so a second one
 	// later could cost the first its notifications. tinygo also fails the whole call
 	// when any asked-for service is missing, so findServices falls back to asking for
@@ -71,7 +76,7 @@ func (g *pedalGATT) setup(dev bluetooth.Device) error {
 		dev.DiscoverServices,
 		bluetooth.DeviceService.UUID)
 	if err != nil {
-		return fmt.Errorf("discover Spark Control X services: %w", err)
+		return fmt.Errorf("discover the pedal's services: %w", err)
 	}
 	battSvc, powerSvc := opt[0], opt[1]
 	sw, err := svcs[0].DiscoverCharacteristics([]bluetooth.UUID{swChar})
@@ -173,6 +178,16 @@ func (g *pedalGATT) watchBattery(svc bluetooth.DeviceService) {
 	if err != nil {
 		log.Printf("ble: battery notifications unavailable: %v", err)
 	}
+}
+
+// uuidStrings spells advertised service UUIDs as Device.services keeps them: 128-bit,
+// lower case.
+func uuidStrings(us []bluetooth.UUID) []string {
+	out := make([]string, 0, len(us))
+	for _, u := range us {
+		out = append(out, strings.ToLower(u.String()))
+	}
+	return out
 }
 
 // write sends one message on FFC9, with response.

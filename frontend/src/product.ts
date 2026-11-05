@@ -3,10 +3,10 @@
 // copy in internal/product.
 
 export const PRODUCT_NAME = "Flintstep";
-/** The virtual MIDI source DAWs see. */
-export const MIDI_PORT_NAME = "Flintstep (Spark Control X)";
+/** The virtual MIDI source DAWs see. The same for every pedal model. */
+export const MIDI_PORT_NAME = "Flintstep";
 /** The virtual MIDI destination a DAW sends LED feedback to. */
-export const MIDI_LED_PORT_NAME = "Flintstep LEDs (Spark Control X)";
+export const MIDI_LED_PORT_NAME = "Flintstep LEDs";
 export const REPO_SLUG = "pierre-borckmans/flintstep";
 export const SITE_URL = "https://flintstep.app";
 

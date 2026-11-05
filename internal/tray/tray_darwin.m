@@ -39,7 +39,7 @@ void trayStart(const void *png, int len) {
 				img.template = YES;
 				gItem.button.image = img;
 			} else {
-				gItem.button.title = @"SparkX";
+				gItem.button.title = @"Flintstep";
 			}
 			if (gMenu != nil) gItem.menu = gMenu;
 			if (gTip != nil) gItem.button.toolTip = gTip;

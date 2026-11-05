@@ -1,8 +1,8 @@
 //go:build darwin && cgo
 
 // Package coremidi publishes the bridge to other apps as a pair of virtual MIDI
-// endpoints: a source the DAW listens to ("Flintstep (Spark Control X)") and a
-// destination it can send LED feedback to ("Flintstep LEDs (Spark Control X)"). The
+// endpoints: a source the DAW listens to ("Flintstep") and a
+// destination it can send LED feedback to ("Flintstep LEDs"). The
 // caller picks the names; see internal/product.
 //
 // A direct binding, like the BEAM Mini app's: a handful of CoreMIDI calls that ship with macOS.
@@ -90,7 +90,7 @@ import (
 // Manufacturer and Model are what the endpoints report to DAWs, next to their names.
 const (
 	Manufacturer = product.Name
-	Model        = "Spark Control X"
+	Model        = "Footswitch" // not the pedal's model: the ports stay the same for every one
 )
 
 // maxMsg bounds Send; channel messages are 3 bytes, the room is for short sysex.

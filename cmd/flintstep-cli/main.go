@@ -1,4 +1,5 @@
-// flintstep-cli is the bridge without the app: connect to a Spark Control X, publish the
+// flintstep-cli is the bridge without the app: connect to a pedal (a Spark Control X or
+// a REACTOR Control), publish the
 // virtual MIDI ports, print every switch and every message. The quickest way to check a
 // pedal against MIDI Monitor or Logic.
 //
@@ -31,7 +32,7 @@ import (
 )
 
 func main() {
-	scan := flag.Bool("scan", false, "list Spark Control X pedals and exit")
+	scan := flag.Bool("scan", false, "list pedals nearby (and possible ones, marked unverified) and exit")
 	addr := flag.String("addr", "", "connect to this pedal (CoreBluetooth identifier)")
 	defaults := flag.Bool("defaults", false, "ignore the saved mapping, use the defaults")
 	trace := flag.String("trace", "", "write the BLE wire trace to this file")
@@ -58,8 +59,11 @@ func main() {
 	b := bridge.New(cfg, nil, bridge.Options{
 		OnActivity: func(a bridge.Activity) { fmt.Printf("  %-3s %s\n", a.Dir, a.Label) },
 		OnStatus: func(s ble.Status) {
-			if s.State != st.State {
+			if s.State != st.State || s.Model != st.Model {
 				fmt.Printf("pedal: %s %s %s\n", s.State, s.Name, s.Detail)
+				if s.State == ble.StateConnected {
+					fmt.Printf("pedal: model %s (%s)\n", s.Model.Name, s.Model.ID)
+				}
 			}
 			if s.Battery != st.Battery && s.Battery >= 0 {
 				fmt.Printf("pedal: battery %d%%\n", s.Battery)
@@ -91,14 +95,10 @@ func main() {
 			log.Fatalf("scan: %v", err)
 		}
 		if len(ds) == 0 {
-			fmt.Println("no Spark Control X found: is it on, and not connected to the Spark app?")
+			fmt.Println("no pedal found: is it on, and not held by the Spark app or a REACTOR amp?")
 		}
 		for _, d := range ds {
-			held := ""
-			if d.System {
-				held = " (held by macOS)"
-			}
-			fmt.Printf("%s  %s  rssi %d%s\n", d.Address, d.Name, d.RSSI, held)
+			fmt.Println(scanLine(d))
 		}
 		return
 	}
@@ -122,4 +122,18 @@ func main() {
 	<-sig
 	fmt.Println("\nstopping: lamps off, disconnecting")
 	m.Stop()
+}
+
+// scanLine is one -scan result: address, name, signal, model, and whether the system
+// holds it.
+func scanLine(d ble.Device) string {
+	model := d.Model.Name
+	if !d.Verified {
+		model = "unverified: connect to check"
+	}
+	held := ""
+	if d.System {
+		held = ", held by the system"
+	}
+	return fmt.Sprintf("%s  %q  rssi %d  (%s%s)", d.Address, d.Name, d.RSSI, model, held)
 }

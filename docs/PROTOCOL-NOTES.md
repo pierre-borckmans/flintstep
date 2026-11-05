@@ -3,6 +3,72 @@
 Additions to the protocol in internal/sparkx and Paul Hamshere's notes. Checked on
 firmware 4.1.23 with tools/probe/power.swift (read-only).
 
+## REACTOR Control (2026-11-05, desk research only, no hardware)
+
+Positive Grid's footswitch for the REACTOR 50 and 100 amps. The maintainer says it is
+physically the Spark Control X: same chassis, six switches, LEDs. The Spark Control X
+reports "AirTurn" as its manufacturer in Device Information, so the REACTOR Control is
+almost certainly the same AirTurn hardware with other branding and firmware. Nobody has
+reported on one connected to anything but its amp yet.
+
+What Positive Grid's own pages say:
+
+| | Spark Control X | REACTOR Control |
+| --- | --- | --- |
+| Size, battery | same dimensions, 750 mAh | same dimensions, 750 mAh [^rc-spec] [^scx-spec] |
+| Expression jacks | 2 | **1** [^rc-hw] |
+| Extra controls | Bluetooth button | a Function button instead, and a 1/4" TRS output [^rc-hw] |
+| Bluetooth | BLE | Bluetooth 5.0, 17 m [^rc-spec] |
+| "Wired" | n/a | 1/4" TRS cable to the amp's REACTOR Control jack (3 m, included) [^rc-hw] |
+| USB-C | charging, firmware | "Charging Port (DC IN 5V/2A)"; the cable is "for charging" [^rc-spec] |
+| Firmware | 4.1.23 (Aug 2024), over the air from the Spark app [^scx-fw] | ships with its firmware, "no new firmware has been released yet"; no update method described [^rc-fw] |
+| Pairs with | Spark amps and the Spark app | the amp: hold the amp's Pair button. It never pairs with a phone [^rc-faq] |
+
+- "Wired" is NOT USB. Nothing mentions USB-MIDI or HID, and Positive Grid says it "does
+  not function as a general-purpose MIDI controller" [^rc-faq]. The amp's manual says MIDI
+  In and the REACTOR Control jack are mutually exclusive [^amp-midi], which hints that the
+  TRS link carries MIDI or serial, but nothing says so. Flintstep only uses Bluetooth.
+- Amp firmware 0.2.5.41 (2026-10-19) "automatically reconnects to the last Reactor Control
+  it was paired with" [^amp-fw]. So the amp holds the pedal much as a Spark amp does: turn
+  the amp off (or out of range) before Flintstep looks for the pedal.
+- The amps advertise "REACTOR 50 BT Control" / "REACTOR 100 BT Control" for app control
+  and "REACTOR 50/100 BT Audio" for audio [^app-faq]. Those are the amp, not the pedal.
+  That is why the model registry never matches a bare "REACTOR" prefix.
+
+UNKNOWN, to be filled in from the first compatibility report (.github/ISSUE_TEMPLATE/
+pedal_compatibility.yml):
+
+- **The advertised Bluetooth name.** Not in any manual, FAQ or spec page found. FCC
+  filings (fccid.io) and GitHub could not be reached from the research session. The
+  registry's REACTOR prefixes (internal/sparkx/models.go) are guesses; a pedal with any
+  other name is still accepted once the user picks it, by its services.
+- Whether it exposes the same services: switch `7BDB8DC0-…`, command `FFC8`
+  (`FFC9`/`FFCA`), the power service `6FACFE71-…`, Battery `180F`, BLE-MIDI.
+- Whether the FFC9/FFCA messages, the lamp messages (`0x01`) and the info requests are
+  byte-identical, and what the single expression jack and the Function button send
+  (probably `0x0c` with input 2 always unplugged, and a seventh bit in the switch mask or a
+  new FFCA type; both guesses).
+- Whether it needs bonding before a host other than the amp can talk to it.
+- Its firmware version string and whether the `0x0b` reply looks like the Spark Control
+  X's.
+- Paul Hamshere's notes (github.com/paulhamsh/Spark-Control-X) and the other community
+  pages found say nothing about it.
+
+Sources (Positive Grid help centre; the pages refuse plain fetches, the Zendesk API
+`https://help.positivegrid.com/api/v2/help_center/en-us/articles/<id>.json` serves them):
+
+[^rc-spec]: Technical Specification for REACTOR Control, <https://help.positivegrid.com/hc/en-us/articles/35952632715661>
+[^scx-spec]: Technical Specification for Spark Control X, <https://help.positivegrid.com/hc/en-us/articles/22702916264461>
+[^rc-hw]: REACTOR Control hardware overview, <https://help.positivegrid.com/hc/en-us/articles/44632037941645>
+[^rc-fw]: REACTOR Control Firmware Update, <https://help.positivegrid.com/hc/en-us/articles/35952660717325>
+[^scx-fw]: Spark Control X Firmware Release Notes, <https://help.positivegrid.com/hc/en-us/articles/29418411269517>
+[^rc-faq]: REACTOR Control FAQ, <https://help.positivegrid.com/hc/en-us/articles/45781417522573>
+[^amp-midi]: REACTOR MIDI Control Commands Setup, <https://help.positivegrid.com/hc/en-us/articles/44536008858509>
+[^amp-fw]: REACTOR 50/100 Firmware Release Notes, <https://help.positivegrid.com/hc/en-us/articles/44385183933709>
+[^app-faq]: REACTOR App FAQ, <https://help.positivegrid.com/hc/en-us/articles/45779393869069>
+
+Product page: <https://www.positivegrid.com/products/reactor-control>.
+
 ## USB power (2026-11-04)
 
 Two sources report whether the USB cable is powering the pedal. Unplugged at ~12 s and

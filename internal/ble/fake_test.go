@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -16,11 +17,15 @@ import (
 // fakeAir is a radio: whether Bluetooth is on, what the Mac holds, what advertises, and
 // which addresses answer a connect. It records what the Manager asked of it.
 type fakeAir struct {
-	mu        sync.Mutex
-	off       string // non-empty: Bluetooth is off, for this reason
-	system    []Device
-	adverts   []Device
-	answers   map[string]bool
+	mu      sync.Mutex
+	off     string // non-empty: Bluetooth is off, for this reason
+	system  []Device
+	adverts []Device
+	answers map[string]bool
+	// gatt is what a connected device turns out to have, by address: one without both
+	// the switch and the command service fails the dial as the real setup does. An
+	// address missing here is a pedal.
+	gatt      map[string][]string
 	dials     []string
 	budgets   []time.Duration
 	scans     int
@@ -84,6 +89,9 @@ func (a *fakeAir) dial(_ context.Context, addr string, timeout time.Duration, s 
 	a.budgets = append(a.budgets, timeout)
 	if !a.answers[addr] {
 		return nil, errors.New("no answer")
+	}
+	if svcs, ok := a.gatt[addr]; ok && !sparkx.HasServices(svcs) {
+		return nil, fmt.Errorf("discover the pedal's services: %w", errIncompatible)
 	}
 	c := &fakeConn{addr: addr, s: s}
 	a.conns = append(a.conns, c)
