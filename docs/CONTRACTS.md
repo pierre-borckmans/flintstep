@@ -485,8 +485,8 @@ type Capture struct { On bool; Low, High, RawLow, RawHigh, Samples, Reversals in
 type SweepResult struct { Low, High, Heel, Toe int }
 ```
 
-Low and High are robust: the lowest and highest values with another value within 5 % of the
-span (at least 400), so a lone glitch is left out. A reversal is going back 15 % of the span
+Low and High are the plain lowest and highest values seen (no glitch filter: a real pedal's
+heel is often a single sample). A reversal is going back 15 % of the span
 from the run's furthest point once the span is MinSweepSpan (4000) wide. Ready = robust span
 >= 4000 and (a reversal or 70 % of the jack). MovedAt moves on a change over 1.5 % of the span
 (at least 300), so a resting foot's jitter is "at rest". The UI ends a sweep (lib/sweep.ts):

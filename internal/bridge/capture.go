@@ -16,7 +16,7 @@ import (
 // so nothing is lost to the UI's state stream, which is throttled to 20 Hz and keeps
 // only the latest value.
 //
-// The extremes are the robust ones (robustExtremes): a lone glitch far outside the rest
+// The extremes are the plain ones (sweepExtremes): see there for why there is no filter
 // does not count. The UI decides when it is over (lib/sweep.ts: at rest once Ready, or
 // SweepTimeout) and calls FinishExpSweep; SweepCalibration then insets heel and toe.
 
@@ -48,7 +48,7 @@ var ErrSweepTooSmall = errors.New("the pedal barely moved: rock it all the way b
 // Capture is one input's sweep, as the UI shows it.
 type Capture struct {
 	On bool `json:"on"`
-	// Low and High are the robust extremes (a lone spike left out), -1 before any value.
+	// Low and High are the lowest and highest values seen, -1 before any value.
 	Low  int `json:"low"`
 	High int `json:"high"`
 	// RawLow and RawHigh are the plain lowest and highest values, -1 before any.
@@ -112,40 +112,17 @@ func SweepCalibration(low, high int) (SweepResult, error) {
 
 func sweepMargin(span int) int { return (span*SweepMarginPercent + 50) / 100 }
 
-// supportBand is how close a second value must be for an extreme to count: 5 % of the
-// whole span seen, at least 400.
-func supportBand(span int) int { return max(400, span*5/100) }
-
-// robustExtremes are the lowest and highest values that another value lies within
-// supportBand of: a glitch alone out there is left out, a stop the pedal reached twice,
-// or slowed into, is kept. With fewer than two values they are the plain extremes.
-func robustExtremes(samples []int) (lo, hi int) {
+// sweepExtremes are the plain lowest and highest values seen. There used to be a glitch
+// filter here (an extreme had to have a second sample near it), and it was wrong for real
+// pedals: an M-Audio EX-P sends nothing while it rests and changes fastest near the heel,
+// so the true heel is often ONE sample, far from the last one before it, and the filter
+// threw it away, leaving a sweep that "only saw a tiny range". No glitch has ever shown
+// up in the recordings; the plain extremes are the truth.
+func sweepExtremes(samples []int) (lo, hi int) {
 	if len(samples) == 0 {
 		return -1, -1
 	}
-	s := slices.Clone(samples)
-	slices.Sort(s)
-	lo, hi = s[0], s[len(s)-1]
-	if len(s) < 2 {
-		return lo, hi
-	}
-	band := supportBand(hi - lo)
-	for i := 0; i+1 < len(s); i++ {
-		if s[i+1]-s[i] <= band {
-			lo = s[i]
-			break
-		}
-	}
-	for i := len(s) - 1; i > 0; i-- {
-		if s[i]-s[i-1] <= band {
-			hi = s[i]
-			break
-		}
-	}
-	if lo > hi { // no two values close together anywhere
-		lo, hi = s[0], s[len(s)-1]
-	}
-	return lo, hi
+	return slices.Min(samples), slices.Max(samples)
 }
 
 // StartExpSweep starts recording input n's values, from where the pedal is now. It
@@ -196,7 +173,7 @@ func (b *Bridge) FinishExpSweep(n int) (SweepResult, error) {
 	if !c.on {
 		return SweepResult{}, fmt.Errorf("expression %d is not being swept", n+1)
 	}
-	lo, hi := robustExtremes(c.samples)
+	lo, hi := sweepExtremes(c.samples)
 	r, err := SweepCalibration(lo, hi)
 	if err != nil {
 		return SweepResult{}, err
@@ -220,7 +197,7 @@ func (c *capture) view() Capture {
 	if !c.on {
 		return Capture{Low: -1, High: -1, RawLow: -1, RawHigh: -1}
 	}
-	lo, hi := robustExtremes(c.samples)
+	lo, hi := sweepExtremes(c.samples)
 	span := hi - lo
 	return Capture{
 		On: true, Low: lo, High: hi, RawLow: c.rawLow, RawHigh: c.rawHigh,

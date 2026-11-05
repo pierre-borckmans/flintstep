@@ -95,37 +95,33 @@ func TestSweepSeesEveryValue(t *testing.T) {
 	}
 }
 
-func TestSweepIgnoresALoneSpike(t *testing.T) {
-	r := realPedal(t, 256)
+// The real EX-P case that the old glitch filter got wrong: a fast sweep whose heel is a
+// single sample, far from the one before it, then silence (the pedal sends nothing at
+// rest). The heel must be kept.
+func TestSweepKeepsALoneSampleAtTheEnd(t *testing.T) {
+	r := realPedal(t, 20000)
 	if err := r.b.StartExpSweep(0); err != nil {
 		t.Fatal(err)
 	}
-	r.feed(0, ramp(256, 27500, 1000)...)
-	r.feed(0, 65535) // a glitch
-	r.feed(0, ramp(27400, 400, 1000)...)
+	r.feed(0, 20000, 24000, 27500, 22000, 14000, 5000, 104)
 	c := r.b.ExpCaptures()[0]
-	if c.RawHigh != 65535 {
-		t.Errorf("rawHigh = %d, want the glitch", c.RawHigh)
-	}
-	if c.High != 27500 || c.Low != 256 {
-		t.Errorf("robust extremes %d..%d, want 256..27500", c.Low, c.High)
+	if c.Low != 104 || c.High != 27500 {
+		t.Errorf("extremes %d..%d, want 104..27500", c.Low, c.High)
 	}
 }
 
-func TestRobustExtremes(t *testing.T) {
+func TestSweepExtremes(t *testing.T) {
 	for _, c := range []struct {
 		in     []int
 		lo, hi int
 	}{
 		{nil, -1, -1},
 		{[]int{500}, 500, 500},
-		{[]int{0, 10000, 10100, 20000, 20100, 65535}, 10000, 20100},
-		{[]int{100, 300, 30000, 30200}, 100, 30200},
-		{[]int{0, 30000, 65535}, 0, 65535}, // nothing close together: the plain ones
+		{[]int{0, 10000, 10100, 20000, 20100, 65535}, 0, 65535},
 	} {
-		lo, hi := robustExtremes(c.in)
+		lo, hi := sweepExtremes(c.in)
 		if lo != c.lo || hi != c.hi {
-			t.Errorf("robustExtremes(%v) = %d..%d, want %d..%d", c.in, lo, hi, c.lo, c.hi)
+			t.Errorf("sweepExtremes(%v) = %d..%d, want %d..%d", c.in, lo, hi, c.lo, c.hi)
 		}
 	}
 }

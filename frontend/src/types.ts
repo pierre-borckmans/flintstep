@@ -144,7 +144,7 @@ export interface State {
 /** bridge.Capture: a calibration sweep as it stands. Times are unix ms. */
 export interface Capture {
   on: boolean;
-  /** The robust extremes (a lone glitch left out), -1 before any value. */
+  /** The lowest and highest values seen, -1 before any value. */
   low: number;
   high: number;
   /** The plain extremes, -1 before any value. */

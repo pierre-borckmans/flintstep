@@ -15,7 +15,9 @@ import (
 
 // widenSamples past an end, each within widenWindow of the last, make a proposal.
 const (
-	widenSamples = 3
+	// One reading past an end is enough: a pedal at rest sends nothing, so parking at a
+	// new heel gives a single sample (see sweepExtremes).
+	widenSamples = 1
 	widenWindow  = 3 * time.Second
 )
 

@@ -44,21 +44,30 @@ func feedAt(b *Bridge, c *clock, n int, vs ...int) {
 	}
 }
 
+// last is the latest proposal, or zero.
+func last(w interface{ all() [][3]int }) [3]int {
+	got := w.all()
+	if len(got) == 0 {
+		return [3]int{}
+	}
+	return got[len(got)-1]
+}
+
 func TestWidenTheHeel(t *testing.T) {
 	b, c, w := widenRig(t, 3000, 27000) // margin 240
 	feedAt(b, c, 0, 2900, 2800, 10000)  // within the margin: nothing
 	if got := w.all(); len(got) != 0 {
 		t.Fatalf("proposed inside the margin: %v", got)
 	}
-	feedAt(b, c, 0, 1200, 300, 256)
-	got := w.all()
-	// The second furthest (300) plus the margin of the range so far.
-	if len(got) != 1 || got[0] != [3]int{0, 300 + 240, 27000} {
-		t.Fatalf("proposals %v, want exp 1 to 540..27000", got)
+	// One reading past the heel is enough: a pedal parked there sends nothing more.
+	feedAt(b, c, 0, 300)
+	if got := last(w); got[0] != 0 || got[1] >= 3000 || got[1] < 300 || got[2] != 27000 {
+		t.Fatalf("proposal %v, want a heel between 300 and 3000", got)
 	}
-	// The same values again propose nothing new: 540 already covers them.
-	feedAt(b, c, 0, 300, 290, 280)
-	if got := w.all(); len(got) != 1 {
+	n := len(w.all())
+	// The same value again proposes nothing new: the new heel already covers it.
+	feedAt(b, c, 0, 300)
+	if got := w.all(); len(got) != n {
 		t.Errorf("proposed again: %v", got)
 	}
 }
@@ -66,30 +75,23 @@ func TestWidenTheHeel(t *testing.T) {
 func TestWidenTheToeAndNeverNarrow(t *testing.T) {
 	b, c, w := widenRig(t, 27000, 3000) // toe reads lower: heel is the high end
 	feedAt(b, c, 0, 28000, 28500, 28400)
-	got := w.all()
-	if len(got) != 1 || got[0] != [3]int{0, 3000, 28400 - 240} {
-		t.Fatalf("proposals %v", got)
+	if got := last(w); got[1] != 3000 || got[2] <= 27000 || got[2] > 28500 {
+		t.Fatalf("proposal %v, want the high end widened toward 28500", got)
 	}
+	n := len(w.all())
 	feedAt(b, c, 0, 15000, 5000, 3100) // inside: nothing
-	if got := w.all(); len(got) != 1 {
+	if got := w.all(); len(got) != n {
 		t.Errorf("proposed a narrower range: %v", got)
 	}
 }
 
-// A lone spike never widens: it needs widenSamples past the end, inside widenWindow,
-// and the proposal is the second furthest.
-func TestWidenIgnoresSpikes(t *testing.T) {
-	b, c, w := widenRig(t, 3000, 27000)
-	feedAt(b, c, 0, 0, 10000, 10000)
-	c.advance(widenWindow + time.Second)
-	feedAt(b, c, 0, 0, 10000, 0)
-	if got := w.all(); len(got) != 0 {
-		t.Errorf("spikes far apart widened: %v", got)
-	}
-	feedAt(b, c, 0, 0, 2000)
-	got := w.all()
-	if len(got) != 1 || got[0][1] != 0+240 {
-		t.Errorf("proposals %v, want a heel at 240", got)
+// The real EX-P case: it changes fastest near the heel and sends nothing at rest, so a
+// quick move to a new heel is a few far-apart samples ending in ONE at the heel.
+func TestWidenOnASingleReadingAtTheEnd(t *testing.T) {
+	b, c, w := widenRig(t, 21448, 27500)
+	feedAt(b, c, 0, 15000, 6000, 104)
+	if got := last(w); got[1] > 104+400 {
+		t.Fatalf("proposal %v, want the heel near 104", got)
 	}
 }
 

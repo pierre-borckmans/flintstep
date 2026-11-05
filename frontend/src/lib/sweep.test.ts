@@ -5,10 +5,10 @@ import {
   createRecorder,
   createWidener,
   IDLE_CAPTURE,
-  robustExtremes,
   SWEEP_REST_MS,
   SWEEP_TIMEOUT_MS,
   sweepCalibration,
+  sweepExtremes,
   sweepPatch,
   sweepProgress,
   sweepVerdict,
@@ -78,12 +78,11 @@ describe("sweepCalibration", () => {
   });
 });
 
-describe("robustExtremes", () => {
-  it("leaves out a lone glitch", () => {
-    expect(robustExtremes([0, 10000, 10100, 20000, 20100, 65535])).toEqual([10000, 20100]);
-    expect(robustExtremes([100, 300, 30000, 30200])).toEqual([100, 30200]);
-    expect(robustExtremes([0, 30000, 65535])).toEqual([0, 65535]);
-    expect(robustExtremes([])).toEqual([-1, -1]);
+describe("sweepExtremes", () => {
+  it("is the plain lowest and highest, a lone sample at the heel included", () => {
+    expect(sweepExtremes([20000, 24000, 27500, 22000, 14000, 5000, 104])).toEqual([104, 27500]);
+    expect(sweepExtremes([500])).toEqual([500, 500]);
+    expect(sweepExtremes([])).toEqual([-1, -1]);
   });
 });
 

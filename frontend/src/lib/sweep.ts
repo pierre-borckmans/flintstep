@@ -6,7 +6,7 @@
 import type { Capture, ExpConfig, SweepResult } from "../types";
 import { RAW_MAX } from "./exp";
 
-/** bridge.MinSweepSpan: the smallest robust span that calibrates. */
+/** bridge.MinSweepSpan: the smallest span that calibrates. */
 export const MIN_SWEEP_SPAN = 4000;
 /** bridge.SweepMarginPercent: kept inside each extreme, so 0 and 127 are reached. */
 export const SWEEP_MARGIN_PERCENT = 1;
@@ -125,29 +125,12 @@ export function calibrationHint(x: Pick<ExpConfig, "min" | "max">, seen: Seen): 
   return null;
 }
 
-/** bridge.robustExtremes: the lowest and highest values another value lies within 5 %
- *  of the span (at least 400) of, so a lone glitch does not count. */
-export function robustExtremes(samples: readonly number[]): [number, number] {
+/** bridge.sweepExtremes: the plain lowest and highest values. No glitch filter: a real
+ *  pedal's heel is often a single sample (it changes fastest there and sends nothing at
+ *  rest), and the filter used to throw it away. */
+export function sweepExtremes(samples: readonly number[]): [number, number] {
   if (samples.length === 0) return [-1, -1];
-  const s = [...samples].sort((a, b) => a - b);
-  let lo = s[0];
-  let hi = s[s.length - 1];
-  if (s.length < 2) return [lo, hi];
-  const band = Math.max(400, Math.floor(((hi - lo) * 5) / 100));
-  for (let i = 0; i + 1 < s.length; i++) {
-    if (s[i + 1] - s[i] <= band) {
-      lo = s[i];
-      break;
-    }
-  }
-  for (let i = s.length - 1; i > 0; i--) {
-    if (s[i] - s[i - 1] <= band) {
-      hi = s[i];
-      break;
-    }
-  }
-  if (lo > hi) return [s[0], s[s.length - 1]];
-  return [lo, hi];
+  return [Math.min(...samples), Math.max(...samples)];
 }
 
 /** Go's sweep recorder (bridge capture.go), for the mock. */
@@ -187,7 +170,7 @@ export function createRecorder(startedAt: number) {
       }
     },
     view(): Capture {
-      const [low, high] = robustExtremes(samples);
+      const [low, high] = sweepExtremes(samples);
       const span = high - low;
       return {
         on: true,
