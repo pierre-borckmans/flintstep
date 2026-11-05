@@ -1,5 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { expFraction, expValue, rawFraction } from "./exp";
+import type { ExpCurve } from "../types";
+import golden from "./curves.golden.json";
+import { applyCurve, expFraction, expOutput, expValue, normalizeCurve, rawFraction } from "./exp";
+
+// ---- response curves: the table Go writes (internal/mapping/curve_test.go) -------
+
+describe("applyCurve matches Go", () => {
+  for (const row of golden.rows) {
+    const c = row.curve as ExpCurve;
+    it(`${c.kind} ${c.amount}`, () => {
+      golden.inputs.forEach((t, i) => {
+        expect(applyCurve(c, t)).toBeCloseTo(row.out[i], 12);
+        expect(Math.round(applyCurve(c, t) * 127)).toBe(row.cc[i]);
+      });
+    });
+  }
+});
+
+describe("curves", () => {
+  const kinds: ExpCurve[] = [
+    { kind: "linear", amount: 0 },
+    { kind: "gentle", amount: 0 },
+    { kind: "fast", amount: 0 },
+    { kind: "s", amount: 0 },
+    { kind: "custom", amount: 0.8 },
+    { kind: "custom", amount: -1 },
+  ];
+  it("are exact at the ends and increasing", () => {
+    for (const c of kinds) {
+      expect(applyCurve(c, 0)).toBe(0);
+      expect(applyCurve(c, 1)).toBe(1);
+      let prev = 0;
+      for (let i = 1; i <= 200; i++) {
+        const y = applyCurve(c, i / 200);
+        expect(y).toBeGreaterThan(prev);
+        prev = y;
+      }
+    }
+  });
+  it("treat a missing or unknown curve as linear, like Go's Normalize", () => {
+    expect(applyCurve(undefined, 0.3)).toBe(0.3);
+    expect(normalizeCurve({ kind: "wobbly" as ExpCurve["kind"], amount: 4 })).toEqual({
+      kind: "linear",
+      amount: 1,
+    });
+    expect(normalizeCurve(undefined)).toEqual({ kind: "linear", amount: 0 });
+  });
+  it("bend the value sent and the bar, not the travel", () => {
+    const curve: ExpCurve = { kind: "gentle", amount: 0 };
+    const c = { min: 0, max: 60000, invert: false, curve };
+    expect(expFraction(30000, c)).toBe(0.5);
+    expect(expOutput(30000, c)).toBe(applyCurve(curve, 0.5));
+    expect(expValue(30000, c)).toBe(Math.round(applyCurve(curve, 0.5) * 127));
+    expect(expValue(30000, c)).toBeLessThan(30);
+  });
+});
 
 const cfg = { min: 1000, max: 61000, invert: false };
 

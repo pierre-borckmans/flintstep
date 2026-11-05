@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Backend } from "./api";
 import { errorText } from "./api";
 import type { Op } from "./lib/config";
+import { type TaperHint, taperHint } from "./lib/curve";
 import { localStore } from "./lib/storage";
 import {
   IDLE_CAPTURE,
@@ -12,7 +13,7 @@ import {
   TOO_SMALL,
   widenCalibration,
 } from "./lib/sweep";
-import { createRing, lastSample, pushSample, type Ring } from "./lib/trace";
+import { createRing, eachSample, lastSample, pushSample, type Ring } from "./lib/trace";
 import { STORAGE_PREFIX } from "./product";
 import type { Capture, Config, State } from "./types";
 
@@ -65,6 +66,11 @@ export function useExpLive(
   ]);
   const [seen, setSeen] = useState<Seen[]>(seenRef.current);
   const [errors, setErrors] = useState<(string | null)[]>([null, null]);
+  /** What the last sweep says about each pedal's taper, until used or dismissed. */
+  const [tapers, setTapers] = useState<(TaperHint | null)[]>([null, null]);
+  const setTaper = useCallback((n: number, h: TaperHint | null) => {
+    setTapers((xs) => (xs[n] === h ? xs : xs.map((x, i) => (i === n ? h : x))));
+  }, []);
   const [learn, setLearnState] = useState<boolean[]>(readLearn);
   const learnRef = useRef(learn);
   learnRef.current = learn;
@@ -155,13 +161,14 @@ export function useExpLive(
   const start = useCallback(
     async (n: number) => {
       setError(n, null);
+      setTaper(n, null);
       try {
         await backend.StartExpSweep(n);
       } catch (e) {
         setError(n, capitalise(errorText(e)));
       }
     },
-    [backend, setError],
+    [backend, setError, setTaper],
   );
 
   const cancel = useCallback(
@@ -172,27 +179,37 @@ export function useExpLive(
     [backend, setError],
   );
 
+  const captures: Capture[] = state?.expCapture ?? [IDLE_CAPTURE, IDLE_CAPTURE];
+  const capRef = useRef(captures);
+  capRef.current = captures;
+
   /** Ends input n's sweep and applies it: one edit, one history entry, one save. */
   const finish = useCallback(
     async (n: number) => {
       try {
+        const from = capRef.current[n]?.startedAt ?? 0;
         const r = await backend.FinishExpSweep(n);
         setError(n, null);
         note(n, r.low);
         note(n, r.high);
-        applyAs({ type: "exp", n, patch: sweepPatch(r) }, `Exp ${n + 1} · calibrated by sweeping`);
+        const patch = sweepPatch(r);
+        applyAs({ type: "exp", n, patch }, `Exp ${n + 1} · calibrated by sweeping`);
+        // The sweep's own values: does the reading race near one end?
+        const samples: [number, number][] = [];
+        eachSample(rings[n], (t, v) => {
+          if (t >= from) samples.push([t, v]);
+        });
+        const invert = configRef.current?.exp[n]?.invert ?? false;
+        setTaper(n, taperHint(samples, patch.min, patch.max, invert));
         return true;
       } catch (e) {
         setError(n, capitalise(errorText(e)));
         return false;
       }
     },
-    [applyAs, backend, note, setError],
+    [applyAs, backend, note, rings, setError, setTaper],
   );
 
-  const captures: Capture[] = state?.expCapture ?? [IDLE_CAPTURE, IDLE_CAPTURE];
-  const capRef = useRef(captures);
-  capRef.current = captures;
   const anyOn = captures.some((c) => c.on);
 
   // A running sweep ends on its own: at rest once it has enough, or at the time limit.
@@ -236,8 +253,24 @@ export function useExpLive(
       watch,
       sweep: { start, finish, cancel },
       clearError: (n: number) => setError(n, null),
+      tapers,
+      dismissTaper: (n: number) => setTaper(n, null),
     }),
-    [rings, seen, captures, errors, learn, setLearn, watch, start, finish, cancel, setError],
+    [
+      rings,
+      seen,
+      captures,
+      errors,
+      learn,
+      setLearn,
+      watch,
+      start,
+      finish,
+      cancel,
+      setError,
+      tapers,
+      setTaper,
+    ],
   );
 }
 

@@ -173,13 +173,13 @@ describe("calibrationHint", () => {
 
   it("flags a heel set with the pedal half way up", () => {
     expect(calibrationHint({ min: 21448, max: 27500 }, seen(256, 27500))).toBe(
-      "Heel looks high: calibrate by sweeping",
+      "Heel looks high: press Calibrate",
     );
   });
 
   it("flags a toe short of the end", () => {
     expect(calibrationHint({ min: 300, max: 15000 }, seen(256, 27500))).toBe(
-      "Toe looks low: calibrate by sweeping",
+      "Toe looks low: press Calibrate",
     );
   });
 

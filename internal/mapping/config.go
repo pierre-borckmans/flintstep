@@ -50,8 +50,9 @@ const (
 
 // ConfigVersion is the Version a Normalized Config carries. 2 added Indicators: a
 // version 1 file has none, and Normalize gives it the defaults. 3 added the expression
-// triggers: an older file has none, and Normalize gives each input one that is off.
-const ConfigVersion = 3
+// triggers: an older file has none, and Normalize gives each input one that is off. 4
+// added the response curves: an older file has none, and Normalize makes them linear.
+const ConfigVersion = 4
 
 // Ranges and defaults. frontend/src/lib/config.ts mirrors these (LONG_PRESS, RAW_MAX).
 const (
@@ -62,7 +63,8 @@ const (
 	ExpRawMax          = 65535
 
 	// Expression triggers (ExpTrigger). Thresholds are percent of the calibrated
-	// travel. frontend/src/lib/trigger.ts mirrors these.
+	// travel after the response curve, so of the value that goes out.
+	// frontend/src/lib/trigger.ts mirrors these.
 	MinTriggerThreshold      = 1
 	MaxTriggerThreshold      = 99
 	DefaultEngageThreshold   = 4  // just off the heel, like an auto-engage wah
@@ -105,6 +107,7 @@ type ExpConfig struct {
 	Min     int        `json:"min"`     // raw value at the heel, 0..65535
 	Max     int        `json:"max"`     // raw value at the toe; may be below Min, never equal
 	Invert  bool       `json:"invert"`  // the user's own flip, on top of heel=0 toe=127
+	Curve   ExpCurve   `json:"curve"`   // how the travel bends on its way out (curve.go)
 	Trigger ExpTrigger `json:"trigger"` // a switch faked from the pedal's position
 }
 
@@ -130,7 +133,7 @@ const (
 type ExpTrigger struct {
 	Mode       TriggerMode `json:"mode"`
 	Action     Action      `json:"action"`     // press half on engaging, release half on letting go
-	Threshold  int         `json:"threshold"`  // percent of the calibrated travel, 1..99
+	Threshold  int         `json:"threshold"`  // percent of the curved travel (the CC), 1..99
 	OffDelayMS int         `json:"offDelayMs"` // engage only: 0..2000 ms back down before it lets go
 }
 
@@ -177,7 +180,7 @@ func offAction() Action {
 }
 
 func defaultExp(n int) ExpConfig {
-	return ExpConfig{Enabled: true, Channel: 1, CC: defaultExpCC[n], Min: 0, Max: ExpRawMax, Trigger: defaultTrigger(n)}
+	return ExpConfig{Enabled: true, Channel: 1, CC: defaultExpCC[n], Min: 0, Max: ExpRawMax, Curve: ExpCurve{Kind: CurveLinear}, Trigger: defaultTrigger(n)}
 }
 
 // defaultTrigger is off, with what auto-engage would use already filled in: CC 102+n
@@ -291,6 +294,7 @@ func (c Config) Normalize() Config {
 		if e.Min == 0 && e.Max == 0 {
 			e.Max = ExpRawMax
 		}
+		e.Curve = e.Curve.normalize()
 		e.Trigger = e.Trigger.normalize(n)
 	}
 
@@ -355,6 +359,9 @@ func (c Config) Validate() error {
 	for n, e := range c.Exp {
 		if e.Enabled && e.Min == e.Max && e.Min != 0 {
 			return fmt.Errorf("expression %d: heel and toe were calibrated at the same point", n+1)
+		}
+		if e.Curve.Kind != "" && !validCurve(e.Curve.Kind) {
+			return fmt.Errorf("expression %d: unknown response curve %q", n+1, e.Curve.Kind)
 		}
 		if tr := e.Trigger; (tr.Mode == TriggerEngage || tr.Mode == TriggerToe) && (tr.Action.Kind == KindOff || tr.Action.Kind == "") {
 			return fmt.Errorf("expression %d: the trigger does nothing: pick what it sends", n+1)

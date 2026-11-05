@@ -36,7 +36,17 @@ export interface ExpConfig {
   min: number; // raw 0..65535 at the heel
   max: number; // raw 0..65535 at the toe; may be below min (toe reads lower), never equal
   invert: boolean; // the user's own flip, on top of heel=0 toe=127
+  curve: ExpCurve; // how the travel bends on its way out
   trigger: ExpTrigger;
+}
+
+/** mapping.CurveKind. */
+export type CurveKind = "linear" | "gentle" | "fast" | "s" | "custom";
+
+/** mapping.ExpCurve: amount shapes "custom" only, -1..1 (0 linear, >0 gentle, <0 fast). */
+export interface ExpCurve {
+  kind: CurveKind;
+  amount: number;
 }
 
 /** mapping.TriggerMode: "engage" is auto-engage (leave the heel), "toe" a toe click. */

@@ -10,8 +10,9 @@ import (
 //
 // The Spark Control X reads one analogue value per expression jack, so the toe switch
 // many expression pedals have cannot reach it. Instead the engine watches the travel
-// the CC already sends (calibrated, inverted) and fires an Action when it crosses a
-// threshold:
+// the CC already sends (calibrated, inverted, through the response curve) and fires an
+// Action when it crosses a threshold. A threshold is therefore a percent of the value
+// the DAW receives: 50 % is CC 64 whatever the curve.
 //   - engage: press on rising to Threshold, release once back under it (less the
 //     hysteresis) for OffDelayMS. A quick touch on the heel does not switch it off.
 //   - toe: press on reaching Threshold, release on falling under it less the
@@ -39,7 +40,7 @@ func trigKey(x ExpConfig) [3]any {
 // 100 so the comparison is exact.
 func level(pct int) int { return pct * ExpRawMax }
 
-// trigger runs input n's trigger on its scaled travel (0..ExpRawMax, inverted as the CC
+// trigger runs input n's trigger on its curved travel (0..ExpRawMax, inverted as the CC
 // is). It returns the press half to send before the CC and the release half to send
 // after it.
 func (e *Engine) trigger(n, scaled int, at time.Time) (press, release Outs) {

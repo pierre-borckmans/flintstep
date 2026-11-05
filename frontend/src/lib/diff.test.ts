@@ -126,6 +126,15 @@ describe("diffConfigs: expression and settings", () => {
     expect(label({ type: "exp", n: 0, patch: { channel: 3 } })).toBe("Exp 1 · channel 1 → 3");
   });
 
+  it("names the response curve", () => {
+    expect(label({ type: "exp", n: 0, patch: { curve: { kind: "custom", amount: 0.35 } } })).toBe(
+      "Exp 1 · curve custom 0.35",
+    );
+    expect(label({ type: "exp", n: 1, patch: { curve: { kind: "gentle", amount: 0 } } })).toBe(
+      "Exp 2 · curve gentle start",
+    );
+  });
+
   it("names the trigger mode, and nothing more for the defaults it fills in", () => {
     expect(label({ type: "triggerMode", n: 0, mode: "engage" })).toBe("Exp 1 · auto-engage");
     expect(label({ type: "triggerMode", n: 1, mode: "toe" })).toBe("Exp 2 · toe click");

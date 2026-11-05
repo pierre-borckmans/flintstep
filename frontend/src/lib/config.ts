@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import { INDICATOR_NAMES, SWITCH_NAMES, SWITCHES } from "../types";
 import { comboName } from "./caption";
-import { RAW_MAX } from "./exp";
+import { isCurveKind, LINEAR, RAW_MAX } from "./exp";
 import { copyIndicators, DEFAULT_INDICATORS, isIndicatorMode } from "./indicators";
 import type { Gesture } from "./scrub";
 import { defaultTrigger, pickMode, TRIGGER } from "./trigger";
@@ -55,10 +55,11 @@ export function defaultConfig(): Config {
     min: 0,
     max: RAW_MAX,
     invert: false,
+    curve: { ...LINEAR },
     trigger: defaultTrigger(n),
   });
   return {
-    version: 3,
+    version: 4,
     pedal: { address: "", name: "" },
     switches: Array.from({ length: SWITCHES }, (_, n) => ({
       tap: cc(80 + n),
@@ -112,6 +113,10 @@ function goValidate(c: Config): string | null {
     if (x.enabled && x.min === x.max && x.min !== 0) {
       return `expression ${n + 1}: heel and toe were calibrated at the same point`;
     }
+    // No curve at all is a file from before version 4: Go makes it linear.
+    if (x.curve && !isCurveKind(x.curve.kind)) {
+      return `expression ${n + 1}: unknown response curve "${x.curve.kind}"`;
+    }
     const t = x.trigger;
     if (t && (t.mode === "engage" || t.mode === "toe") && t.action.kind === "off") {
       return `expression ${n + 1}: the trigger does nothing: pick what it sends`;
@@ -151,6 +156,9 @@ export function validate(c: Config): string | null {
     if (!inRange(x.cc, 0, 127)) return `${where}: CC number must be 0 to 127`;
     if (!inRange(x.min, 0, RAW_MAX) || !inRange(x.max, 0, RAW_MAX)) {
       return `${where}: calibration out of range`;
+    }
+    if (x.curve && (!Number.isFinite(x.curve.amount) || Math.abs(x.curve.amount) > 1)) {
+      return `${where}: curve amount must be -1 to 1`;
     }
     const t = x.trigger;
     if (!t || !TRIGGER_MODES.includes(t.mode)) return `${where}: unknown trigger mode`;

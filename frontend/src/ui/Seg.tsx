@@ -20,6 +20,7 @@ export function Seg<T extends string>({
   className,
   size = "md",
   label,
+  fit = false,
 }: {
   options: SegOption<T>[];
   value: T;
@@ -27,6 +28,8 @@ export function Seg<T extends string>({
   className?: string;
   size?: "sm" | "md";
   label?: string;
+  /** Segments as wide as their labels (the rest shared out) instead of all equal. */
+  fit?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const thumb = useIndicator(box, '[aria-checked="true"]', [value, options.length]);
@@ -76,7 +79,8 @@ export function Seg<T extends string>({
             tabIndex={on || (index < 0 && o === options[0]) ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cx(
-              "flex min-w-0 flex-1 rounded-ui-sm font-semibold transition-[color,background-image] duration-(--dur) ease-(--ease) active:brightness-90",
+              fit ? "flex-auto" : "flex-1",
+              "flex min-w-0 rounded-ui-sm font-semibold transition-[color,background-image] duration-(--dur) ease-(--ease) active:brightness-90",
               o.hint
                 ? "flex-col items-center gap-0.5 px-1.5 py-1.5"
                 : cx(

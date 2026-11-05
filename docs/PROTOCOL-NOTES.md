@@ -143,7 +143,10 @@ charging), blinking green at 61 % (charging). Green therefore starts somewhere i
 - **M-Audio EX-P** (TRS, built-in cable, polarity switch): works. Raw values on jack 1 ran
   from about 80 (heel) to 27280 (toe), about 42 % of the 16-bit range, so software
   heel/toe calibration matters. `0x0c` arrived at ~20-30 per second while moving and not at
-  all at rest.
+  all at rest. Mapped linearly it feels coarse near the heel and very fine near the toe:
+  the raw value changes much faster over the first part of the travel than the last, the
+  mark of an audio-taper pot. That is what the response curves are for (Gentle start
+  evens it out); the app can spot it from a calibration sweep and suggest it.
 - **Line 6 EX-1**: does NOT work, with any cable. It is a 2-wire pedal (a 10 kΩ pot read
   as a variable resistor between tip and sleeve, meant for a mono cable into Line 6 gear).
   The Spark Control X expects a 3-wire TRS expression pedal (reference voltage + wiper),

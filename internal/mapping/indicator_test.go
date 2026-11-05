@@ -62,7 +62,7 @@ func TestOldConfigGetsDefaultIndicators(t *testing.T) {
 	if c.Indicators != Default().Indicators {
 		t.Errorf("indicators %+v, want the defaults", c.Indicators)
 	}
-	if c.Version != ConfigVersion || ConfigVersion != 3 {
+	if c.Version != ConfigVersion || ConfigVersion != 4 {
 		t.Errorf("version %d", c.Version)
 	}
 	if c.LEDMode != LEDFeedback || c.Brightness != 40 {

@@ -86,14 +86,22 @@ type ExpConfig struct {
     Min     int  `json:"min"`    // raw value at the heel, 0..65535
     Max     int  `json:"max"`    // raw value at the toe; may be below Min, never equal to it
     Invert  bool `json:"invert"` // the user's own flip, on top of heel=0 toe=127
+    Curve   ExpCurve   `json:"curve"`
     Trigger ExpTrigger `json:"trigger"`
 }
+
+type CurveKind string // "linear" | "gentle" | "fast" | "s" | "custom"
+type ExpCurve struct {
+    Kind   CurveKind `json:"kind"`
+    Amount float64   `json:"amount"` // custom only, -1..1: 0 linear, >0 gentle, <0 fast
+}
+func (c ExpCurve) Apply(t float64) float64 // travel 0..1 -> output 0..1 (curve.go)
 
 type TriggerMode string // "off" | "engage" | "toe"
 type ExpTrigger struct {
     Mode       TriggerMode `json:"mode"`
     Action     Action      `json:"action"`     // press half on engaging, release half on letting go
-    Threshold  int         `json:"threshold"`  // percent of the calibrated travel, 1..99
+    Threshold  int         `json:"threshold"`  // percent of the curved travel (the CC), 1..99
     OffDelayMS int         `json:"offDelayMs"` // engage only, 0..2000
 }
 
@@ -120,7 +128,7 @@ type PedalRef struct { Address string `json:"address"`; Name string `json:"name"
 
 func Default() Config        // the spec's table: switch n = CC 80+n momentary ch1, exp1 CC11, exp2 CC7, local LEDs,
                              // Amp = midiOut green (00,B0,50), App = connected indigo (40,20,FF),
-                             // exp n trigger off with CC 102+n momentary ch1 127, 4 %, 400 ms
+                             // exp n linear curve, trigger off with CC 102+n momentary ch1 127, 4 %, 400 ms
 func (c Config) Normalize() Config // clamps everything into range, fills zero values with defaults
 func (c Config) Validate() error   // human-readable error for the UI (e.g. "combo I + I uses the same switch twice")
 ```
@@ -134,7 +142,7 @@ func (e *Engine) SetConfig(cfg Config) Outs         // keeps toggle states where
 func (e *Engine) Switch(ed sparkx.Edge, at time.Time) Outs // MIDI to send now
 func (e *Engine) Tick(at time.Time) Outs            // long-press / combo / trigger off-delay timers; every ~10ms while pending
 func (e *Engine) Pending() bool                     // whether Tick has work
-func (e *Engine) Exp(n, raw int, at time.Time) Outs // calibrated + inverted + hysteresis -> CC, plus the
+func (e *Engine) Exp(n, raw int, at time.Time) Outs // calibrated + inverted + curve + hysteresis -> CC, plus the
                                                     // trigger's press (before the CC) or release (after it)
 func (e *Engine) ExpRelease(n int) Outs             // input n lost its cable: its trigger lets go, next value resent
 func (e *Engine) ExpTriggers() [2]bool              // engaged now: held, or on for a CC toggle action
@@ -177,8 +185,23 @@ Behaviour:
   Min == Max on an enabled input is a Validate error (0/0 is "not calibrated" and
   Normalize makes it 0..65535); the engine treats one-point calibration as the whole jack.
   Scaled to 0..127 with the same hysteresis idea as sparkx.ExpScale.
+- Exp response curve: applied to the calibrated, inverted travel t in 0..1, before the
+  hysteresis and the quantising to 0..127, so a resting pedal does not flicker on a
+  steep part and the trigger sees the same number the DAW gets. Every curve is strictly
+  increasing with f(0) = 0 and f(1) = 1 exactly. With E(t, k) = (e^(k·t) - 1) / (e^k - 1)
+  (E(t, 0) = t): linear t; gentle E(t, 3) (half the travel is 23 of 127, fine at the
+  heel); fast E(t, -3) = 1 - gentle(1 - t); s 0.4·t + 0.6·(3t² - 2t³) (symmetric, fine at
+  both ends, slope 0.4 there); custom E(t, 5·Amount), so Amount 0.6 is gentle and -0.6
+  fast. Normalize: no kind (files before version 4) or an unknown one -> linear; Amount
+  clamped to -1..1, NaN -> 0, kept on the other kinds so Custom comes back as left.
+  Validate: an unknown non-empty kind is "expression N: unknown response curve \"x\""
+  (only reachable before Normalize; the frontend's validate() checks it too).
+  frontend/src/lib/exp.ts mirrors the maths; frontend/src/lib/curves.golden.json, written
+  by internal/mapping/curve_test.go (UPDATE_GOLDEN=1), pins both to the same numbers, and
+  default.golden.json does the same for Default() against defaultConfig().
 - Exp trigger (a toe switch faked from the position, since the jack reads one value):
-  measured on the same calibrated, inverted travel as the CC, in percent. "engage":
+  measured on the same calibrated, inverted, curved travel as the CC, in percent (50 %
+  is CC 64 whatever the curve). "engage":
   press on reaching Threshold (default 4), release once under Threshold - 3 for
   OffDelayMS (default 400; rising back to Threshold inside the delay cancels it).
   "toe": press on reaching Threshold (default 96), release under Threshold - 3. The
@@ -201,9 +224,10 @@ Behaviour:
 - Indicators (the Amp and App lamps): "connected" is lit while the bridge holds the pedal,
   "midiOut" flashes on each message sent, "midiIn" on each message to the LED destination,
   "usb" is lit on USB power, "on" always, "off" never. Normalize turns an unknown mode into
-  that lamp's default mode and a black colour into its default colour. ConfigVersion is 3:
+  that lamp's default mode and a black colour into its default colour. ConfigVersion is 4:
   a version 1 file has no "indicators" and so gets the defaults; a version 2 file has no
-  "trigger" on its inputs and so gets them off.
+  "trigger" on its inputs and so gets them off; a version 3 file has no "curve" and so
+  gets linear.
 
 ## internal/store
 
@@ -469,6 +493,13 @@ from the run's furthest point once the span is MinSweepSpan (4000) wide. Ready =
 Ready and still for SweepRest (1.2 s), or at SweepTimeout (15 s) with whatever is enough,
 otherwise it cancels with ErrSweepTooSmall's words. Heel is always the low end and toe the
 high end; Invert is untouched.
+
+After a sweep the UI may suggest a curve (lib/curve.ts taperHint), using the raw trace's
+samples since the sweep started: the moving time (steps under 250 ms apart with a new value)
+spent in the lower and upper half of the calibrated travel. A foot rocks evenly enough
+that a linear pot splits it about 1:1; 1.6:1 or more says the reading races through the
+short half, and the suggestion is Gentle start for a fast heel (Fast start if inverted),
+shown only while the curve is linear, applied only by the user's click.
 
 Learning the range (widen.go): with a calibrated input and no sweep on it, a value past the
 low or high end by more than the 1 % margin is noted; 3 of them within 3 s of each other

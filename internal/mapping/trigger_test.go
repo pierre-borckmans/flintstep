@@ -343,3 +343,25 @@ func TestTriggerLowThresholdStillLetsGo(t *testing.T) {
 	e := NewEngine(engageCfg(func(tr *ExpTrigger) { tr.Threshold, tr.OffDelayMS = 2, 0 }))
 	runT(t, e, []tstep{feed(0, raw(3), on), feed(10, raw(0.5)), feed(20, 0, off)})
 }
+
+// A threshold is a percent of the value that goes out, so it moves with the curve: on
+// Gentle, 50 % (CC 64) is reached about 79 % of the way to the toe, not half way.
+func TestTriggerUsesTheCurvedValue(t *testing.T) {
+	cfg := cfgWith(func(c *Config) {
+		c.Exp[0].Trigger = ExpTrigger{Mode: TriggerToe, Action: trigCC, Threshold: 50}
+		c.Exp[0].Curve = ExpCurve{Kind: CurveGentle}
+	})
+	runT(t, NewEngine(cfg), []tstep{
+		feed(0, raw(50)),  // linear would press here
+		feed(10, raw(75)), // gentle(0.75) is 0.445
+		feed(20, raw(80), cc(1, 102, 127)),
+		feed(30, raw(77)),                // 0.475: inside the hysteresis
+		feed(40, raw(72), cc(1, 102, 0)), // 0.42: under 47 %, lets go
+	})
+	// The same thresholds on Fast press far earlier in the travel.
+	cfg.Exp[0].Curve = ExpCurve{Kind: CurveFast}
+	runT(t, NewEngine(cfg), []tstep{
+		feed(0, raw(20)),
+		feed(10, raw(25), cc(1, 102, 127)), // fast(0.25) is 0.55
+	})
+}

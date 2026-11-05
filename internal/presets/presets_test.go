@@ -22,6 +22,7 @@ func custom() mapping.Config {
 	// the library, which never names it.
 	c.Exp[1].Trigger.Mode = mapping.TriggerToe
 	c.Exp[1].Trigger.Threshold = 77
+	c.Exp[0].Curve = mapping.ExpCurve{Kind: mapping.CurveCustom, Amount: -0.4}
 	return c.Normalize()
 }
 

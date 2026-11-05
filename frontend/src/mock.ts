@@ -1,6 +1,6 @@
 import type { Backend } from "./api";
 import { cc, defaultConfig, mappingOf, type Op, validate } from "./lib/config";
-import { expFraction, expValue, RAW_MAX } from "./lib/exp";
+import { applyCurve, expOutput, expValue, normalizeCurve, RAW_MAX } from "./lib/exp";
 import { fractionRaw, sweepFraction, sweepOffset } from "./lib/expsim";
 import { indicatorLit } from "./lib/indicators";
 import { describeMidi } from "./lib/midi";
@@ -29,6 +29,7 @@ import type {
   Colour,
   Config,
   Device,
+  ExpCurve,
   ExpRawEvent,
   ExpWiden,
   PedalModel,
@@ -87,6 +88,11 @@ export interface SimOptions {
   travel?: [number, number];
   /** Heel and toe raw for both inputs; unset, the default 0..65535. */
   cal?: [number, number];
+  /** Each input's response curve; unset, linear. */
+  curves?: [ExpCurve, ExpCurve];
+  /** The real pedals read like an audio-taper pot: the raw value races near the heel
+   *  and crawls near the toe, as the M-Audio EX-P feels. Pinned positions stay linear. */
+  taper?: boolean;
 }
 
 /** How a simulated pedal starts: at a percent of the jack's range, or sweeping. */
@@ -149,6 +155,7 @@ export function createSim(opts: SimOptions = {}) {
   config.exp.forEach((x, n) => {
     x.trigger = pickMode(x.trigger, modes[n], n);
     if (opts.cal) [x.min, x.max] = opts.cal;
+    if (opts.curves) x.curve = { ...opts.curves[n] };
   });
 
   const cables = opts.cables ?? [true, false];
@@ -365,12 +372,14 @@ export function createSim(opts: SimOptions = {}) {
       } else if (pin !== undefined && pin !== null) {
         raw[n] = Math.round(x.min + ((x.max - x.min) * pin) / 100);
       } else {
-        const f = sweep(t + n * 4000);
+        const foot = sweep(t + n * 4000);
+        const f = opts.taper ? applyCurve(TAPER, foot) : foot;
         const [heel, toe] = opts.travel ?? [x.min, x.max];
         raw[n] = heel + (toe - heel) * f + (f > 0 && f < 1 ? (rand() - 0.5) * 120 : 0);
         raw[n] = Math.round(Math.min(RAW_MAX, Math.max(0, raw[n])));
       }
-      const f = x.enabled ? expFraction(raw[n], x) : null;
+      // The trigger reads the value going out: after the curve, like the engine.
+      const f = x.enabled ? expOutput(raw[n], x) : null;
       const r = stepTrigger(trig[n], x.trigger, f === null ? null : f * 100, t);
       trig[n] = r.state;
       if (r.release) up(x.trigger.action, { source: "trigger", index: n });
@@ -729,7 +738,8 @@ export function demoScript(name: string): DemoStep[] {
  *  ?picker=open|rename|delete (App opens the preset picker), ?cal=21448,27500 (both
  *  inputs' heel and toe; unset, as swept from the mock pedals, which read raw 256..27500
  *  like an M-Audio EX-P), ?capture=1|2 (a calibration sweep starts on that input once
- *  the pedal is up). See also demoScript (?demo=). */
+ *  the pedal is up), ?curve=gentle,custom:0.35 (the inputs' response curves; one name
+ *  sets both), ?taper (the mock pedals read like an audio-taper pot). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
   const names = ["I", "II", "A", "III", "IV", "B"];
   const holdMask = (q.get("hold") ?? "")
@@ -745,6 +755,12 @@ export function createMockBackend(q: URLSearchParams): Backend {
   const simQ = q.get("sim")?.split(",");
   const simStart = (s: string | undefined): SimStart => (s === "sweep" ? "sweep" : pinQ(s));
   const calQ = q.get("cal")?.split(",").map(Number);
+  // ?curve=gentle,custom:0.35
+  const curveQ = (s: string | undefined): ExpCurve => {
+    const [kind, amount] = (s ?? "").split(":");
+    return normalizeCurve({ kind: kind as ExpCurve["kind"], amount: Number(amount ?? 0) || 0 });
+  };
+  const curvesQ = q.get("curve")?.split(",");
   const cal: [number, number] =
     calQ?.length === 2 && calQ.every(Number.isFinite) ? [calQ[0], calQ[1]] : EX_P_SWEPT;
   const sim = createSim({
@@ -761,6 +777,8 @@ export function createMockBackend(q: URLSearchParams): Backend {
     epoch: Date.now(),
     travel: EX_P,
     cal,
+    curves: curvesQ ? [curveQ(curvesQ[0]), curveQ(curvesQ[1] ?? curvesQ[0])] : undefined,
+    taper: q.has("taper"),
   });
   let launchAtLogin = false;
   const lib = createMockLibrary(sim.config, q.get("presets") === "one" ? [] : samplePresets());
@@ -1014,6 +1032,8 @@ export function createMockBackend(q: URLSearchParams): Backend {
 /** The mock's expression pedals read like the M-Audio EX-P on a real jack
  *  (docs/PROTOCOL-NOTES.md): raw 256 at the heel to 27500 at the toe. */
 const EX_P: [number, number] = [256, 27500];
+/** ?taper: how an audio-taper pot reads against the foot's position. */
+const TAPER: ExpCurve = { kind: "fast", amount: 0 };
 /** What a sweep of them calibrates: each end 1 % of the span inside. */
 const EX_P_SWEPT: [number, number] = [528, 27228];
 

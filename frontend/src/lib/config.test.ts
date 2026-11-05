@@ -11,6 +11,7 @@ import {
   sameMapping,
   validate,
 } from "./config";
+import goDefault from "./default.golden.json";
 
 describe("defaultConfig", () => {
   it("matches the spec table", () => {
@@ -24,7 +25,7 @@ describe("defaultConfig", () => {
   // mapping.Default(), field for field: what ResetConfig would return.
   it("is Go's Default()", () =>
     expect(defaultConfig()).toEqual({
-      version: 3,
+      version: 4,
       pedal: { address: "", name: "" },
       switches: [
         { r: 255, g: 150, b: 0 },
@@ -49,6 +50,7 @@ describe("defaultConfig", () => {
         min: 0,
         max: 65535,
         invert: false,
+        curve: { kind: "linear", amount: 0 },
         trigger: {
           mode: "off",
           action: { kind: "cc", channel: 1, number: trig, value: 127, mode: "momentary" },
@@ -64,6 +66,12 @@ describe("defaultConfig", () => {
         { mode: "connected", colour: { r: 64, g: 32, b: 255 } },
       ],
     }));
+});
+
+// Written by Go (internal/mapping/curve_test.go, UPDATE_GOLDEN=1) from Default() itself,
+// so a field added on one side and not the other fails here.
+it("matches the JSON Go writes for Default()", () => {
+  expect(defaultConfig()).toEqual(goDefault);
 });
 
 describe("indicators", () => {

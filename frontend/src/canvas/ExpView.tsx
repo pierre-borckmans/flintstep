@@ -1,7 +1,7 @@
 import { useTick } from "@pixi/react";
 import { ColorMatrixFilter, type Container, type Graphics, TextStyle } from "pixi.js";
 import { useCallback, useMemo, useRef } from "react";
-import { expFraction, expValue, rawFraction } from "../lib/exp";
+import { expFraction, expOutput, expValue, rawFraction } from "../lib/exp";
 import {
   ART,
   ART_ASPECT,
@@ -287,7 +287,8 @@ function Gauge({
 }) {
   const trig = x.trigger.mode !== "off" ? x.trigger.threshold : null;
   const m = gaugeMarks({
-    fraction: raw >= 0 ? expFraction(raw, x) : null,
+    // The value going out (after the curve): the threshold is measured on it too.
+    fraction: raw >= 0 ? expOutput(raw, x) : null,
     rawFraction: raw >= 0 ? rawFraction(raw) : null,
     heelRaw: rawFraction(x.min),
     toeRaw: rawFraction(x.max),

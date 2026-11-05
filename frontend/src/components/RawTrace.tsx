@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { expFraction, RAW_MAX } from "../lib/exp";
+import { expOutput, RAW_MAX } from "../lib/exp";
 import { lastSample, type Ring, TRACE_MS, tracePoints, windowed } from "../lib/trace";
+import type { ExpCurve } from "../types";
 import { useReducedMotion } from "../useReducedMotion";
 
 /** Most frames a second the trace draws; under reduced motion it steps at this. */
@@ -54,6 +55,7 @@ export function RawTrace({
   min,
   max,
   invert,
+  curve,
   swept,
   watch,
 }: {
@@ -62,6 +64,8 @@ export function RawTrace({
   min: number;
   max: number;
   invert: boolean;
+  /** The response curve: the faint line is the value after it. */
+  curve?: ExpCurve;
   /** The extremes a running sweep has kept, or null. */
   swept: { low: number; high: number } | null;
   /** Starts the raw stream; returns the stop. */
@@ -71,8 +75,8 @@ export function RawTrace({
   const canvas = useRef<HTMLCanvasElement>(null);
   const reduced = useReducedMotion();
   // The draw loop reads the latest props without restarting.
-  const props = useRef({ min, max, invert, swept });
-  props.current = { min, max, invert, swept };
+  const props = useRef({ min, max, invert, curve, swept });
+  props.current = { min, max, invert, curve, swept };
 
   useEffect(() => {
     const el = canvas.current;
@@ -104,7 +108,7 @@ export function RawTrace({
         palette = readPalette(wrap); // the theme may have changed
         paletteAt = now;
       }
-      const { min: heel, max: toe, invert: inv, swept: sw } = props.current;
+      const { min: heel, max: toe, invert: inv, curve: crv, swept: sw } = props.current;
       const w = width;
       const h = HEIGHT;
       const pad = 6;
@@ -153,9 +157,9 @@ export function RawTrace({
       const samples = windowed(ring, now, TRACE_MS);
       if (samples.length > 0) {
         // The value going out, 0..127, faint, on the same height.
-        const cfg = { min: heel, max: toe, invert: inv };
+        const cfg = { min: heel, max: toe, invert: inv, curve: crv };
         const out = samples.map(
-          ([t, v]) => [t, (expFraction(v, cfg) ?? 0) * RAW_MAX] as [number, number],
+          ([t, v]) => [t, (expOutput(v, cfg) ?? 0) * RAW_MAX] as [number, number],
         );
         ctx.strokeStyle = palette.out;
         ctx.globalAlpha = 0.55;

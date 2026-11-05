@@ -43,7 +43,8 @@ Control and what is not.
 - Six switches (I, II, A over III, IV, B), CC 80 to 85 on channel 1 by default. Each one
   can be a momentary or toggle CC, a note or a program change, with an optional long-press
   action. Two-switch combos add more triggers.
-- Two expression inputs, CC 11 and CC 7 by default, calibrated in the app (heel/toe). The
+- Two expression inputs, CC 11 and CC 7 by default, calibrated in the app (heel/toe), each
+  with a response curve (linear, gentle or fast start, S, or your own). The
   calibration never gets written to the pedal.
 - LEDs in two modes. In **local** mode a switch lights while held and while its toggle is
   on. In **MIDI feedback** mode the app listens on a second virtual port, **Flintstep

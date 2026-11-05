@@ -63,6 +63,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	c.Switches[5].Colour = sparkx.Colour{R: 1, G: 2, B: 3}
 	c.Combos = []mapping.Combo{{A: 0, B: 1, Action: mapping.Action{Kind: mapping.KindPC, Channel: 1, Number: 9, Value: 127, Mode: mapping.Momentary}}}
 	c.Exp[1] = mapping.ExpConfig{Enabled: true, Channel: 3, CC: 1, Min: 1000, Max: 60000, Invert: true,
+		Curve:   mapping.ExpCurve{Kind: mapping.CurveCustom, Amount: 0.35},
 		Trigger: mapping.ExpTrigger{Mode: mapping.TriggerToe, Action: mapping.Action{Kind: mapping.KindNote, Channel: 2, Number: 40, Value: 100, Mode: mapping.Momentary}, Threshold: 90}}
 	c.Brightness = 0 // a real choice once saved: must survive the round trip
 	if err := Save(path, c); err != nil {

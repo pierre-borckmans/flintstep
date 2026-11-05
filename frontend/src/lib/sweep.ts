@@ -114,14 +114,14 @@ export interface Seen {
 export function calibrationHint(x: Pick<ExpConfig, "min" | "max">, seen: Seen): string | null {
   if (x.min === x.max || (x.min === 0 && x.max === RAW_MAX)) return null;
   const span = Math.abs(x.max - x.min);
-  if (span < MIN_SWEEP_SPAN) return "The calibrated travel is very short: calibrate by sweeping";
+  if (span < MIN_SWEEP_SPAN) return "The calibrated travel is very short: press Calibrate";
   if (seen.low < 0) return null;
   const slack = span * 0.05;
   const heelLow = x.min < x.max;
   const pastLow = seen.low < Math.min(x.min, x.max) - slack;
   const pastHigh = seen.high > Math.max(x.min, x.max) + slack;
-  if (pastLow) return `${heelLow ? "Heel" : "Toe"} looks high: calibrate by sweeping`;
-  if (pastHigh) return `${heelLow ? "Toe" : "Heel"} looks low: calibrate by sweeping`;
+  if (pastLow) return `${heelLow ? "Heel" : "Toe"} looks high: press Calibrate`;
+  if (pastHigh) return `${heelLow ? "Toe" : "Heel"} looks low: press Calibrate`;
   return null;
 }
 

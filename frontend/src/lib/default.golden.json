@@ -1,0 +1,207 @@
+{
+  "version": 4,
+  "pedal": {
+    "address": "",
+    "name": ""
+  },
+  "switches": [
+    {
+      "tap": {
+        "kind": "cc",
+        "channel": 1,
+        "number": 80,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "long": {
+        "kind": "off",
+        "channel": 1,
+        "number": 0,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "colour": {
+        "r": 255,
+        "g": 150,
+        "b": 0
+      }
+    },
+    {
+      "tap": {
+        "kind": "cc",
+        "channel": 1,
+        "number": 81,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "long": {
+        "kind": "off",
+        "channel": 1,
+        "number": 0,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "colour": {
+        "r": 255,
+        "g": 80,
+        "b": 0
+      }
+    },
+    {
+      "tap": {
+        "kind": "cc",
+        "channel": 1,
+        "number": 82,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "long": {
+        "kind": "off",
+        "channel": 1,
+        "number": 0,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "colour": {
+        "r": 255,
+        "g": 0,
+        "b": 170
+      }
+    },
+    {
+      "tap": {
+        "kind": "cc",
+        "channel": 1,
+        "number": 83,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "long": {
+        "kind": "off",
+        "channel": 1,
+        "number": 0,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "colour": {
+        "r": 0,
+        "g": 220,
+        "b": 255
+      }
+    },
+    {
+      "tap": {
+        "kind": "cc",
+        "channel": 1,
+        "number": 84,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "long": {
+        "kind": "off",
+        "channel": 1,
+        "number": 0,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "colour": {
+        "r": 0,
+        "g": 120,
+        "b": 255
+      }
+    },
+    {
+      "tap": {
+        "kind": "cc",
+        "channel": 1,
+        "number": 85,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "long": {
+        "kind": "off",
+        "channel": 1,
+        "number": 0,
+        "value": 127,
+        "mode": "momentary"
+      },
+      "colour": {
+        "r": 150,
+        "g": 0,
+        "b": 255
+      }
+    }
+  ],
+  "combos": [],
+  "exp": [
+    {
+      "enabled": true,
+      "channel": 1,
+      "cc": 11,
+      "min": 0,
+      "max": 65535,
+      "invert": false,
+      "curve": {
+        "kind": "linear",
+        "amount": 0
+      },
+      "trigger": {
+        "mode": "off",
+        "action": {
+          "kind": "cc",
+          "channel": 1,
+          "number": 102,
+          "value": 127,
+          "mode": "momentary"
+        },
+        "threshold": 4,
+        "offDelayMs": 400
+      }
+    },
+    {
+      "enabled": true,
+      "channel": 1,
+      "cc": 7,
+      "min": 0,
+      "max": 65535,
+      "invert": false,
+      "curve": {
+        "kind": "linear",
+        "amount": 0
+      },
+      "trigger": {
+        "mode": "off",
+        "action": {
+          "kind": "cc",
+          "channel": 1,
+          "number": 103,
+          "value": 127,
+          "mode": "momentary"
+        },
+        "threshold": 4,
+        "offDelayMs": 400
+      }
+    }
+  ],
+  "ledMode": "local",
+  "longPressMs": 500,
+  "brightness": 100,
+  "indicators": [
+    {
+      "mode": "midiOut",
+      "colour": {
+        "r": 0,
+        "g": 176,
+        "b": 80
+      }
+    },
+    {
+      "mode": "connected",
+      "colour": {
+        "r": 64,
+        "g": 32,
+        "b": 255
+      }
+    }
+  ]
+}

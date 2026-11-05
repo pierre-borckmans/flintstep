@@ -1,19 +1,25 @@
+import { ChevronRight, Eye, EyeOff, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { errorText } from "../api";
 import type { Apply } from "../lib/config";
-import { expFraction, expValue, rawFraction } from "../lib/exp";
+import { CURVE_LABEL, CURVE_TIP, formatAmount, type TaperHint, taperText } from "../lib/curve";
+import { expFraction, expOutput, expValue, LINEAR, rawFraction } from "../lib/exp";
 import { cableLabel } from "../lib/expsim";
 import { calibrationHint, sweepProgress, sweepPrompt } from "../lib/sweep";
-import type { Capture, Config, ExpEdge, Status } from "../types";
+import { STORAGE_PREFIX } from "../product";
+import type { Capture, Config, ExpConfig, ExpCurve, ExpEdge, Status } from "../types";
 import { Button } from "../ui/Button";
+import { Collapse } from "../ui/Collapse";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
 import { NumField } from "../ui/NumField";
 import { Toggle } from "../ui/Toggle";
 import type { ExpLive } from "../useExpLive";
+import { useStoredFlags } from "../useStoredFlags";
 import { type SimControls, SimRow, SimTag } from "./ExpSim";
 import { RawTrace } from "./RawTrace";
+import { ResponseRow } from "./Response";
 import { ThresholdOverlay, ThresholdZone, TriggerBlock } from "./Trigger";
 
 /** The live reading: a bar of the value the input sends (0..127), and under it the raw
@@ -23,6 +29,7 @@ function Meter({
   min,
   max,
   invert,
+  curve,
   trigger,
   zone,
 }: {
@@ -30,13 +37,15 @@ function Meter({
   min: number;
   max: number;
   invert: boolean;
+  curve: ExpCurve;
   /** The trigger's threshold marker, over the bar, while one is on. */
   trigger?: ReactNode;
   /** The trigger's zones, inside the bar under the fill. */
   zone?: ReactNode;
 }) {
-  const v = expValue(raw, { min, max, invert });
-  const f = expFraction(raw, { min, max, invert }) ?? 0;
+  // The bar is the value going out (after the curve): the threshold marker reads on it.
+  const v = expValue(raw, { min, max, invert, curve });
+  const f = expOutput(raw, { min, max, invert, curve }) ?? 0;
   const has = v !== null;
   return (
     <div className="flex flex-col gap-1.5">
@@ -214,6 +223,65 @@ function SweepCapture({
   );
 }
 
+/** The quiet line under Calibrate: a calibration that looks wrong, or a curve the last
+ *  sweep suggests (with a button that applies it). */
+function Attention({
+  hint,
+  taper,
+  onTaper,
+  onDismiss,
+}: {
+  hint: string | null;
+  taper: TaperHint | null;
+  onTaper: () => void;
+  onDismiss: () => void;
+}) {
+  if (hint) {
+    return (
+      <p className="text-ui-xs text-warn" role="status">
+        {hint}
+      </p>
+    );
+  }
+  if (!taper) return null;
+  return (
+    <div className="flex items-center gap-2" role="status">
+      <p className="min-w-0 flex-1 text-ui-xs leading-snug text-muted">{taperText(taper)}</p>
+      <Button
+        size="sm"
+        kind="plain"
+        onClick={onTaper}
+        title={`${CURVE_TIP[taper.curve]}\nChange it any time under Tuning`}
+      >
+        Apply
+      </Button>
+      <Button size="sm" kind="ghost" onClick={onDismiss} title="Keep Linear" aria-label="Dismiss">
+        <X size={12} aria-hidden />
+      </Button>
+    </div>
+  );
+}
+
+/** "Gentle start · inverted": what Tuning holds that differs from the defaults, so a
+ *  closed disclosure still says what it changed. */
+function tuningSummary(x: ExpConfig): string {
+  const parts: string[] = [];
+  const c = x.curve ?? LINEAR;
+  if (c.kind !== "linear") {
+    parts.push(c.kind === "custom" ? `custom ${formatAmount(c.amount)}` : CURVE_LABEL[c.kind]);
+  }
+  if (x.invert) parts.push("inverted");
+  return parts.join(" · ");
+}
+
+/** Per-input view flags kept across launches: Tuning open, the trace shown. */
+export interface CardView {
+  tuning: boolean;
+  setTuning: (on: boolean) => void;
+  trace: boolean;
+  setTrace: (on: boolean) => void;
+}
+
 function ExpCard({
   n,
   config,
@@ -224,6 +292,7 @@ function ExpCard({
   focused = false,
   sim,
   live,
+  view,
 }: {
   n: number;
   /** Selected on the canvas: lit, and scrolled into view. */
@@ -236,14 +305,17 @@ function ExpCard({
   sim?: SimControls;
   /** Traces, sweeps and learning (useExpLive); without it the card has none of them. */
   live?: ExpLive;
+  view: CardView;
 }) {
   const x = config.exp[n];
+  const curve = x.curve ?? LINEAR;
   const trigOn = x.trigger.mode !== "off";
   // A simulated jack reads as having a cable (Go reports one), connected or not.
   const simulated = !!sim?.on[n];
   const realCable = !simulated && !!status?.cables?.[n] && status?.state === "connected";
   const cable = realCable || simulated;
   const raw = status?.expRaw?.[n] ?? -1;
+  const travel = cable && raw >= 0 ? expFraction(raw, x) : null;
   const [err, setErr] = useState<string | null>(null);
   const [flash, setFlash] = useState<ExpEdge | null>(null);
   const card = useRef<HTMLDivElement>(null);
@@ -260,10 +332,19 @@ function ExpCard({
         setTimeout(() => setFlash(null), 900);
       })
       .catch((e) => setErr(errorText(e)));
+  // The raw stream runs while a pedal is in, trace shown or not: the calibration hint
+  // and the sweep's curve suggestion read what it brings.
+  const watch = live?.watch;
+  useEffect(() => (watch && cable ? watch() : undefined), [watch, cable]);
   const capture = live?.captures[n];
   const sweeping = !!capture?.on;
   const sweepErr = live?.errors[n] ?? null;
   const hint = live && cable && !sweeping ? calibrationHint(x, live.seen[n]) : null;
+  // A suggestion only while the curve is still the default: never second-guess a choice.
+  const taper = live && !sweeping && curve.kind === "linear" ? live.tapers[n] : null;
+  const attention = !!hint || !!taper;
+  const summary = tuningSummary(x);
+  const off = !x.enabled;
 
   return (
     <div
@@ -303,6 +384,7 @@ function ExpCard({
           min={x.min}
           max={x.max}
           invert={x.invert}
+          curve={curve}
           zone={
             trigOn && <ThresholdZone trigger={x.trigger} engaged={cable && x.enabled && engaged} />
           }
@@ -317,19 +399,8 @@ function ExpCard({
           }
         />
       </div>
-      {live && cable && (
-        <RawTrace
-          ring={live.rings[n]}
-          n={n}
-          min={x.min}
-          max={x.max}
-          invert={x.invert}
-          swept={sweeping && capture ? capture : null}
-          watch={live.watch}
-        />
-      )}
 
-      <div className={cx("grid grid-cols-2 gap-2", !x.enabled && "opacity-50")}>
+      <div className={cx("grid grid-cols-2 gap-2", off && "opacity-50")}>
         <NumField
           label="Ch"
           hint="MIDI channel"
@@ -357,78 +428,35 @@ function ExpCard({
         />
       ) : (
         live && (
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              kind="primary"
-              disabled={!cable}
-              onClick={() => {
-                setErr(null);
-                void live.sweep.start(n);
-              }}
-              title={
-                cable
-                  ? "Click, then rock the pedal all the way back and forth: heel and toe are set from the ends it reaches"
-                  : "Plug in or simulate a pedal first"
-              }
-            >
-              Calibrate by sweeping
-            </Button>
-            <div className="flex-1" />
-            <span className="text-ui-xs text-muted">Learn range</span>
-            <Toggle
-              label={`Learn EXP ${n + 1} range while playing`}
-              title="Widen heel or toe when the pedal goes past them while you play"
-              on={live.learn[n]}
-              onChange={(on) => live.setLearn(n, on)}
-            />
-          </div>
+          <Button
+            kind="primary"
+            disabled={!cable}
+            className="self-start"
+            onClick={() => {
+              setErr(null);
+              void live.sweep.start(n);
+            }}
+            title={
+              cable
+                ? "Rock the pedal all the way back and forth: heel and toe are set from the ends it reaches"
+                : "Plug in or simulate a pedal first"
+            }
+          >
+            Calibrate
+          </Button>
         )
       )}
       {sweepErr && <p className="text-ui-xs text-hot">{sweepErr}</p>}
-      {hint && !sweepErr && (
-        <p className="text-ui-xs text-warn" role="status">
-          {hint}
-        </p>
-      )}
-
-      <div className="flex items-center gap-2">
-        {live && <Kicker className="!text-faint">Fine-tune</Kicker>}
-        <Button
-          size="sm"
-          kind={flash === "min" ? "primary" : "plain"}
-          disabled={!cable || sweeping}
-          onClick={() => set("min")}
-          title={
-            cable
-              ? "Rock the pedal fully back, then click to make that 0"
-              : "Plug in or simulate a pedal first"
+      {!sweepErr && live && (
+        <Attention
+          hint={hint}
+          taper={taper}
+          onTaper={() =>
+            taper && apply({ type: "exp", n, patch: { curve: { ...curve, kind: taper.curve } } })
           }
-        >
-          Set heel
-        </Button>
-        <Button
-          size="sm"
-          kind={flash === "max" ? "primary" : "plain"}
-          disabled={!cable || sweeping}
-          onClick={() => set("max")}
-          title={
-            cable
-              ? "Push the pedal fully forward, then click to make that 127"
-              : "Plug in or simulate a pedal first"
-          }
-        >
-          Set toe
-        </Button>
-        <div className="flex-1" />
-        <span className="text-ui-xs text-muted">Invert</span>
-        <Toggle
-          label={`Invert EXP ${n + 1}`}
-          title="Send 127 at the heel and 0 at the toe"
-          on={x.invert}
-          onChange={(invert) => apply({ type: "exp", n, patch: { invert } })}
+          onDismiss={() => live.dismissTaper(n)}
         />
-      </div>
+      )}
       {err && <p className="text-ui-xs text-hot">{err}</p>}
       {!cable && (
         <p className="text-ui-xs text-faint">
@@ -437,10 +465,144 @@ function ExpCard({
         </p>
       )}
       {sim && <SimRow n={n} sim={sim} realCable={realCable} raw={raw} />}
+
+      <div className="flex flex-col gap-3 border-t border-edge pt-2">
+        <button
+          type="button"
+          aria-expanded={view.tuning}
+          aria-controls={`exp-tuning-${n}`}
+          onClick={() => view.setTuning(!view.tuning)}
+          title={
+            view.tuning
+              ? "Hide the response curve, heel and toe, invert and the live input"
+              : "Response curve, heel and toe, invert, learning the range, and the live input"
+          }
+          className="group -mx-1 flex items-center gap-1.5 rounded-ui-sm px-1 py-0.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-cold/70"
+        >
+          <ChevronRight
+            size={12}
+            aria-hidden
+            className={cx(
+              "text-faint transition-transform duration-(--dur) ease-(--ease) group-hover:text-muted",
+              view.tuning && "rotate-90",
+            )}
+          />
+          <Kicker className="group-hover:!text-text">Tuning</Kicker>
+          {attention && !view.tuning && (
+            <span
+              role="img"
+              className="h-1.5 w-1.5 rounded-full bg-warn"
+              style={{
+                boxShadow: "0 0 6px color-mix(in srgb, var(--color-warn) 60%, transparent)",
+              }}
+              aria-label="needs attention"
+            />
+          )}
+          <div className="flex-1" />
+          {summary && <span className="truncate font-mono text-ui-2xs text-faint">{summary}</span>}
+        </button>
+        <Collapse open={view.tuning} className="flex flex-col gap-3">
+          <div id={`exp-tuning-${n}`} className={cx("flex flex-col gap-3", off && "opacity-50")}>
+            <ResponseRow n={n} x={x} travel={travel} apply={apply} />
+
+            {live && cable && (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Kicker className="!text-faint">Input</Kicker>
+                  <div className="flex-1" />
+                  <Button
+                    size="sm"
+                    kind="ghost"
+                    className="!h-5 !px-1"
+                    aria-pressed={view.trace}
+                    onClick={() => view.setTrace(!view.trace)}
+                    title={view.trace ? "Hide the live input trace" : "Show the live input trace"}
+                    icon={
+                      view.trace ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />
+                    }
+                  >
+                    {view.trace ? "Hide" : "Show"}
+                  </Button>
+                </div>
+                <Collapse open={view.trace}>
+                  <RawTrace
+                    ring={live.rings[n]}
+                    n={n}
+                    min={x.min}
+                    max={x.max}
+                    invert={x.invert}
+                    curve={curve}
+                    swept={sweeping && capture ? capture : null}
+                    watch={live.watch}
+                  />
+                </Collapse>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <Button
+                size="sm"
+                kind={flash === "min" ? "primary" : "plain"}
+                disabled={!cable || sweeping}
+                onClick={() => set("min")}
+                title={
+                  cable
+                    ? "Set heel: rock the pedal fully back, then click to make that 0"
+                    : "Plug in or simulate a pedal first"
+                }
+              >
+                Set heel
+              </Button>
+              <Button
+                size="sm"
+                kind={flash === "max" ? "primary" : "plain"}
+                disabled={!cable || sweeping}
+                onClick={() => set("max")}
+                title={
+                  cable
+                    ? "Set toe: push the pedal fully forward, then click to make that 127"
+                    : "Plug in or simulate a pedal first"
+                }
+              >
+                Set toe
+              </Button>
+              <div className="flex-1" />
+              <span
+                className="flex items-center gap-1.5"
+                title="Send 127 at the heel and 0 at the toe"
+              >
+                <span className="text-ui-xs text-muted">Invert</span>
+                <Toggle
+                  label={`Invert EXP ${n + 1}`}
+                  on={x.invert}
+                  onChange={(invert) => apply({ type: "exp", n, patch: { invert } })}
+                />
+              </span>
+              {live && (
+                <span
+                  className="flex items-center gap-1.5"
+                  title="Learn range: widen heel or toe when the pedal goes past them while you play"
+                >
+                  <span className="text-ui-xs text-muted">Learn</span>
+                  <Toggle
+                    label={`Learn EXP ${n + 1} range while playing`}
+                    on={live.learn[n]}
+                    onChange={(on) => live.setLearn(n, on)}
+                  />
+                </span>
+              )}
+            </div>
+          </div>
+        </Collapse>
+      </div>
+
       <TriggerBlock n={n} x={x} engaged={engaged} cable={cable} apply={apply} />
     </div>
   );
 }
+
+const TUNING_KEY = `${STORAGE_PREFIX}expTuning`;
+const TRACE_KEY = `${STORAGE_PREFIX}expTrace`;
 
 export function ExpressionPanel({
   engaged,
@@ -460,15 +622,26 @@ export function ExpressionPanel({
   /** Traces, sweeps and learning the range. */
   live?: ExpLive;
 }) {
+  // Tuning starts closed, the trace inside it shown; both remembered per input.
+  // ?tuning=open: both open, whatever was left (screenshots).
+  const forceOpen =
+    new URLSearchParams(window.location.search).get("tuning") === "open" ? [true, true] : undefined;
+  const [tuning, setTuning] = useStoredFlags(TUNING_KEY, [false, false], forceOpen);
+  const [trace, setTrace] = useStoredFlags(TRACE_KEY, [true, true]);
+  const view = (n: number): CardView => ({
+    tuning: tuning[n],
+    setTuning: (on) => setTuning(n, on),
+    trace: trace[n],
+    setTrace: (on) => setTrace(n, on),
+  });
   return (
     <div className="flex flex-col gap-3 p-4">
-      <ExpCard n={0} engaged={!!engaged[0]} focused={focus === 0} {...props} />
-      <ExpCard n={1} engaged={!!engaged[1]} focused={focus === 1} {...props} />
+      <ExpCard n={0} engaged={!!engaged[0]} focused={focus === 0} view={view(0)} {...props} />
+      <ExpCard n={1} engaged={!!engaged[1]} focused={focus === 1} view={view(1)} {...props} />
       <p className="px-1 text-ui-xs leading-snug text-faint">
         <Kicker className="mr-1">Tip</Kicker>
-        Calibrate by sweeping, then rock the pedal heel to toe and back: it finishes on its own once
-        the pedal rests. Set heel and Set toe take the pedal's position as it is now. The value only
-        moves when the pedal is clearly past a step, so a resting pedal does not flicker.
+        Press Calibrate and rock the pedal heel to toe and back: it finishes on its own once the
+        pedal rests. Tuning holds the response curve, heel and toe by hand, and the live input.
       </p>
     </div>
   );

@@ -340,10 +340,12 @@ func isToggle(a Action) bool { return a.Kind == KindCC && a.Mode == Toggle }
 // whatever order the numbers fall: heel sends 0 and toe 127 either way, and Invert
 // (the user's own choice) flips that on top. The calibrated travel is stretched to
 // the full raw range first, so ExpScale's hysteresis (half a step and a margin) is
-// measured in steps of the pedal the user actually has. Nothing comes back for the CC
-// when the input is off or the value did not move a step.
+// measured in steps of the pedal the user actually has. The response curve (curve.go)
+// bends the travel next, before the hysteresis, so a resting pedal does not flicker on
+// a steep part of the curve. Nothing comes back for the CC when the input is off or the
+// value did not move a step.
 //
-// The same travel drives the input's trigger (trigger.go): a press half goes before
+// The same curved travel drives the input's trigger (trigger.go): a press half goes before
 // the CC, a release half after it. Timers due by at fire first, as in Switch.
 func (e *Engine) Exp(n, raw int, at time.Time) Outs {
 	out := e.Tick(at)
@@ -366,6 +368,7 @@ func (e *Engine) Exp(n, raw int, at time.Time) Outs {
 	if x.Invert {
 		scaled = ExpRawMax - scaled
 	}
+	scaled = x.Curve.curveScaled(scaled)
 	press, release := e.trigger(n, scaled, at)
 	out = append(out, press...)
 	if v, changed := e.exp.Feed(n, scaled); changed {

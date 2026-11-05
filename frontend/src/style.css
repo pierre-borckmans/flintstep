@@ -439,6 +439,8 @@ select:not(:disabled) {
    negative margin cancels the parent's gap while closed, so nothing jumps at the end. */
 .collapsible {
   display: grid;
+  /* The column never grows past the parent, whatever the content's min width. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 0fr;
   margin-top: calc(-1 * var(--collapse-gap, 0px));
   opacity: 0;
@@ -459,6 +461,12 @@ select:not(:disabled) {
 /* While open and settled, let focus rings and popovers spill out. */
 .collapsible[data-settled="true"] > div {
   overflow: visible;
+}
+
+/* The response curve's live dot: follows the pedal like the meter's fill, no lag to
+   speak of. Reduced motion zeroes the transition with everything else. */
+.curve-dot {
+  transition: transform var(--dur-led) var(--ease-led);
 }
 
 /* Tab panel arriving: a short slide from the side it came from. */

@@ -10,6 +10,7 @@ import type {
 import { INDICATOR_NAMES, SWITCH_NAMES } from "../types";
 import { comboName } from "./caption";
 import { defaultConfig, mappingOf, sameConfig } from "./config";
+import { curveWords } from "./curve";
 import { modeLabel } from "./indicators";
 import { noteName } from "./notes";
 
@@ -83,6 +84,9 @@ function expChanges(n: number, a: ExpConfig, b: ExpConfig): string[] {
   else if (heel) out.push(`${at} · heel set`);
   else if (toe) out.push(`${at} · toe set`);
   if (a.invert !== b.invert) out.push(`${at} · ${b.invert ? "inverted" : "not inverted"}`);
+  if (a.curve && b.curve && (a.curve.kind !== b.curve.kind || a.curve.amount !== b.curve.amount)) {
+    out.push(`${at} · curve ${curveWords(b.curve)}`);
+  }
   if (a.trigger && b.trigger) out.push(...triggerChanges(at, a.trigger, b.trigger));
   return out;
 }

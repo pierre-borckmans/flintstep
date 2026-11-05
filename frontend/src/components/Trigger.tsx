@@ -225,8 +225,8 @@ export function TriggerBlock({
             label={t.mode === "toe" ? "Click at" : "Engage at"}
             hint={
               t.mode === "toe"
-                ? "Pedal position where it clicks"
-                : "Pedal position where it switches on"
+                ? "Where it clicks, as a percent of the value sent (after the response curve)"
+                : "Where it switches on, as a percent of the value sent (after the response curve)"
             }
             value={t.threshold}
             min={TRIGGER.min}
