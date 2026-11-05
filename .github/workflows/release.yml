@@ -82,6 +82,9 @@ jobs:
           name: ${{ env.PRODUCT_NAME }} ${{ github.ref_name }}
           body_path: build/bin/release-notes.md
           generate_release_notes: true
+          # v1.2.3-rc.1 and the like are pre-releases: never "latest", so the site's
+          # download link keeps pointing at the last real release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true
           files: |
             build/bin/*.dmg

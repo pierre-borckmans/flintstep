@@ -809,6 +809,21 @@ export function createMockBackend(q: URLSearchParams): Backend {
     RevealLogs: async () => {
       console.info("[mock] RevealLogs");
     },
+    GetTheme: async () => "system",
+    ThirdPartyNotices: async () =>
+      [
+        "# Third-party notices",
+        "",
+        "Browser preview: the desktop app shows THIRD_PARTY_NOTICES.md here.",
+        "",
+        "## MIT",
+        "",
+        "- [react](https://github.com/react/react) 19 (npm)",
+        "",
+        "```text",
+        "Permission is hereby granted, free of charge, to any person obtaining a copy…",
+        "```",
+      ].join("\n"),
     SetTheme: async () => {},
     ListPresets: async () => lib.list(),
     SelectPreset: async (id) => {

@@ -4,6 +4,7 @@ import {
   parseTheme,
   type Resolved,
   resolveTheme,
+  startupTheme,
   THEME_KEY,
   type ThemeMode,
   themeAttr,
@@ -75,23 +76,46 @@ function crossfade(change: () => void) {
   window.setTimeout(() => delete root.dataset.themeFading, 400);
 }
 
-/** Once, with the backend: shows the saved theme (or ?theme= in browser dev, unsaved) and
- *  tells Go, so the native window matches even if prefs.json and localStorage disagree. */
-export function initTheme(setTheme: (mode: ThemeMode) => Promise<void>) {
-  tell = setTheme;
-  let mode = stored();
-  if (document.documentElement.dataset.mock) {
-    const q = new URLSearchParams(window.location.search).get("theme");
-    if (q) mode = parseTheme(q);
+// Set once the user picks a theme, so a slow startup answer from Go can't undo it.
+let picked = false;
+
+function storedRaw(): string | null {
+  try {
+    return localStorage.getItem(THEME_KEY);
+  } catch {
+    return null;
   }
-  paint(mode);
-  publish(mode);
-  tell(mode).catch(() => {});
+}
+
+/** Once, with the backend. A theme in localStorage (or ?theme= in browser dev, unsaved) is
+ *  shown and told to Go, so the native window matches even if prefs.json disagrees. With
+ *  none, Go's saved theme is adopted (see startupTheme). */
+export async function initTheme(backend: {
+  SetTheme(mode: ThemeMode): Promise<void>;
+  GetTheme(): Promise<string>;
+}) {
+  tell = (mode) => backend.SetTheme(mode);
   // System follows macOS live. CSS does the repaint; this keeps `resolved` true.
   media("(prefers-color-scheme: light)")?.addEventListener("change", () => publish(get().mode));
+  const q = document.documentElement.dataset.mock
+    ? new URLSearchParams(window.location.search).get("theme")
+    : null;
+  const start = q
+    ? { mode: parseTheme(q), push: true, save: false }
+    : await startupTheme(storedRaw(), () => backend.GetTheme());
+  if (picked) return;
+  if (start.save) {
+    try {
+      localStorage.setItem(THEME_KEY, start.mode);
+    } catch {}
+  }
+  paint(start.mode);
+  publish(start.mode);
+  if (start.push) tell(start.mode).catch(() => {});
 }
 
 export function setTheme(mode: ThemeMode) {
+  picked = true;
   if (mode === get().mode) return;
   try {
     localStorage.setItem(THEME_KEY, mode);

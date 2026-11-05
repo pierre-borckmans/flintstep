@@ -3,7 +3,8 @@
 #
 #   scripts/release/dmg.sh <out.dmg> [app]     app defaults to build/bin/<PRODUCT_NAME>.app
 #
-# The image holds the app and a symlink to /Applications, nothing else. No background
+# The image holds the app, a symlink to /Applications, LICENSE and
+# THIRD_PARTY_NOTICES.md. No background
 # picture or window layout yet; Finder shows the two icons side by side.
 set -euo pipefail
 # shellcheck source=../lib/common.sh
@@ -21,5 +22,6 @@ trap 'rm -rf "$stage"' EXIT
 # ditto keeps the signature, extended attributes and any stapled ticket intact.
 ditto "$app" "$stage/$(basename "$app")"
 ln -s /Applications "$stage/Applications"
+cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$stage/"
 hdiutil create -volname "$PRODUCT_NAME" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$out" >/dev/null
 echo "wrote $out"

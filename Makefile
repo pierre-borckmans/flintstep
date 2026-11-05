@@ -68,6 +68,10 @@ product-check:
 cli: dist ## Build the headless bridge into build/bin/<CLI_NAME>
 	go build -o "build/bin/$(CLI_NAME)" ./cmd/$(CLI_NAME)
 
+.PHONY: notices
+notices: ## Regenerate THIRD_PARTY_NOTICES.md (needs make install)
+	scripts/notices.sh
+
 frontend: ## Build the real frontend bundle (tsc + vite)
 	$(BUN) run build
 

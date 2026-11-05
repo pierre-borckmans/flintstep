@@ -67,3 +67,27 @@ func TestSetThemeWithoutDataDir(t *testing.T) {
 		t.Fatalf("theme = %q", a.prefs.Theme)
 	}
 }
+
+func TestGetTheme(t *testing.T) {
+	path := filepath.Join(t.TempDir(), store.PrefsFile)
+	if err := store.SavePrefs(path, store.Prefs{Theme: store.ThemeLight}); err != nil {
+		t.Fatal(err)
+	}
+	// As main does: prefs.json is read before the window exists.
+	a := NewApp()
+	a.applyTheme = func(store.Theme) {}
+	a.prefsFile = path
+	a.prefs = store.LoadPrefs(path)
+	if got := a.GetTheme(); got != "light" {
+		t.Fatalf("GetTheme = %q, want the saved light", got)
+	}
+	if err := a.SetTheme("dark"); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.GetTheme(); got != "dark" {
+		t.Fatalf("GetTheme after SetTheme = %q", got)
+	}
+	if got := NewApp().GetTheme(); got != "system" {
+		t.Fatalf("GetTheme with no prefs = %q", got)
+	}
+}

@@ -46,6 +46,15 @@ func prefsPath() string {
 	return filepath.Join(dir, store.PrefsFile)
 }
 
+// GetTheme is the theme kept in prefs.json, as loaded at launch or last set. The frontend
+// asks for it when its own copy (localStorage) is missing, as on the first launch under a
+// new bundle id, so it adopts the saved theme instead of overwriting it with "system".
+func (a *App) GetTheme() string {
+	a.prefsMu.Lock()
+	defer a.prefsMu.Unlock()
+	return string(a.prefs.Theme)
+}
+
 // SetTheme follows macOS ("system") or forces "dark" or "light": the native window
 // switches at once and the choice is kept for the next launch.
 func (a *App) SetTheme(mode string) error {

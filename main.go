@@ -52,7 +52,7 @@ func main() {
 			Appearance: appearance,
 			About: &mac.AboutInfo{
 				Title:   product.Name,
-				Message: "Turns a Spark Control X into a MIDI foot controller.\nNot affiliated with Positive Grid.",
+				Message: "Turns a Spark Control X into a MIDI foot controller.\nNot affiliated with Positive Grid.\n\nOpen-source licences: Settings > App > Acknowledgements.",
 			},
 		},
 		OnStartup:  app.startup,

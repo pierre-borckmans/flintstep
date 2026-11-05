@@ -27,6 +27,10 @@ export interface Backend {
   RevealLogs(): Promise<void>;
   /** Themes the native window (appearance, background) and keeps it for the next launch. */
   SetTheme(mode: ThemeMode): Promise<void>;
+  /** The theme in prefs.json; read at startup when localStorage has none. */
+  GetTheme(): Promise<string>;
+  /** THIRD_PARTY_NOTICES.md, for the Acknowledgements view. */
+  ThirdPartyNotices(): Promise<string>;
   ListPresets(): Promise<PresetInfo[]>;
   /** Makes the preset the active one and runs it; resolves to its mapping. */
   SelectPreset(id: string): Promise<Config>;
@@ -86,6 +90,8 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     SimSweep: (n, on) => app.SimSweep(n, on),
     RevealLogs: () => app.RevealLogs(),
     SetTheme: (mode) => app.SetTheme(mode),
+    GetTheme: () => app.GetTheme(),
+    ThirdPartyNotices: () => app.ThirdPartyNotices(),
     ListPresets: () => app.ListPresets(),
     SelectPreset: (id) => app.SelectPreset(id),
     CreatePreset: (name, from) => app.CreatePreset(name, from),
