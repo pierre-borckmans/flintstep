@@ -3,7 +3,7 @@
 //
 //   node scripts/site/pedal-svg.mjs
 //
-// The geometry is frontend/src/components/Pedal.tsx's REF table, re-done without React:
+// The geometry is frontend/src/lib/sparkgeom.ts's REF table, re-done without React:
 // the case (textured, never repaints) and the lights (LEDs, nuts, caps, lamps), which the
 // page's script switches on and off. No wordmark: the site draws the hardware, not the
 // brand. The markup is the page's resting frame: II held, A toggled on.

@@ -144,7 +144,7 @@ export const SWEEP_MS = 760;
 /** How long each lamp stays lit (ms). */
 const SWEEP_LIT = 240;
 
-/** Each lamp's place across the face, 0 left to 1 right (Pedal.tsx's REF table): the
+/** Each lamp's place across the face, 0 left to 1 right (lib/sparkgeom's REF table): the
  *  columns I/III, II/IV, A/B and, between the last two, AMP and APP. */
 const SWEEP_AT: [number, number][] = [
   [0, 0],
