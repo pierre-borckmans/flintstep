@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { Backend } from "./api";
 import { ActivityLog } from "./components/Activity";
 import { ExpressionPanel } from "./components/ExpressionPanel";
+import { useSimControls } from "./components/ExpSim";
 import { Header } from "./components/Header";
 import { HistoryControls } from "./components/HistoryControls";
 import { IndicatorEditor } from "./components/IndicatorEditor";
@@ -26,6 +27,7 @@ const q = new URLSearchParams(window.location.search);
 export default function App({ backend }: { backend: Backend }) {
   const bridge = useBridge(backend);
   const { state, config, apply } = bridge;
+  const sim = useSimControls(backend, state);
   const [sel, setSel] = useState(() => Math.max(0, Number(q.get("sel") ?? 0)) % 6);
   // An indicator lamp (Amp 0, App 1) being edited instead of a switch: one or the
   // other, never both. ?lamp=amp|app opens on one, for screenshots.
@@ -181,6 +183,7 @@ export default function App({ backend }: { backend: Backend }) {
                     engaged={state.expTrigger ?? []}
                     apply={apply}
                     calibrate={bridge.calibrate}
+                    sim={sim}
                   />
                 ) : (
                   <SettingsPanel

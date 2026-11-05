@@ -318,14 +318,36 @@ destination back, drives Manager.SetLamps, emits UI events. Interfaces so it is 
 type Pedal interface { SetLamps([8]sparkx.Colour); Status() ble.Status } // the app owns Start/SetTarget/Stop
 type MIDIOut interface { Send([]byte) error }
 type Activity struct { Dir string `json:"dir"`; Bytes []int `json:"bytes"`; Label string `json:"label"`; At int64 `json:"at"` } // "out" | "in"
-type Options struct { OnActivity func(Activity); OnStatus func(ble.Status); OnTrigger func([2]bool); Now func() time.Time }
+type Options struct { OnActivity func(Activity); OnStatus func(ble.Status); OnTrigger func([2]bool); OnSim func(); Now func() time.Time }
 func (b *Bridge) ExpTriggers() [2]bool // Engine.ExpTriggers under the bridge's lock
+
+// Simulated expression pedals (sim.go): test the whole exp path without one.
+func (b *Bridge) SimulateExp(n int, on bool) error      // on at the heel; refused with a real cable in jack n
+func (b *Bridge) SetSimExp(n int, fraction float64) error // 0 heel..1 toe -> raw FractionRaw(f); turns on, stops a sweep
+func (b *Bridge) SimSweep(n int, on bool) error         // heel->toe->heel, cosine-eased, SweepPeriod (4 s), from where it is
+func (b *Bridge) ExpSim() [2]bool                       // simulated now
+func (b *Bridge) ExpSweep() [2]bool                     // sweeping now
+func (b *Bridge) Status() ble.Status                    // Pedal.Status with simulated jacks: cables[n] true, expRaw[n] simulated
+func FractionRaw(f float64) int                         // round(clamp(f) * 65535)
+var ErrClosed error                                     // the sim calls after Close
 ```
 
 OnTrigger is called (inside a step, like OnActivity) whenever ExpTriggers changes:
 an engage, a let-go, an off delay ending on the tick loop. The bridge lets go of a
 trigger on disconnect (Engine.Reset) and for each jack a connected Status reports
 without a cable (Engine.ExpRelease), and sends what SetConfig returns from Apply.
+
+Simulation: a simulated input's raw value goes to the engine through the same step as a
+real pedal's (so its CCs and trigger reach the virtual port and the activity log), at
+most every 16 ms (simEvery); a faster SetSimExp is held and the latest sent by the sim
+loop, a goroutine that runs while any input is simulated and stops on Close. A real exp
+value for a simulated jack is ignored; a connected Status with a real cable in it ends
+the simulation (logged), lets go of its trigger, and real values flow. A cable-less
+Status does not release a simulated jack. Turning it off lets go like a cable coming
+out (Engine.ExpRelease) and forgets the reading. After Reset or Apply the current
+simulated value is fed again, so a new calibration shows on a parked pedal. Works
+with the pedal disconnected too. Never persisted: off at launch. OnSim is called (no
+lock held) on every on/off/sweep change and each value fed.
 
 ## Wails bindings (package main, `App`), what the frontend calls
 
@@ -338,6 +360,10 @@ ChoosePedal(address: string, name: string): Promise<void> // saves the pedal and
 ForgetPedal(): Promise<void>                               // same, with an empty target
 CalibrateExp(n: number, edge: "min" | "max"): Promise<Config> // stores the input's current raw value as heel ("min")
                                                               // or toe ("max") as it is, never swapped; errors if heel == toe
+                                                              // (a simulated input's raw counts)
+SimulateExp(n: number, on: boolean): Promise<void>  // Bridge.SimulateExp; not saved
+SetSimExp(n: number, fraction: number): Promise<void> // Bridge.SetSimExp
+SimSweep(n: number, on: boolean): Promise<void>     // Bridge.SimSweep
 SetLaunchAtLogin(on: boolean): Promise<void>
 RevealLogs(): Promise<void>
 SetTheme(mode: "system" | "dark" | "light"): Promise<void> // native window appearance + background,
@@ -369,6 +395,9 @@ type State = {
   activePreset: string     // id
   libraryError: string     // what went wrong opening library.json, "" = nothing
   expTrigger: [boolean, boolean] // each input's trigger engaged now (Bridge.ExpTriggers)
+  expSim: [boolean, boolean]     // each input simulated now (Bridge.ExpSim); pedal is Bridge.Status,
+                                 // so a simulated jack shows cables[n] true and its expRaw[n]
+  expSweep: [boolean, boolean]   // each simulated input sweeping (Bridge.ExpSweep)
 }
 ```
 

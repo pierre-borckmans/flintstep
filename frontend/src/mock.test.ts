@@ -173,3 +173,65 @@ describe("mock preset library", () => {
     expect(lib.select(got.id).longPressMs).toBe(800);
   });
 });
+
+describe("simulated expression pedal", () => {
+  const still = { seed: 1, fixedState: "connected" as const, autoPress: false };
+
+  it("reports a cable and the simulated raw, and sends the CC", () => {
+    const sim = createSim({ ...still, cables: [false, false] });
+    sim.simulate(1, true);
+    sim.simPosition(1, 1);
+    const acts = sim.step(100);
+    const st = sim.status();
+    expect(st.cables).toEqual([false, true]);
+    expect(st.expRaw[1]).toBe(65535);
+    expect(sim.simState()).toEqual({ on: [false, true], sweep: [false, false] });
+    expect(acts.some((a) => a.bytes.join() === [0xb0, 7, 127].join())).toBe(true);
+  });
+
+  it("works without the link, and calibrates", () => {
+    const sim = createSim({
+      seed: 1,
+      fixedState: "searching",
+      autoPress: false,
+      simAt: [25, null],
+    });
+    sim.step(50);
+    expect(sim.status().cables[0]).toBe(true);
+    sim.calibrate(0, "min");
+    expect(sim.config.exp[0].min).toBe(16384);
+  });
+
+  it("is refused on a jack with a real cable", () => {
+    const sim = createSim({ ...still, cables: [true, false] });
+    expect(() => sim.simulate(0, true)).toThrow(/real pedal/);
+  });
+
+  it("sweeps heel to toe and back, and stops where it got to", () => {
+    const sim = createSim({ ...still, cables: [false, false] });
+    sim.simSweep(0, true);
+    expect(sim.simState().sweep[0]).toBe(true);
+    sim.step(2000);
+    expect(sim.status().expRaw[0]).toBe(65535);
+    sim.step(1000);
+    sim.simSweep(0, false);
+    expect(sim.simState().sweep[0]).toBe(false);
+    const parked = sim.status().expRaw[0];
+    sim.step(500);
+    expect(Math.abs(sim.status().expRaw[0] - parked)).toBeLessThan(100);
+  });
+
+  it("off lets go of the trigger and forgets the reading", () => {
+    const sim = createSim({ ...still, cables: [false, false], triggers: ["engage", "off"] });
+    sim.simulate(0, true);
+    sim.simPosition(0, 0.5);
+    sim.step(50);
+    expect(sim.triggers()[0]).toBe(true);
+    sim.simulate(0, false);
+    expect(sim.triggers()[0]).toBe(false);
+    sim.step(50);
+    const st = sim.status();
+    expect(st.cables[0]).toBe(false);
+    expect(st.expRaw[0]).toBe(-1);
+  });
+});

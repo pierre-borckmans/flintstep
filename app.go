@@ -55,6 +55,11 @@ type State struct {
 	LibraryError string `json:"libraryError"`
 	// ExpTrigger says which expression inputs' triggers are engaged now.
 	ExpTrigger [2]bool `json:"expTrigger"`
+	// ExpSim says which expression inputs are simulated now: Pedal then reports a cable
+	// in those jacks and the simulated raw value.
+	ExpSim [2]bool `json:"expSim"`
+	// ExpSweep says which simulated inputs are sweeping heel to toe on their own.
+	ExpSweep [2]bool `json:"expSweep"`
 }
 
 // App is bound to the frontend: its exported methods are the UI's API.
@@ -133,6 +138,7 @@ func (a *App) startup(ctx context.Context) {
 		OnActivity: func(ev bridge.Activity) { a.emit("activity", ev) },
 		OnStatus:   func(ble.Status) { a.changed() },
 		OnTrigger:  func([2]bool) { a.changed() },
+		OnSim:      a.changed,
 	})
 	v, err := coremidi.NewVirtual(midiClient, midiSource, midiDest, a.bridge.Feedback)
 	if err != nil {
@@ -245,7 +251,7 @@ func (a *App) stateLoop() {
 // GetState is everything the UI draws.
 func (a *App) GetState() State {
 	return State{
-		Pedal:         a.pedal.Status(),
+		Pedal:         a.bridge.Status(), // the pedal's, with simulated inputs filled in
 		Config:        a.bridge.Config(),
 		MIDI:          a.mstate,
 		LaunchAtLogin: loginitem.Enabled(),
@@ -254,6 +260,8 @@ func (a *App) GetState() State {
 		ActivePreset:  a.lib.ActiveID(),
 		LibraryError:  a.libErr,
 		ExpTrigger:    a.bridge.ExpTriggers(),
+		ExpSim:        a.bridge.ExpSim(),
+		ExpSweep:      a.bridge.ExpSweep(),
 	}
 }
 
@@ -330,7 +338,7 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	if n < 0 || n > 1 {
 		return a.bridge.Config(), fmt.Errorf("no expression input %d", n+1)
 	}
-	st := a.pedal.Status()
+	st := a.bridge.Status() // a simulated pedal calibrates like a real one
 	raw := st.ExpRaw[n]
 	if !st.Cables[n] || raw < 0 {
 		return a.bridge.Config(), fmt.Errorf("plug an expression pedal into jack %d first", n+1)
@@ -358,6 +366,16 @@ func (a *App) CalibrateExp(n int, edge string) (mapping.Config, error) {
 	}
 	return a.bridge.Config(), nil
 }
+
+// SimulateExp turns input n's simulated expression pedal on or off. Never saved:
+// every launch starts with it off.
+func (a *App) SimulateExp(n int, on bool) error { return a.bridge.SimulateExp(n, on) }
+
+// SetSimExp moves input n's simulated pedal to fraction 0 (heel) .. 1 (toe).
+func (a *App) SetSimExp(n int, fraction float64) error { return a.bridge.SetSimExp(n, fraction) }
+
+// SimSweep makes input n's simulated pedal sweep heel to toe and back on its own.
+func (a *App) SimSweep(n int, on bool) error { return a.bridge.SimSweep(n, on) }
 
 // SetLaunchAtLogin turns the login item on or off.
 func (a *App) SetLaunchAtLogin(on bool) error {

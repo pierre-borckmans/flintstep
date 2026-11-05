@@ -2,6 +2,7 @@ import { type ReactNode, useState } from "react";
 import { errorText } from "../api";
 import type { Apply } from "../lib/config";
 import { expFraction, expValue, rawFraction } from "../lib/exp";
+import { cableLabel } from "../lib/expsim";
 import type { Config, ExpEdge, Status } from "../types";
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
@@ -9,6 +10,7 @@ import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
 import { NumField } from "../ui/NumField";
 import { Toggle } from "../ui/Toggle";
+import { type SimControls, SimRow, SimTag } from "./ExpSim";
 import { ThresholdOverlay, ThresholdZone, TriggerBlock } from "./Trigger";
 
 /** The live reading: a bar of the value the input sends (0..127), and under it the raw
@@ -128,6 +130,7 @@ function ExpCard({
   engaged,
   apply,
   calibrate,
+  sim,
 }: {
   n: number;
   config: Config;
@@ -135,10 +138,14 @@ function ExpCard({
   engaged: boolean;
   apply: Apply;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
+  sim?: SimControls;
 }) {
   const x = config.exp[n];
   const trigOn = x.trigger.mode !== "off";
-  const cable = !!status?.cables?.[n] && status?.state === "connected";
+  // A simulated jack reads as having a cable (Go reports one), connected or not.
+  const simulated = !!sim?.on[n];
+  const realCable = !simulated && !!status?.cables?.[n] && status?.state === "connected";
+  const cable = realCable || simulated;
   const raw = status?.expRaw?.[n] ?? -1;
   const [err, setErr] = useState<string | null>(null);
   const [flash, setFlash] = useState<ExpEdge | null>(null);
@@ -155,9 +162,10 @@ function ExpCard({
     <div className="flex flex-col gap-3 rounded-ui-lg border border-edge bg-panel2/60 p-3 rim">
       <div className="flex items-center gap-2">
         <span className="text-ui-base font-semibold text-bone engraved">EXP {n + 1}</span>
+        {simulated && <SimTag />}
         <Lamp on={cable} colour="live" size={6} />
         <span className={cx("text-ui-xs", cable ? "text-muted" : "text-faint")}>
-          {cable ? "cable in" : "no cable"}
+          {cableLabel(cable, simulated)}
         </span>
         <div className="flex-1" />
         <span className="text-ui-xs text-muted">{x.enabled ? "On" : "Off"}</span>
@@ -239,9 +247,11 @@ function ExpCard({
       {err && <p className="text-ui-xs text-hot">{err}</p>}
       {!cable && (
         <p className="text-ui-xs text-faint">
-          Plug an expression pedal into EXP {n + 1} to see it and calibrate it.
+          Plug an expression pedal into EXP {n + 1} to see it and calibrate it
+          {sim ? ", or simulate one." : "."}
         </p>
       )}
+      {sim && <SimRow n={n} sim={sim} realCable={realCable} raw={raw} />}
       <TriggerBlock n={n} x={x} engaged={engaged} cable={cable} apply={apply} />
     </div>
   );
@@ -257,6 +267,8 @@ export function ExpressionPanel({
   engaged: boolean[];
   apply: Apply;
   calibrate: (n: number, edge: ExpEdge) => Promise<void>;
+  /** The simulated pedals; without it the cards have no "Simulate pedal" row. */
+  sim?: SimControls;
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
