@@ -103,7 +103,8 @@ patching, so the AppImage relies on the system's `libwebkit2gtk-4.1-0`.
 
 ### How it was checked, and what was not
 
-Checked, in Docker on an arm64 OrbStack VM (amd64 builds the same way, emulated):
+Checked, in Docker on an arm64 OrbStack VM (arm64 natively, amd64 emulated; build and
+smoke test pass on both):
 
 - `go vet`, golangci-lint and `go test -race` for linux with cgo (`make linux-test`),
   plus `GOOS=linux` and `GOOS=windows` vet and lint without cgo from macOS.
