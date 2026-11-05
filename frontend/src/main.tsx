@@ -4,7 +4,11 @@ import "./style.css";
 import App from "./App";
 import { loadBackend } from "./api";
 import { localStore, migrateStorage } from "./lib/storage";
+import { initTooltips } from "./ui/tooltip";
 import { initTheme } from "./useTheme";
+
+// Native `title` tooltips become styled ones app-wide (see ui/tooltip).
+initTooltips();
 
 const root = createRoot(document.getElementById("root") as HTMLElement);
 
