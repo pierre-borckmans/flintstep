@@ -147,7 +147,7 @@ func (r *bluezRadio) scan(ctx context.Context, timeout time.Duration, visit func
 	}
 	return runScan(ctx, timeout, func(found func(Device)) error {
 		return ad.Scan(func(_ *bluetooth.Adapter, res bluetooth.ScanResult) {
-			found(Device{Name: res.LocalName(), Address: res.Address.String(), RSSI: int(res.RSSI)})
+			found(Device{Name: res.LocalName(), Address: res.Address.String(), RSSI: int(res.RSSI), services: uuidStrings(res.ServiceUUIDs())})
 		})
 	}, ad.StopScan, visit)
 }

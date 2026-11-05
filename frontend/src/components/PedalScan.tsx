@@ -83,7 +83,8 @@ export function ScanResults({
         >
           {found.length === 0 && (
             <li className="px-3 py-2 text-ui-xs text-faint">
-              No pedal found. Is it on, and not connected to the Spark app on a phone?
+              No pedal found. Is it on, and not held by the Spark app on a phone or by a REACTOR
+              amp?
             </li>
           )}
           {found.map((d) => (
@@ -93,7 +94,21 @@ export function ScanResults({
             >
               <Bars rssi={d.rssi} />
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-ui-sm text-text">{d.name}</span>
+                <span className="truncate text-ui-sm text-text">
+                  {d.name || "Unnamed device"}
+                  {d.verified ? (
+                    d.model.name &&
+                    d.model.name !== d.name && <span className="text-muted"> · {d.model.name}</span>
+                  ) : (
+                    <span
+                      className="text-faint"
+                      title="Its name is not a known pedal's, but it offers a pedal's Bluetooth service. Connecting checks whether it is one."
+                    >
+                      {" "}
+                      (unverified)
+                    </span>
+                  )}
+                </span>
                 <span className="truncate font-mono text-ui-2xs text-faint">
                   {d.address}
                   {d.system && ` · connected to ${thisComputer()}`}

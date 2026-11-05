@@ -15,20 +15,24 @@ export function ExpPlacementSetting() {
           {
             value: "auto",
             label: "Auto",
-            title: "Behind or beside the Spark, whichever draws it bigger",
+            title: "Behind or beside the footswitch, whichever draws it bigger",
           },
-          { value: "behind", label: "Behind", title: "Behind the Spark, cables straight back" },
-          { value: "beside", label: "Beside", title: "To the right of the Spark" },
+          {
+            value: "behind",
+            label: "Behind",
+            title: "Behind the footswitch, cables straight back",
+          },
+          { value: "beside", label: "Beside", title: "To the right of the footswitch" },
         ]}
         value={mode}
         onChange={setExpPlacement}
       />
       <p className="text-ui-xs leading-snug text-faint">
         {mode === "auto"
-          ? "Behind the Spark or beside it, whichever leaves it bigger in the window."
+          ? "Behind the footswitch or beside it, whichever leaves it bigger in the window."
           : mode === "behind"
-            ? "Behind the Spark, cables straight back from the jacks."
-            : "To the right of the Spark, cables round its corner."}
+            ? "Behind the footswitch, cables straight back from the jacks."
+            : "To the right of the footswitch, cables round its corner."}
       </p>
     </div>
   );

@@ -1,6 +1,7 @@
 import { PRODUCT_NAME } from "../product";
 import type { Colour, Config, PedalRef, Status } from "../types";
 import { LAMP_AMP, LAMP_APP } from "../types";
+import { pedalLabel } from "./pedalname";
 import { type OS, OS_NOW } from "./platform";
 
 // WHAT THE PEDAL VIEWER SAYS ABOUT THE LINK. Pure: a status (and the remembered pedal) in,
@@ -33,7 +34,7 @@ export interface LinkView {
   /** Go's own words for what is happening now ("Not found, trying again in 4 s"), or ""
    *  when they would only repeat the title. */
   detail: string;
-  /** The remembered pedal's name, "" for "any Spark Control X". */
+  /** The remembered pedal's name, "" for "any pedal". */
   pedal: string;
   hint: string;
   actions: LinkAction[];
@@ -71,7 +72,9 @@ export function linkView(
 
   switch (status.state) {
     case "searching": {
-      const title = "Looking for your Spark Control X…";
+      // Go's status names the remembered pedal (and its model) while it looks for it.
+      const what = known ? pedalLabel(status.name || remembered.name, status.model) : "your pedal";
+      const title = `Looking for ${what}…`;
       return {
         visible: true,
         tone: "searching",
@@ -79,12 +82,12 @@ export function linkView(
         title,
         detail: news(status.detail),
         pedal,
-        hint: "Turn the pedal on, and close the Spark app if it's connected.",
+        hint: "Turn the pedal on. If the Spark app or a REACTOR amp holds it, close or switch that off.",
         actions: known ? [scan, forget] : [scan],
       };
     }
     case "connecting": {
-      const name = status.name || remembered.name || "your Spark Control X";
+      const name = pedalLabel(status.name || remembered.name, status.model);
       const title = `Connecting to ${name}…`;
       return {
         visible: true,

@@ -131,7 +131,7 @@ Not checked:
   AppImage and .deb on distributions other than the build image.
 
 What a Linux tester with a pedal should try, in order: start from a terminal and watch
-the log; Scan; connect; press switches with `aseqdump -p "Flintstep (Spark Control X)"`
+the log; Scan; connect; press switches with `aseqdump -p "Flintstep"`
 running; send a CC back to the LED port (`amidi`/a DAW) in feedback mode; turn the pedal
 off and on (reconnect); turn Bluetooth off and on; the tray menu; launch at login.
 
@@ -159,7 +159,7 @@ Pedals Windows already holds: `BluetoothLEDevice.GetDeviceSelectorFromConnection
 (Connected)` gives an AQS filter for `DeviceInformation.FindAllAsync`;[^win-selector]
 winrt-go has generated neither, so they need generating (its generator skips methods
 inherited from parent interfaces[^winrt-go]) or a few hand-written vtable calls. Filter the
-results by name with `sparkx.IsName`, and resolve each to its address with
+results with the Manager's `classify` (a known model's name, or the switch and FFC8 services), and resolve each to its address with
 `BluetoothLEDevice.FromIdAsync`.
 
 Pairing: Microsoft's GATT client guide never requires pairing; a GATT read, write or

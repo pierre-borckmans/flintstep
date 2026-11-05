@@ -1,5 +1,6 @@
-// Package ble keeps one Positive Grid Spark Control X connected over Bluetooth LE and
-// turns what it sends into switch edges, raw expression values and a Status for the UI.
+// Package ble keeps one pedal (a Positive Grid Spark Control X, a REACTOR Control, or
+// another pedal on the same AirTurn hardware) connected over Bluetooth LE and turns what
+// it sends into switch edges, raw expression values and a Status for the UI.
 //
 // The protocol itself is internal/sparkx. This package is the connection: finding the
 // pedal (find.go), keeping it connected (loop.go), and talking to it while it is
@@ -28,7 +29,7 @@ const (
 	StateConnected  State = "connected"
 )
 
-// Device is a Spark Control X found by Scan.
+// Device is a pedal found by Scan, or connected.
 type Device struct {
 	Name    string `json:"name"`
 	Address string `json:"address"`
@@ -36,10 +37,20 @@ type Device struct {
 	// System marks a pedal macOS already holds a connection to: it does not advertise,
 	// so only the system query finds it.
 	System bool `json:"system"`
+	// Model is the pedal's model: known from its name, or Compatible once its services
+	// were seen. Zero while it is unverified.
+	Model sparkx.ModelInfo `json:"model"`
+	// Verified is false for a device listed only because it advertises the switch or the
+	// BLE-MIDI service under a name no model has: it may not be a pedal at all, and
+	// connecting tells (classify).
+	Verified bool `json:"verified"`
+	// services are the service UUIDs the radio saw, lower case: advertised in a scan, or
+	// (a held device) discovered by whoever connected it.
+	services []string
 }
 
 // Target is the pedal the Manager should keep connected: mapping.PedalRef, without
-// the import. An empty Address means the first Spark Control X found.
+// the import. An empty Address means the first pedal of a known model found.
 type Target struct {
 	Address string
 	Name    string
@@ -52,6 +63,9 @@ type Status struct {
 	// Name and Address are the pedal connected, being connected to, or wanted.
 	Name    string `json:"name"`
 	Address string `json:"address"`
+	// Model is that pedal's model, zero when not known (no pedal remembered, or one not
+	// yet verified).
+	Model sparkx.ModelInfo `json:"model"`
 	sparkx.Status
 	// ExpRaw is the last raw value (0..65535) per expression input, -1 with no cable or
 	// no reading yet.
@@ -71,7 +85,7 @@ type Handlers struct {
 	Status func(Status)
 }
 
-// Manager keeps one Spark Control X connected. Safe for concurrent use.
+// Manager keeps one pedal connected. Safe for concurrent use.
 type Manager struct {
 	h  Handlers
 	r  radio
@@ -82,6 +96,7 @@ type Manager struct {
 	detail   string
 	name     string
 	addr     string
+	model    sparkx.ModelInfo
 	cur      *session // the connected pedal, nil when none
 	target   Target
 	lamps    [sparkx.Lamps]sparkx.Colour
@@ -91,6 +106,10 @@ type Manager struct {
 	lastDone chan struct{}
 
 	trace traceFile
+
+	// rejected are the addresses that turned out not to be compatible pedals when
+	// connected: a pedal looked for by name alone never picks them again.
+	rejected map[string]bool
 
 	// scanMu serialises radio scans: the reconnect loop's and Scan's. tinygo keeps one
 	// scan per adapter and two overlapping ones fail or race.
@@ -166,6 +185,8 @@ func newManager(h Handlers, r radio, tm timing) *Manager {
 		wake:   make(chan struct{}, 1),
 		kickCh: make(chan struct{}, 1),
 		events: make(chan event, eventBuffer),
+
+		rejected: map[string]bool{},
 	}
 	go m.report()
 	go m.dispatch()
@@ -174,12 +195,12 @@ func newManager(h Handlers, r radio, tm timing) *Manager {
 
 // Start keeps target connected: it connects, waits for a drop and reconnects, with a
 // backoff of 1 s to 15 s between failures, until Stop. An empty target takes the first
-// Spark Control X found. Starting a running Manager only changes the target.
+// pedal of a known model found. Starting a running Manager only changes the target.
 func (m *Manager) Start(target Target) {
 	m.mu.Lock()
 	m.target = target
 	if m.name == "" && m.addr == "" {
-		m.name, m.addr = target.Name, target.Address
+		m.name, m.addr, m.model = target.Name, target.Address, nameModel(target.Name)
 	}
 	if m.run != nil {
 		m.mu.Unlock()
@@ -201,7 +222,7 @@ func (m *Manager) SetTarget(target Target) {
 	m.mu.Lock()
 	m.target = target
 	if m.cur == nil {
-		m.name, m.addr = target.Name, target.Address
+		m.name, m.addr, m.model = target.Name, target.Address, nameModel(target.Name)
 	}
 	m.mu.Unlock()
 	log.Printf("ble: target %s", describe(target))
@@ -255,7 +276,7 @@ func (m *Manager) Status() Status {
 }
 
 func (m *Manager) statusLocked() Status {
-	st := Status{State: m.state, Detail: m.detail, Name: m.name, Address: m.addr}
+	st := Status{State: m.state, Detail: m.detail, Name: m.name, Address: m.addr, Model: m.model}
 	if s := m.cur; s != nil {
 		st.Status, st.ExpRaw = s.snapshot()
 	} else {

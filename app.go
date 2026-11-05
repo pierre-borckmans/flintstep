@@ -23,7 +23,8 @@ import (
 	"flintstep/internal/tray"
 )
 
-// Names other apps see.
+// Names other apps see. The MIDI ports are named after the app, not the pedal model, so
+// a DAW's mapping survives a switch from one model to the other.
 const (
 	midiClient = product.Name
 	midiSource = product.MIDIPortName
@@ -327,7 +328,7 @@ func (a *App) ResetConfig() (mapping.Config, error) {
 	return a.bridge.Config(), nil
 }
 
-// Scan lists the Spark Control X pedals in range or already held by macOS.
+// Scan lists the pedals in range or already held by the system, unverified ones too.
 func (a *App) Scan() ([]ble.Device, error) {
 	ds, err := a.pedal.Scan(4 * time.Second)
 	if ds == nil {
@@ -341,7 +342,7 @@ func (a *App) ChoosePedal(address, name string) error {
 	return a.setPedal(mapping.PedalRef{Address: address, Name: name})
 }
 
-// ForgetPedal goes back to "the first Spark Control X found".
+// ForgetPedal goes back to "the first pedal of a known model found".
 func (a *App) ForgetPedal() error {
 	return a.setPedal(mapping.PedalRef{})
 }
@@ -500,17 +501,16 @@ func batteryLine(p ble.Status) string {
 	return s
 }
 
+// statusLine is the menu's first line and the tooltip: the state, and the pedal by its
+// model ("Connected to REACTOR Control", "Looking for your pedal…").
 func statusLine(p ble.Status) string {
 	switch p.State {
 	case ble.StateConnected:
-		if p.Name != "" {
-			return "Connected to " + p.Name
-		}
-		return "Connected"
+		return "Connected to " + ble.Label(p.Name, p.Model)
 	case ble.StateConnecting:
-		return "Connecting…"
+		return "Connecting to " + ble.Label(p.Name, p.Model) + "…"
 	case ble.StateSearching:
-		return "Looking for the pedal…"
+		return "Looking for " + ble.Label(p.Name, p.Model) + "…"
 	case ble.StateOff:
 		if p.Detail != "" {
 			return p.Detail

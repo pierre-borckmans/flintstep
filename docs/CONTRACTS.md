@@ -15,8 +15,12 @@ Biome, vitest, golangci-lint v2.
 `frontend/src/product.ts`; both have a test that fails when they disagree with it.
 
 - App / product: **Flintstep** (bundle id `com.silversol.flintstep`)
-- Virtual MIDI source: **Flintstep (Spark Control X)**
-- Virtual MIDI destination (LED feedback): **Flintstep LEDs (Spark Control X)**
+- Virtual MIDI source: **Flintstep**
+- Virtual MIDI destination (LED feedback): **Flintstep LEDs**
+- The port names never carry the pedal's model: they stay the same whichever pedal is
+  connected, so DAW mappings survive a change of pedal. The model shows in the app.
+  (Until the REACTOR Control was added they were "Flintstep (Spark Control X)" and
+  "Flintstep LEDs (Spark Control X)"; never in a public release.)
 - Data dir: `~/Library/Application Support/Flintstep/` (library.json, prefs.json, app.log, ble-trace.log;
   config.json from before presets is kept as a backup and no longer written)
 - Before the rename the app was **SparkX MIDI** (`com.silversol.sparkxmidi`, data dir
@@ -29,8 +33,24 @@ The pedal protocol, adapted from the author's earlier BEAM Mini controller proje
 `ParseMsg`, `Msg`/`Msg*` kinds, the info requests (`PowerRequest` is `11 00 00 00`, answered by
 `MsgPower` with Value 1 on USB power, 0 on battery), `LampMessages`, `LampSet`, `Colour{R,G,B}`,
 `ExpScale`, `Status` (with `Powered bool` json "powered"), `NewStatus()`, `NoBattery`, `Switches`=6, `SwitchNames`,
-`Lamps`=8, `LampAmp`=6, `LampApp`=7, `ExpInputs`=2, GATT UUID constants, `IsName`.
+`Lamps`=8, `LampAmp`=6, `LampApp`=7, `ExpInputs`=2, GATT UUID constants.
 Never add a builder for command types 03/07/0a/0e/13.
+
+The model registry (models.go):
+
+```go
+type Model struct { ID, DisplayName string; NamePrefixes []string }
+type ModelInfo struct { ID string `json:"id"`; Name string `json:"name"` } // Model.Info(), for the UI
+var SparkControlX  // "spark-control-x", "Spark Control X", prefix "SparkX"
+var ReactorControl // "reactor-control", "REACTOR Control", prefixes guessed (PROTOCOL-NOTES.md); never bare "REACTOR"
+var Compatible     // "compatible", "compatible AirTurn-based pedal", no prefixes: only by services, after connecting
+var Models = []Model{SparkControlX, ReactorControl}
+func ModelForName(name string) (Model, bool) // prefix match, case-insensitive, trimmed
+func IsName(name string) bool                // a known model's name
+func ModelByID(id string) (Model, bool)
+const CommandServiceUUID = "0000ffc8-0000-1000-8000-00805f9b34fb"
+func HasServices(uuids []string) bool        // switch service AND FFC8; the switch service alone (AirTurn BT500S) is not a pedal
+```
 
 ## internal/mapping (pure)
 
@@ -290,13 +310,13 @@ type Handlers struct {
     Status func(Status)            // whenever it changes, at most every 50 ms
 }
 
-type Target struct { Address, Name string } // mapping.PedalRef at the ble boundary (ble does not import mapping); empty Address = first SparkX found
+type Target struct { Address, Name string } // mapping.PedalRef at the ble boundary (ble does not import mapping); empty Address = first known model found
 
 func NewManager(h Handlers, tracePath string) *Manager // tracePath "" = no trace
 func (m *Manager) Start(target Target)     // keeps the pedal connected: reconnects forever with backoff (1s..15s)
 func (m *Manager) SetTarget(target Target) // lets go of a pedal that is not the new target and connects to it
 func (m *Manager) Stop()                         // lamps dark, disconnect, stop reconnecting
-func (m *Manager) Scan(timeout time.Duration) ([]Device, error) // Spark Control X pedals in range or held by macOS
+func (m *Manager) Scan(timeout time.Duration) ([]Device, error) // pedals in range or held by the system, unverified ones too
 func (m *Manager) SetLamps(l [8]sparkx.Colour)   // all eight: six switches, Amp (6), App (7); only changed lamps are written
 func (m *Manager) Status() Status
 func (m *Manager) OnConnected(fn func(Device))   // called after each successful connect to the target of the moment
@@ -304,10 +324,24 @@ func (m *Manager) OnConnected(fn func(Device))   // called after each successful
                                                  // target was replaced by SetTarget while it was dialling
 ```
 
-Finding a pedal: remembered address by identifier -> a SparkX the Mac already holds
-(retrieveConnectedPeripheralsWithServices on the switch service 7BDB8DC0... or the BLE-MIDI
-service) -> scan for a name starting "SparkX". On Linux the address is a MAC address, "held"
-means a BlueZ Device1 with Connected=true offering either service, a dial only reaches a
+`Device` carries `Model sparkx.ModelInfo` (json "model") and `Verified bool` (json
+"verified"); `Status` carries `Model` too: the connected pedal's, or the remembered one's
+by its name, zero when none is remembered. `ble.Label(name, model)` is how the app names a
+pedal in a sentence ("Connected to REACTOR Control"; "your pedal" with nothing to go on).
+
+Recognising a pedal: a known model's name (`sparkx.ModelForName`), or, after connecting,
+the switch service AND FFC8 (setup fails with errIncompatible otherwise, and that address
+is not picked by name again this session). Without being asked the Manager only picks a
+known model's name, the remembered address, or for a remembered pedal that moved, its
+exact name with the switch service advertised. It never picks an unverified device. Scan
+also lists devices that advertise the switch or the BLE-MIDI service under unknown names,
+`Verified` false, for the user to choose.
+
+Finding a pedal: remembered address by identifier -> a known pedal the Mac already holds
+(retrieveConnectedPeripheralsWithServices on the switch service 7BDB8DC0..., the BLE-MIDI
+service and FFC8, each asked on its own so a held device comes with its services) -> scan
+for a known model's name. On Linux the address is a MAC address, "held"
+means a BlueZ Device1 with Connected=true offering the switch or BLE-MIDI service (its UUIDs kept for the services check), a dial only reaches a
 device BlueZ already knows (seen in a scan or paired), drops come from watching Connected
 on D-Bus, and a pedal connected before Flintstep dialled stays connected when it lets go.
 Addresses are per OS: a remembered pedal from macOS is found on Linux by name. All eight lamps are the caller's (the bridge

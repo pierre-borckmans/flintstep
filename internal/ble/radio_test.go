@@ -107,6 +107,7 @@ func TestFindServices(t *testing.T) {
 		{"no battery service", []string{"power", "cmd", "sw"}, 2, []bool{false, true}, false},
 		{"neither", []string{"cmd", "sw"}, 2, []bool{false, false}, false},
 		{"no switch service", []string{"cmd", "batt"}, 2, nil, true},
+		{"no command service (an AirTurn page turner)", []string{"sw", "batt"}, 2, nil, true},
 	} {
 		g := &fakeGATT{has: c.has}
 		r, o, err := findServices(req, opt, g.discover, id)
@@ -114,8 +115,8 @@ func TestFindServices(t *testing.T) {
 			t.Errorf("%s: %d discoveries, want %d", c.name, g.calls, c.calls)
 		}
 		if c.fails {
-			if err == nil {
-				t.Errorf("%s: no error", c.name)
+			if !errors.Is(err, errIncompatible) {
+				t.Errorf("%s: err = %v, want errIncompatible", c.name, err)
 			}
 			continue
 		}

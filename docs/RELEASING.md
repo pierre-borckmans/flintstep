@@ -237,5 +237,5 @@ The localStorage copy only helps where the storage survives, such as `wails dev`
 browser mock: the packaged app has a new bundle id and so a new, empty WebKit store. The
 theme is the only setting that matters there, and it falls back to "follow macOS".
 
-`SparkX` on its own in `internal/sparkx`, `internal/ble/find.go` and `tools/probe` is the
+`SparkX` on its own in `internal/sparkx/models.go`, the ble tests and `tools/probe` is the
 pedal's Bluetooth name, not the app's. Leave it.

@@ -90,7 +90,7 @@ func (r *cbRadio) held() ([]Device, error) {
 func (r *cbRadio) scan(ctx context.Context, timeout time.Duration, visit func(Device) bool) error {
 	return runScan(ctx, timeout, func(found func(Device)) error {
 		return r.adapter.Scan(func(_ *bluetooth.Adapter, res bluetooth.ScanResult) {
-			found(Device{Name: res.LocalName(), Address: res.Address.String(), RSSI: int(res.RSSI)})
+			found(Device{Name: res.LocalName(), Address: res.Address.String(), RSSI: int(res.RSSI), services: uuidStrings(res.ServiceUUIDs())})
 		})
 	}, r.adapter.StopScan, visit)
 }
@@ -240,7 +240,10 @@ func systemState() (cbgo.ManagerState, error) {
 	}
 }
 
-// systemPedals lists the Spark Control X pedals connected to this Mac now, by anyone.
+// systemPedals lists the devices connected to this Mac now, by anyone, that offer the
+// switch or the BLE-MIDI service. Each service is asked about on its own, FFC8 too, so
+// every device comes with the services it was found under: one with the switch and the
+// command service is a compatible pedal whatever its name (classify).
 func systemPedals() ([]Device, error) {
 	st, err := systemState()
 	if err != nil {
@@ -249,25 +252,35 @@ func systemPedals() ([]Device, error) {
 	if st != cbgo.ManagerStatePoweredOn {
 		return nil, errors.New("bluetooth is not powered on")
 	}
-	var uuids []cbgo.UUID
-	for _, s := range []string{sparkx.SwitchService, midiService} {
+	byID := map[string]*Device{}
+	var order []string
+	for _, s := range []string{sparkx.SwitchService, midiService, sparkx.CommandServiceUUID} {
 		u, err := cbgo.ParseUUID(s)
 		if err != nil {
 			return nil, err
 		}
-		uuids = append(uuids, u)
+		for _, p := range sysBT.cm.RetrieveConnectedPeripheralsWithServices([]cbgo.UUID{u}) {
+			// Through tinygo's UUID, so the address is spelled exactly as a scan spells it.
+			id, err := bluetooth.ParseUUID(p.Identifier().String())
+			if err != nil {
+				continue
+			}
+			k := id.String()
+			d, ok := byID[k]
+			if !ok {
+				if s == sparkx.CommandServiceUUID {
+					continue // FFC8 alone is not a reason to list it
+				}
+				d = &Device{Name: p.Name(), Address: k, System: true}
+				byID[k] = d
+				order = append(order, k)
+			}
+			d.services = append(d.services, strings.ToLower(s))
+		}
 	}
-	var out []Device
-	for _, p := range sysBT.cm.RetrieveConnectedPeripheralsWithServices(uuids) {
-		if !sparkx.IsName(p.Name()) {
-			continue
-		}
-		// Through tinygo's UUID, so the address is spelled exactly as a scan spells it.
-		id, err := bluetooth.ParseUUID(p.Identifier().String())
-		if err != nil {
-			continue
-		}
-		out = append(out, Device{Name: p.Name(), Address: id.String(), System: true})
+	out := make([]Device, 0, len(order))
+	for _, k := range order {
+		out = append(out, *byID[k])
 	}
 	return out, nil
 }

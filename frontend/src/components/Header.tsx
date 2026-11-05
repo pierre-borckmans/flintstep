@@ -1,6 +1,7 @@
 import { Plug, Zap } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { batteryInfo } from "../lib/battery";
+import { pedalLabel, pedalTitle } from "../lib/pedalname";
 import { levelColour } from "../lib/power";
 import { PRODUCT_NAME } from "../product";
 import type { State } from "../types";
@@ -16,7 +17,7 @@ function Connection({ state }: { state: State | null }) {
   const looking = s === "searching" || s === "connecting";
   const words =
     s === "connected"
-      ? p?.name || "Spark Control X"
+      ? pedalTitle(p?.name ?? "", p?.model)
       : s === "connecting"
         ? "Connecting"
         : s === "searching"
@@ -29,7 +30,13 @@ function Connection({ state }: { state: State | null }) {
   const head = p?.detail || words;
   const more =
     s === "connected"
-      ? [p?.address, p?.firmware && `Firmware ${p.firmware}`].filter(Boolean).join(" · ")
+      ? [
+          p?.name && p.name !== pedalLabel(p.name, p.model) ? p.name : "",
+          p?.address,
+          p?.firmware && `Firmware ${p.firmware}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : s === "idle"
         ? "Choose a pedal in Settings, under Pedal"
         : s === "off"

@@ -79,12 +79,21 @@ export interface Config {
 
 export type BleState = "off" | "idle" | "searching" | "connecting" | "connected";
 
+/** sparkx.ModelInfo: "spark-control-x", "reactor-control" or "compatible" (an AirTurn-based
+ *  pedal recognised by its services). id "" = not known. */
+export interface PedalModel {
+  id: string;
+  name: string;
+}
+
 /** ble.Status, with sparkx.Status embedded (flattened in JSON). */
 export interface Status {
   state: BleState;
   detail: string;
   name: string;
   address: string;
+  /** The model of the pedal connected, being connected to, or remembered. */
+  model: PedalModel;
   firmware: string;
   profile: number; // -1 until read
   profileName: string;
@@ -136,6 +145,10 @@ export interface Device {
   address: string;
   rssi: number;
   system: boolean;
+  model: PedalModel;
+  /** false: listed because it advertises the switch or BLE-MIDI service under an unknown
+   *  name. Connecting tells whether it is a pedal. */
+  verified: boolean;
 }
 
 /** mapping.Source: what produced a message. "release" is a release forced by a

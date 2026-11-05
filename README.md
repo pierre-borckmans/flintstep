@@ -5,17 +5,38 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A macOS menu-bar app that connects to a Positive Grid Spark Control X over Bluetooth and
-publishes it as a normal MIDI device named **Flintstep (Spark Control X)**. Logic, Ableton, MainStage,
+publishes it as a normal MIDI device named **Flintstep**. Logic, Ableton, MainStage,
 a browser or anything else that takes MIDI can then use the pedal as a foot controller.
 You don't need the Spark app, a Spark amp, a firmware change or Audio MIDI Setup.
+
+The REACTOR Control should work too: it's the same hardware. It is untested so far, so if
+you have one, please [report how it went](https://github.com/pierre-borckmans/flintstep/issues/new?template=pedal_compatibility.yml).
 Web page: <https://flintstep.app>. There is also an [experimental Linux
 build](#linux-experimental).
 
-Positive Grid ships no MIDI mode. The pedal advertises the Bluetooth MIDI service but
+Positive Grid ships no MIDI mode. The Spark Control X advertises the Bluetooth MIDI service but
 never sends anything on it; its switches, expression jacks, battery and LEDs all run over
 two vendor services. This app speaks those and turns them into MIDI.
 
 Not affiliated with Positive Grid.
+
+## Which pedals
+
+- **Spark Control X**: tested, firmware 4.1.23.
+- **REACTOR Control**: Positive Grid's footswitch for its REACTOR amps. Same chassis,
+  switches and LEDs as the Spark Control X (one expression jack instead of two), and almost
+  certainly the same AirTurn electronics, so the app treats it the same way. Nobody has
+  tried one yet. It pairs with the amp, so turn the amp off before connecting. Its USB-C
+  port only charges; "wired" means a TRS cable to the amp, which Flintstep doesn't use.
+- **Other pedals on the same hardware**: a pedal with an unknown name is accepted once
+  connected if it has both the AirTurn switch service and the FFC8 command service the
+  protocol runs on. Scan lists such devices as "(unverified)" until you pick one. The app
+  never connects to an unverified device on its own.
+
+Whichever pedal is connected, the MIDI ports keep the same names, so your DAW's setup
+survives a change of pedal. The app shows the model in its header and menu.
+[docs/PROTOCOL-NOTES.md](docs/PROTOCOL-NOTES.md) has what is known about the REACTOR
+Control and what is not.
 
 ## What it does
 
@@ -25,8 +46,8 @@ Not affiliated with Positive Grid.
 - Two expression inputs, CC 11 and CC 7 by default, calibrated in the app (heel/toe). The
   calibration never gets written to the pedal.
 - LEDs in two modes. In **local** mode a switch lights while held and while its toggle is
-  on. In **MIDI feedback** mode the app listens on a second virtual port, **Flintstep LEDs
-  (Spark Control X)**: send the same CC back from your DAW and the LED shows the real state (plugin
+  on. In **MIDI feedback** mode the app listens on a second virtual port, **Flintstep
+  LEDs**: send the same CC back from your DAW and the LED shows the real state (plugin
   bypassed, track armed).
 - Presets: keep several named mappings (one per DAW, one per gig) and switch from the
   editor or the menu bar. Export one as a `.flintstep.json` file and import it on another Mac;
@@ -61,9 +82,8 @@ macOS asks for Bluetooth access on first run. The app lives in the menu bar, not
 Flintstep used to be called SparkX MIDI. The first launch under the new name moves
 `~/Library/Application Support/SparkX MIDI` to `.../Flintstep` and carries "launch at
 login" over. macOS sees a new app, so it asks for Bluetooth access again, and your DAW
-sees new MIDI ports called **Flintstep (Spark Control X)** and **Flintstep LEDs (Spark
-Control X)**: pick them again where you used the old ones. You can delete
-`SparkX MIDI.app` afterwards.
+sees new MIDI ports called **Flintstep** and **Flintstep LEDs**: pick them again where
+you used the old ones. You can delete `SparkX MIDI.app` afterwards.
 
 ## Linux (experimental)
 
@@ -93,7 +113,7 @@ What it needs from the system:
 - **The ALSA sequencer** (`/dev/snd/seq`, module `snd-seq`; loaded on any desktop with
   sound). Your user must be able to open it, which on most distributions means being
   logged in at the seat or in the `audio` group. The pedal shows up as ALSA ports
-  **Flintstep (Spark Control X)** and **Flintstep LEDs (Spark Control X)**; PipeWire
+  **Flintstep** and **Flintstep LEDs**; PipeWire
   and JACK applications see them through their ALSA MIDI bridges (`aconnect -l` lists
   them).
 - **A tray**, for the menu-bar behaviour: KDE, Xfce, Cinnamon and Ubuntu's GNOME show
@@ -156,8 +176,8 @@ make linux-smoke  # start the Linux binary under Xvfb, in Docker
 Without the app: `go run ./cmd/flintstep-cli -scan` lists pedals, and
 `go run ./cmd/flintstep-cli` bridges the first one it finds and prints every message.
 
-Turn the pedal on and keep the Spark app closed. A pedal holds one connection to an app at
-a time.
+Turn the pedal on and keep the Spark app closed (or the REACTOR amp off). A pedal holds
+one connection at a time.
 
 ## Credits
 
@@ -174,5 +194,5 @@ inside the app and the DMG; in the app it is under Settings > App > Acknowledgem
 current. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security
 reports: [SECURITY.md](SECURITY.md).
 
-Spark and Spark Control X are trademarks of Positive Grid; this project is not
-affiliated with or endorsed by Positive Grid.
+Spark, Spark Control X, REACTOR and REACTOR Control are trademarks of Positive Grid.
+Flintstep is not affiliated with or endorsed by Positive Grid.
