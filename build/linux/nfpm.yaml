@@ -1,0 +1,36 @@
+# The .deb, built by scripts/linux/package.sh with nfpm, which fills in the ${...}.
+name: flintstep
+arch: ${DEB_ARCH}
+platform: linux
+version: ${DEB_VERSION}
+version_schema: none
+section: sound
+priority: optional
+maintainer: Pierre Borckmans <pborckmans@gmail.com>
+description: |
+  Turns a Positive Grid Spark Control X into a MIDI foot controller.
+  Connects to the pedal over Bluetooth LE (BlueZ) and publishes it as ALSA
+  sequencer ports. Experimental on Linux. Not affiliated with Positive Grid.
+vendor: silversol
+homepage: https://flintstep.app
+license: MIT
+depends:
+  - libgtk-3-0
+  - libwebkit2gtk-4.1-0
+  - libasound2
+recommends:
+  - bluez
+contents:
+  - src: ${STAGE}/flintstep
+    dst: /usr/bin/flintstep
+    file_info:
+      mode: 0755
+  - src: ${STAGE}/flintstep.desktop
+    dst: /usr/share/applications/flintstep.desktop
+  - src: ${STAGE}/icons/256/flintstep.png
+    dst: /usr/share/icons/hicolor/256x256/apps/flintstep.png
+  - src: ${STAGE}/icons/512/flintstep.png
+    dst: /usr/share/icons/hicolor/512x512/apps/flintstep.png
+  - src: ${STAGE}/doc/
+    dst: /usr/share/doc/flintstep/
+    type: tree

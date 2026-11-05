@@ -1,3 +1,5 @@
+//go:build !linux
+
 // Package loginitem starts the app at login with a per-user LaunchAgent, which needs
 // no entitlement and no helper app: a plist in ~/Library/LaunchAgents that launchd
 // reads at the next login. It runs the current executable with --hidden.

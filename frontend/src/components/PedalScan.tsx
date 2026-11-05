@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Backend } from "../api";
 import { errorText } from "../api";
+import { thisComputer } from "../lib/platform";
 import type { Device } from "../types";
 import { Button } from "../ui/Button";
 import { Collapse } from "../ui/Collapse";
@@ -95,7 +96,7 @@ export function ScanResults({
                 <span className="truncate text-ui-sm text-text">{d.name}</span>
                 <span className="truncate font-mono text-ui-2xs text-faint">
                   {d.address}
-                  {d.system && " · paired with this Mac"}
+                  {d.system && ` · connected to ${thisComputer()}`}
                 </span>
               </div>
               {d.address === remembered ? (
