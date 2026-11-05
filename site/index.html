@@ -1,21 +1,23 @@
 <!doctype html>
-<html lang="en" data-repo="https://github.com/pierre-borckmans/spark-control-x-midi">
+<html lang="en" data-repo="https://github.com/pierre-borckmans/flintstep">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Flint: Spark Control X to MIDI for macOS</title>
-<meta name="description" content="Flint is a free, open-source macOS menu-bar app that turns a Spark Control X Bluetooth footswitch into a MIDI controller for Logic, Ableton, MainStage or any MIDI app.">
+<title>Flintstep: Spark Control X to MIDI for macOS</title>
+<meta name="description" content="Flintstep is a free, open-source macOS menu-bar app that turns a Spark Control X Bluetooth footswitch into a MIDI controller for Logic, Ableton, MainStage or any MIDI app.">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#141514" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#e6e3da" media="(prefers-color-scheme: light)">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Flint: Spark Control X to MIDI for macOS">
+<meta property="og:title" content="Flintstep: Spark Control X to MIDI for macOS">
 <meta property="og:description" content="A free macOS menu-bar app that turns a Spark Control X footswitch into a MIDI controller.">
-<meta property="og:image" content="og.png">
+<meta property="og:url" content="https://flintstep.app/">
+<meta property="og:image" content="https://flintstep.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="A Spark Control X pedal drawing next to a list of MIDI messages it sends.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://flintstep.app/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <script>
@@ -30,9 +32,9 @@
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="top">
-  <a class="brand" href="./" aria-label="Flint, home">
+  <a class="brand" href="./" aria-label="Flintstep, home">
     <img src="favicon.svg" alt="" width="22" height="22">
-    <span>Flint</span>
+    <span>Flintstep</span>
   </a>
   <nav aria-label="Site">
     <a href="#how">How it works</a>
@@ -44,7 +46,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <h1 id="hero-title">Use your Spark Control X as a MIDI foot controller.</h1>
     <div class="hero-side">
-      <p class="lede">Flint is a free menu-bar app for macOS. It connects to the pedal over Bluetooth and shows up in Logic, Ableton, MainStage or any other MIDI app as a device called Spark Control X.</p>
+      <p class="lede">Flintstep is a free menu-bar app for macOS. It connects to the pedal over Bluetooth and shows up in Logic, Ableton, MainStage or any other MIDI app as a device called Flintstep (Spark Control X).</p>
       <div class="actions">
         <a class="btn" data-repo-path="/releases/latest"><span class="btn-led" aria-hidden="true"></span>Download for macOS</a>
         <a class="quiet" data-repo-path="">Source on GitHub</a>
@@ -182,7 +184,7 @@
         <div class="log-head">
           <span class="log-lamp"></span>
           <span>MIDI out</span>
-          <span class="log-port">Spark Control X</span>
+          <span class="log-port">Flintstep (Spark Control X)</span>
         </div>
         <ol class="log-rows">
           <li class="fresh"><span class="msg">CC 81 = 127 · ch 1</span><span class="sw">II</span></li>
@@ -216,14 +218,14 @@
       <li>
         <h3>Two expression inputs</h3>
         <div>
-          <p>Plug TRS expression pedals into EXP 1 and EXP 2. Set heel and toe in Flint and invert the direction if you need to. Each input can also act as a switch: it fires when the pedal leaves the heel, or when you click the toe down.</p>
+          <p>Plug TRS expression pedals into EXP 1 and EXP 2. Set heel and toe in Flintstep and invert the direction if you need to. Each input can also act as a switch: it fires when the pedal leaves the heel, or when you click the toe down.</p>
           <p class="eg"><code>EXP 1</code><span aria-hidden="true">→</span><code>CC 11 = 0 to 127 · ch 1</code></p>
         </div>
       </li>
       <li>
         <h3>LEDs your DAW can drive</h3>
         <div>
-          <p>A switch lights while you hold it and while its toggle is on. Or turn on MIDI feedback: send the same CC back to the <code>Spark Control X LEDs</code> port and the LED shows the real state, like a plugin bypassed or a track armed. The AMP and APP lamps can show MIDI traffic, the connection or USB power.</p>
+          <p>A switch lights while you hold it and while its toggle is on. Or turn on MIDI feedback: send the same CC back to the <code>Flintstep LEDs (Spark Control X)</code> port and the LED shows the real state, like a plugin bypassed or a track armed. The AMP and APP lamps can show MIDI traffic, the connection or USB power.</p>
         </div>
       </li>
       <li>
@@ -232,18 +234,18 @@
           <p>Keep a mapping per DAW or per gig and switch between them from the menu bar. Each preset has its own undo history. Export one as a file to use it on another Mac.</p>
           <picture class="crop t-dark">
             <source srcset="img/presets-dark.webp" type="image/webp">
-            <img src="img/presets-dark.png" width="620" height="280" loading="lazy" decoding="async" alt="Flint's preset menu listing My mapping, Ableton live, Logic tracking and MainStage gig, with buttons to rename, duplicate, export and delete.">
+            <img src="img/presets-dark.png" width="680" height="280" loading="lazy" decoding="async" alt="Flintstep's preset menu listing My mapping, Ableton live, Logic tracking and MainStage gig, with buttons to rename, duplicate, export and delete.">
           </picture>
           <picture class="crop t-light">
             <source srcset="img/presets-light.webp" type="image/webp">
-            <img src="img/presets-light.png" width="620" height="280" loading="lazy" decoding="async" alt="Flint's preset menu listing My mapping, Ableton live, Logic tracking and MainStage gig, with buttons to rename, duplicate, export and delete.">
+            <img src="img/presets-light.png" width="680" height="280" loading="lazy" decoding="async" alt="Flintstep's preset menu listing My mapping, Ableton live, Logic tracking and MainStage gig, with buttons to rename, duplicate, export and delete.">
           </picture>
         </div>
       </li>
       <li>
         <h3>Nothing else to install</h3>
         <div>
-          <p>No Spark app, no amp, no firmware update. Flint never writes to the profiles stored on the pedal. It remembers your pedal, reconnects on its own, and shows the battery level and charging in the menu bar.</p>
+          <p>No Spark app, no amp, no firmware update. Flintstep never writes to the profiles stored on the pedal. It remembers your pedal, reconnects on its own, and shows the battery level and charging in the menu bar.</p>
         </div>
       </li>
     </ul>
@@ -254,11 +256,11 @@
       <span class="traffic" aria-hidden="true"><i></i><i></i><i></i></span>
       <picture class="t-dark">
         <source srcset="img/app-dark.webp" type="image/webp">
-        <img src="img/app-dark.png" width="1180" height="820" loading="lazy" decoding="async" alt="Flint's editor. A drawing of the pedal shows each switch's message, CC 80 to CC 85, two expression pedals send CC 11 and CC 7, and a panel on the right sets switch I to CC 80, momentary, with an amber LED.">
+        <img src="img/app-dark.png" width="1180" height="820" loading="lazy" decoding="async" alt="Flintstep's editor. A drawing of the pedal shows each switch's message, CC 80 to CC 85, two expression pedals send CC 11 and CC 7, and a panel on the right sets switch I to CC 80, momentary, with an amber LED.">
       </picture>
       <picture class="t-light">
         <source srcset="img/app-light.webp" type="image/webp">
-        <img src="img/app-light.png" width="1180" height="820" loading="lazy" decoding="async" alt="Flint's editor. A drawing of the pedal shows each switch's message, CC 80 to CC 85, two expression pedals send CC 11 and CC 7, and a panel on the right sets switch I to CC 80, momentary, with an amber LED.">
+        <img src="img/app-light.png" width="1180" height="820" loading="lazy" decoding="async" alt="Flintstep's editor. A drawing of the pedal shows each switch's message, CC 80 to CC 85, two expression pedals send CC 11 and CC 7, and a panel on the right sets switch I to CC 80, momentary, with an amber LED.">
       </picture>
     </div>
     <figcaption>The editor. Click a switch on the drawing to choose what it sends.</figcaption>
@@ -272,12 +274,12 @@
         <p>Keep the Spark app closed. The pedal talks to one app at a time.</p>
       </li>
       <li>
-        <h3>Open Flint</h3>
-        <p>It finds the pedal and connects. macOS asks for Bluetooth access the first time. After that Flint stays in the menu bar.</p>
+        <h3>Open Flintstep</h3>
+        <p>It finds the pedal and connects. macOS asks for Bluetooth access the first time. After that Flintstep stays in the menu bar.</p>
       </li>
       <li>
         <h3>Map it in your DAW</h3>
-        <p>Pick Spark Control X as a MIDI input and use MIDI learn, or change the messages in Flint to match what your DAW expects.</p>
+        <p>Pick Flintstep (Spark Control X) as a MIDI input and use MIDI learn, or change the messages in Flintstep to match what your DAW expects.</p>
       </li>
     </ol>
   </section>
@@ -290,18 +292,18 @@
     <div class="actions">
       <a class="btn" data-repo-path="/releases/latest"><span class="btn-led" aria-hidden="true"></span>Download for macOS</a>
     </div>
-    <p class="note">Flint isn't notarized yet, so macOS blocks the first launch: click Open Anyway in System Settings › Privacy &amp; Security, or on macOS 14 and earlier right-click the app and choose Open.</p>
+    <p class="note">Flintstep isn't notarized yet, so macOS blocks the first launch: click Open Anyway in System Settings › Privacy &amp; Security, or on macOS 14 and earlier right-click the app and choose Open.</p>
   </section>
 
   <section class="block" aria-labelledby="src-title">
     <h2 id="src-title">Open source</h2>
-    <p>Flint is free and MIT licensed. The code, issues and releases are <a data-repo-path="">on GitHub</a>. The protocol work started from Paul Hamshere's <a href="https://github.com/paulhamsh/Spark-Control-X">Spark-Control-X notes</a>.</p>
+    <p>Flintstep is free and MIT licensed. The code, issues and releases are <a data-repo-path="">on GitHub</a>. The protocol work started from Paul Hamshere's <a href="https://github.com/paulhamsh/Spark-Control-X">Spark-Control-X notes</a>.</p>
   </section>
   </div>
 </main>
 
 <footer class="foot">
-  <p>Spark and Spark Control X are trademarks of Positive Grid. Flint is not affiliated with or endorsed by Positive Grid.</p>
+  <p>Spark and Spark Control X are trademarks of Positive Grid. Flintstep is not affiliated with or endorsed by Positive Grid.</p>
   <p><a data-repo-path="/blob/main/LICENSE">MIT License</a> · <a data-repo-path="">GitHub</a></p>
 </footer>
 

@@ -1,4 +1,4 @@
-/* Flint. The app's light law: every surface is a neutral material, colour only where
+/* Flintstep. The app's light law: every surface is a neutral material, colour only where
    something gives off light (an LED, a lamp, the brass of a lit key, ice-blue data).
    Dark by default; light follows the system, or ?theme=light. */
 
@@ -195,7 +195,8 @@ h1 { font-size: clamp(2.05rem, 6.4vw, 3.3rem); line-height: 1.06; letter-spacing
   padding: 0.7rem 0.9rem; border-bottom: 1px solid var(--edge);
   color: var(--faint); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
 }
-.log-port { margin-left: auto; letter-spacing: 0.02em; text-transform: none; color: var(--muted); font-size: 0.78rem; }
+.log-head > span { white-space: nowrap; }
+.log-port { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 0.78rem; }
 .log-lamp { width: 6px; height: 6px; border-radius: 50%; background: var(--lamp-live); box-shadow: 0 0 6px var(--lamp-live), 0 0 14px rgb(127 227 160 / 0.4); }
 .log-rows { list-style: none; margin: 0; padding: 0.35rem 0; height: calc(6 * 2rem + 0.7rem); overflow: hidden; }
 .log-rows li {
