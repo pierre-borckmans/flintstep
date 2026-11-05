@@ -5,7 +5,7 @@
 // destination it can send LED feedback to ("Flintstep LEDs (Spark Control X)"). The
 // caller picks the names; see internal/product.
 //
-// A direct binding, like Beam's: a handful of CoreMIDI calls that ship with macOS.
+// A direct binding, like the BEAM Mini app's: a handful of CoreMIDI calls that ship with macOS.
 package coremidi
 
 /*

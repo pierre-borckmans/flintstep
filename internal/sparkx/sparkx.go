@@ -8,7 +8,7 @@ import (
 //
 // The Spark Control X advertises the BLE-MIDI service but never sends a MIDI message.
 // Its switches, expression inputs, battery and lamps all go through two vendor services
-// instead. The design doc has the protocol as verified on
+// instead. The protocol was first verified on
 // firmware 4.1.23; Paul Hamshere's notes (github.com/paulhamsh/Spark-Control-X) are where
 // it was first written down.
 //

@@ -11,7 +11,7 @@ import (
 
 // ONE CONNECTED SPARK CONTROL X.
 //
-// Lifted from Beam's sparkx_ble.go, which was verified on hardware. The switches
+// Lifted from the BEAM Mini app's sparkx_ble.go, which was verified on hardware. The switches
 // notify a bitmask, FFCA notifies everything else (sparkx.ParseMsg), and FFC9 takes
 // our requests and lamp messages.
 //

@@ -3,25 +3,29 @@
 The app is built by several people at once. This file is the agreement between the
 packages: names, signatures and behaviour. Change it only together with every user.
 
-Spec: the "Spark Control X MIDI bridge" design doc (summarised in README.md).
+What the app does is summarised in README.md.
 Go module: `flintstep` (go.mod at repo root). Wails v2 app in package `main` at the root,
-frontend in `frontend/`. Same stack as the Beam app (`../beam/app`): Wails v2.17,
-React 19 + TS + Tailwind v4, bun 1.3.14, Biome, vitest, golangci-lint v2.
+frontend in `frontend/`. Stack: Wails v2.17, React 19 + TS + Tailwind v4, bun 1.3.14,
+Biome, vitest, golangci-lint v2.
 
 ## Names
 
 `product.env` is the source for the build and release tooling (see docs/RELEASING.md,
-"Renaming"); the Go and TS constants below must match it.
+"Renaming"). Go reads the names from `internal/product`, the frontend from
+`frontend/src/product.ts`; both have a test that fails when they disagree with it.
 
-- App / product: **SparkX MIDI** (bundle id `com.silversol.sparkxmidi`)
-- Virtual MIDI source: **Spark Control X**
-- Virtual MIDI destination (LED feedback): **Spark Control X LEDs**
-- Data dir: `~/Library/Application Support/SparkX MIDI/` (library.json, prefs.json, app.log, ble-trace.log;
+- App / product: **Flintstep** (bundle id `com.silversol.flintstep`)
+- Virtual MIDI source: **Flintstep (Spark Control X)**
+- Virtual MIDI destination (LED feedback): **Flintstep LEDs (Spark Control X)**
+- Data dir: `~/Library/Application Support/Flintstep/` (library.json, prefs.json, app.log, ble-trace.log;
   config.json from before presets is kept as a backup and no longer written)
+- Before the rename the app was **SparkX MIDI** (`com.silversol.sparkxmidi`, data dir
+  `SparkX MIDI`, ports "Spark Control X" and "Spark Control X LEDs"). The constants for the
+  old names live in `internal/product` and are read only by the migrations below.
 
 ## internal/sparkx (done, pure)
 
-The pedal protocol, lifted from Beam. `Edge{Switch int; Down bool}`, `Edges(prev, cur byte)`,
+The pedal protocol, adapted from the author's earlier BEAM Mini controller project. `Edge{Switch int; Down bool}`, `Edges(prev, cur byte)`,
 `ParseMsg`, `Msg`/`Msg*` kinds, the info requests (`PowerRequest` is `11 00 00 00`, answered by
 `MsgPower` with Value 1 on USB power, 0 on battery), `LampMessages`, `LampSet`, `Colour{R,G,B}`,
 `ExpScale`, `Status` (with `Powered bool` json "powered"), `NewStatus()`, `NoBattery`, `Switches`=6, `SwitchNames`,
@@ -173,7 +177,10 @@ Behaviour:
 ## internal/store
 
 ```go
-func Dir() (string, error)                 // the data dir, created
+func Dir() (string, error)                 // the data dir, created; the first call moves the old one (below)
+func ExistingDir() (string, error)         // for readers (the CLI): the data dir if it exists, else the old-named one if that does; creates nothing
+func MigrateLegacy(base string) Migration  // base/"SparkX MIDI" -> base/"Flintstep" when the new one doesn't exist
+func LastMigration() Migration             // what Dir's move did this run; String() is the log line, "" for nothing
 func Load(path string) (mapping.Config, error) // missing file -> Default(), no error; corrupt -> Default() + error
 func Save(path string, c mapping.Config) error // atomic (temp + rename)
 func WriteAtomic(path string, b []byte) error  // the same, for any file
@@ -187,6 +194,10 @@ func DefaultPrefs() Prefs                // Theme "system"
 func LoadPrefs(path string) Prefs        // missing, damaged or unknown -> defaults; never fails
 func SavePrefs(path string, p Prefs) error // atomic
 ```
+
+The move copies the old folder into a temp folder next to it, renames that into place and
+then deletes the old one. On any error before the rename, nothing new exists, the old
+folder is untouched, and Dir returns the old folder for that run; the next launch retries.
 
 ## internal/presets (pure, files only)
 
@@ -232,9 +243,10 @@ the write worked.
   Create/Rename; Duplicate and Import add " (2)", " (3)"… (cutting the base to stay ≤ 40).
 - Create, Duplicate and Import never activate. Delete refuses the last preset; deleting the
   active one activates the next preset, or the previous one if it was last.
-- Export format: `{ "format": "sparkx-midi-preset", "version": 1, "name": ..., "config": {...} }`,
-  the config without its "pedal" key, suggested file name `<name>.sparkx.json` (`/ : \` → `-`).
-  Import takes that format (a newer version is refused) or a bare Config such as an old
+- Export format: `{ "format": "flintstep-preset", "version": 1, "name": ..., "config": {...} }`,
+  the config without its "pedal" key, suggested file name `<name>.flintstep.json` (`/ : \` → `-`).
+  Import takes that format or the pre-rename `"sparkx-midi-preset"` / `.sparkx.json` (a newer
+  version of either is refused), or a bare Config such as an old
   config.json (only Config's keys allowed, named after the file); the config is normalized,
   must Validate, and loses its pedal.
 
@@ -305,14 +317,19 @@ func Start(templateIconPNG []byte, onClick func(id string)) // call once NSApp e
 func SetMenu(items []Item)
 func SetTooltip(s string)
 ```
-The bridge decides the items (status line, battery, "Open SparkX MIDI…", "Launch at login", "Quit").
+The bridge decides the items (status line, battery, "Open Flintstep…", "Launch at Login", "Quit Flintstep").
 
 ## internal/loginitem
 
 ```go
 func Enabled() bool
-func Set(on bool) error // ~/Library/LaunchAgents/com.silversol.sparkxmidi.plist, runs the current executable with --hidden
+func Set(on bool) error // ~/Library/LaunchAgents/com.silversol.flintstep.plist, runs the current executable with --hidden
+func MigrateLegacy() (found bool, err error) // an old com.silversol.sparkxmidi.plist -> Set(true), then delete the old one
 ```
+
+The app calls MigrateLegacy on every startup; with no old agent it does nothing. The old
+agent only exists while "launch at login" was on, so finding one means turning it on under
+the new label. If writing the new one fails the old one stays.
 
 ## internal/bridge (pure glue, tested with fakes)
 
@@ -416,10 +433,14 @@ jumping across it selects the other preset again (and saves the entry's mapping 
 Go's differs). Create, rename, duplicate, delete, import and export are not undo steps;
 deleting a preset drops its entries. A switch made from the menu bar becomes an entry too.
 
+localStorage keys are all `flintstep.*`. Values saved under the pre-rename `sparkx.*` keys
+are copied to the new key when it is unset, first by index.html before the first paint, then
+by `lib/storage.ts` from main.tsx. The old keys are left alone.
+
 Menu bar: with two or more presets, they are listed flat under a separator (the tray has no
 submenus), the active one checked; clicking one selects it.
 
-Theme: the frontend keeps the choice in localStorage (`sparkx.theme`), sets
+Theme: the frontend keeps the choice in localStorage (`flintstep.theme`), sets
 `<html data-theme>` ("light" / "dark", absent for system, where CSS follows
 `prefers-color-scheme`), and calls SetTheme on load and on every change. Go keeps its own
 copy in prefs.json so main.go opens the window in the right appearance and background

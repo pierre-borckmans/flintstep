@@ -36,7 +36,7 @@ body:
     attributes:
       label: Logs
       description: >
-        Settings > Logs and Bluetooth trace > Reveal in Finder, or ~/Library/Application Support/SparkX MIDI/.
+        Settings > Logs and Bluetooth trace > Reveal in Finder, or ~/Library/Application Support/Flintstep/.
         Attach app.log, and ble-trace.log for connection problems. Look through them
         first for anything you'd rather not share.
   - type: textarea

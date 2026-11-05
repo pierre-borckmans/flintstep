@@ -146,16 +146,16 @@ v0.2.0`), fix, and tag again.
 ```sh
 cd ~/Downloads
 shasum -a 256 -c SHA256SUMS.txt
-#   SparkX-MIDI-v0.2.0.dmg: OK
+#   Flintstep-v0.2.0.dmg: OK
 
-xcrun stapler validate SparkX-MIDI-v0.2.0.dmg
-spctl -a -vvv -t open --context context:primary-signature SparkX-MIDI-v0.2.0.dmg
+xcrun stapler validate Flintstep-v0.2.0.dmg
+spctl -a -vvv -t open --context context:primary-signature Flintstep-v0.2.0.dmg
 #   accepted  source=Notarized Developer ID
 
 # after copying the app to /Applications
-spctl -a -vvv -t exec "/Applications/SparkX MIDI.app"
+spctl -a -vvv -t exec "/Applications/Flintstep.app"
 #   accepted  source=Notarized Developer ID  origin=Developer ID Application: …
-codesign -dv --verbose=2 "/Applications/SparkX MIDI.app"   # flags=0x10000(runtime), Authority=Developer ID…
+codesign -dv --verbose=2 "/Applications/Flintstep.app"   # flags=0x10000(runtime), Authority=Developer ID…
 ```
 
 `spctl -a -t install` is for installer packages; a DMG is assessed with `-t open` and an
@@ -174,7 +174,7 @@ the message about the app and clicks **Open Anyway**, then confirms with their p
 Right-click > Open no longer skips this on macOS 15. Or, in Terminal:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/SparkX MIDI.app"
+xattr -dr com.apple.quarantine "/Applications/Flintstep.app"
 ```
 
 An ad-hoc build is also a different app to macOS after every update, so it asks for
@@ -183,29 +183,52 @@ updates.
 
 ## Renaming
 
-The build and release side reads every name from `product.env`. To rename:
+Every name comes from `product.env`. To rename:
 
 1. Edit `product.env`. Run `make product`, which rewrites the copies in `wails.json`
    and `build/darwin/Info.plist`/`Info.dev.plist`. CI fails if they drift.
-2. Run `make cert` again for the local certificate, which is named after the product.
-3. Change the names still written out in the Go and TypeScript sources (below).
-4. Think twice before changing `BUNDLE_ID` or `DATA_DIR_NAME`. A new bundle id means
-   macOS treats it as a new app (Bluetooth permission asked again, the old LaunchAgent
-   left behind), and the MIDI port UIDs are hashed from it, so DAWs see new ports. A new
-   data folder needs a one-time move of `~/Library/Application Support/<old>`.
+2. Update `internal/product/product.go` and `frontend/src/product.ts` to match.
+   `go test ./internal/product` and `bun run test` fail until they do. If `CLI_NAME`
+   changed, rename the `cmd/` directory too (the Makefile builds `./cmd/$(CLI_NAME)`).
+3. Update the spots that can't import those constants (below).
+4. `make cert NEW=1` for a local certificate under the new name. Optional: `make app`
+   also signs with the one named before the last rename if it finds that.
+5. Think twice before changing `BUNDLE_ID` or `DATA_DIR_NAME`. A new bundle id means
+   macOS treats it as a new app (Bluetooth permission asked again, a new WebKit storage
+   so localStorage starts empty, the old LaunchAgent left behind), and the MIDI port UIDs
+   are hashed from it, so DAWs see new ports. A new data folder needs a one-time move.
+   The SparkX MIDI to Flintstep rename handles both: see "Migrations" below.
 
-Names in source, as of this writing (`git grep -n -E 'SparkX MIDI|silversol|Spark Control X LEDs'`
-finds them):
+Names still written out, as of this writing:
 
-| product.env key | File and line |
+| What | Where |
 | --- | --- |
-| `PRODUCT_NAME` | `main.go` window `Title` and About `Title`; `app.go` `midiClient`, tray items "Open …", "Quit …", tooltip, the "stopped" log line; `applog.go` "starting" log line; `presets.go` file dialog filter; `internal/coremidi/coremidi_darwin.go` `Manufacturer`; `internal/ble/radio_darwin.go` Bluetooth-denied message; `internal/presets/presets.go` `notAPreset` and "newer …" errors; `cmd/miditest/main.go`, `cmd/sparkx-midi/main.go` client name; `frontend/index.html` `<title>`; `frontend/src/components/Header.tsx` wordmark; `frontend/src/components/SettingsPanel.tsx` version line; `frontend/src/lib/indicators.ts`, `frontend/src/lib/linkview.ts` hints; `frontend/src/lib/presets.ts` error strings; `build/icon/appicon.svg` comment |
-| `BUNDLE_ID` | `internal/loginitem/loginitem.go` `Label`; `internal/coremidi/uid.go` UID seed (and their tests) |
-| `MIDI_PORT_NAME` | `app.go` `midiSource`; `cmd/sparkx-midi/main.go`, `cmd/miditest/main.go`; fallbacks in `frontend/src/components/Activity.tsx`, `Header.tsx`, `frontend/src/mock.ts` |
-| `MIDI_LED_PORT_NAME` | `app.go` `midiDest`; `cmd/sparkx-midi/main.go`, `cmd/miditest/main.go`; `frontend/src/components/SettingsPanel.tsx`, `frontend/src/mock.ts` |
-| `DATA_DIR_NAME` | `internal/store/store.go` `AppDirName` (and `store_test.go`) |
-| `CLI_NAME` | the `cmd/sparkx-midi` directory |
-| (file format ids) | `sparkx-midi-preset` and `.sparkx.json` in `internal/presets/presets.go` and `frontend/src/lib/presets.ts`; `sparkx.*` localStorage keys in `frontend/index.html`, `App.tsx`, `lib/theme.ts`, `lib/nuts.ts`, `lib/exppedal.ts`. Renaming these breaks old exports and saved view settings unless both spellings are read. |
+| `PRODUCT_NAME` | `frontend/index.html` `<title>` (checked by `product.test.ts`); `build/icon/appicon.svg` comment; `scripts/site/og.html` and `site/` copy |
+| `MIDI_PORT_NAME`, `MIDI_LED_PORT_NAME` | `site/index.html` copy |
+| `REPO_SLUG` | `site/index.html` `data-repo`; README badges; `.github/ISSUE_TEMPLATE/config.yml` |
+| `SITE_URL` | `site/index.html` canonical and `og:url`; README |
+| file format ids | `flintstep-preset` and `.flintstep.json` in `internal/presets/presets.go` and `frontend/src/lib/presets.ts` |
+| localStorage prefix | `STORAGE_PREFIX` in `frontend/src/product.ts`, and the inline script in `frontend/index.html` (checked by `product.test.ts`) |
+
+`git grep -n -i "sparkx midi\|sparkxmidi\|sparkx-midi"` should find only the migration
+code, its tests and the release notes.
+
+### Migrations
+
+What carries a SparkX MIDI install over to Flintstep, all in place since the rename:
+
+| Old | New | Where |
+| --- | --- | --- |
+| `~/Library/Application Support/SparkX MIDI` | `.../Flintstep`, moved on first launch | `internal/store/migrate.go` |
+| `~/Library/LaunchAgents/com.silversol.sparkxmidi.plist` | `com.silversol.flintstep.plist` for the running app | `loginitem.MigrateLegacy` |
+| exports `"sparkx-midi-preset"`, `.sparkx.json` | still import | `internal/presets`, `frontend/src/lib/presets.ts` |
+| localStorage `sparkx.*` | copied to `flintstep.*` when unset | `frontend/index.html`, `frontend/src/lib/storage.ts` |
+| "SparkX MIDI Local Signing" | still used by `make app` when "Flintstep Local Signing" is missing | `scripts/lib/common.sh` |
+| CoreMIDI unique ids | new ones: DAWs see a new device | `internal/coremidi/uid.go` |
+
+The localStorage copy only helps where the storage survives, such as `wails dev` and the
+browser mock: the packaged app has a new bundle id and so a new, empty WebKit store. The
+theme is the only setting that matters there, and it falls back to "follow macOS".
 
 `SparkX` on its own in `internal/sparkx`, `internal/ble/find.go` and `tools/probe` is the
 pedal's Bluetooth name, not the app's. Leave it.

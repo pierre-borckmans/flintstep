@@ -18,7 +18,7 @@ import (
 	"flintstep/internal/sparkx"
 )
 
-// THE REAL RADIO: tinygo-bluetooth on CoreBluetooth. From Beam's ble.go, blehub.go and
+// THE REAL RADIO: tinygo-bluetooth on CoreBluetooth. From the BEAM Mini app's ble.go, blehub.go and
 // blesystem_darwin.go.
 //
 // Three things on tinygo's Adapter are global: Enable may only be in progress once,
@@ -71,7 +71,7 @@ func (r *cbRadio) power() (bool, string) {
 	return false, "Bluetooth is starting"
 }
 
-// enable turns the adapter on and installs the connect handler. Unlike Beam it retries
+// enable turns the adapter on and installs the connect handler. Unlike the BEAM Mini app it retries
 // after a failure: Bluetooth may come on later, and tinygo clears its own state on a
 // failed Enable so a second one can run.
 func (r *cbRadio) enable() error {
@@ -187,7 +187,7 @@ type cbConn struct {
 	tx  bluetooth.DeviceCharacteristic
 }
 
-// setup discovers the pedal's services and subscribes. From Beam's sparkx_ble.go.
+// setup discovers the pedal's services and subscribes. From the BEAM Mini app's sparkx_ble.go.
 func (c *cbConn) setup() error {
 	swSvc, err := bluetooth.ParseUUID(sparkx.SwitchService)
 	if err != nil {

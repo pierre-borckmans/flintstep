@@ -13,7 +13,7 @@ import (
 	"flintstep/internal/sparkx"
 )
 
-// FINDING THE PEDAL. From Beam's blefind.go.
+// FINDING THE PEDAL. From the BEAM Mini app's blefind.go.
 //
 // Scanning only finds a pedal that advertises, and a pedal stops advertising once
 // anything holds a connection to it. So a connect tries, in order:
