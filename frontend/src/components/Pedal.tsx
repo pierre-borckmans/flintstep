@@ -370,11 +370,15 @@ function LedBar({
   lamp,
   glowId,
   width = 17,
+  glow = 1,
 }: {
   d: string;
   lamp: Colour | undefined;
   glowId: string;
   width?: number;
+  /** How far the light spills, 1 = the switch LEDs. The POWER pill is a small, frosted
+   *  window on the real pedal and spills much less. */
+  glow?: number;
 }) {
   const { colour: c, level } = lampLight(lamp ?? BLACK);
   const lit = !isDark(lamp);
@@ -391,9 +395,9 @@ function LedBar({
       <path
         d={d}
         stroke={rgb(c)}
-        strokeWidth={width * 3.2}
+        strokeWidth={width * (1.4 + 1.8 * glow)}
         filter={`url(#${glowId})`}
-        style={{ opacity: lit ? 0.55 * a : 0 }}
+        style={{ opacity: lit ? 0.55 * a * glow : 0 }}
       />
       <path
         d={d}
@@ -447,6 +451,7 @@ function Lamps({
           lamp={power}
           glowId={`${id}-lampglow`}
           width={u(REF.lamp.thick)}
+          glow={0.4}
         />
       </g>
       {(
