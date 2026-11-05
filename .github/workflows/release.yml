@@ -150,6 +150,7 @@ jobs:
         with:
           append_body: true
           body_path: linux/notes.md
+          prerelease: ${{ contains(github.ref_name, '-') }} # as the dmg job set it
           fail_on_unmatched_files: true
           files: |
             linux/*.AppImage
