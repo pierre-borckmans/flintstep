@@ -18,7 +18,7 @@
         <key>CFBundleIconFile</key>
         <string>iconfile</string>
         <key>LSMinimumSystemVersion</key>
-        <string>10.13.0</string>
+        <string>12.0</string>
         <key>LSUIElement</key>
         <true/>
         <key>NSHighResolutionCapable</key>
@@ -26,7 +26,7 @@
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
         <key>NSBluetoothAlwaysUsageDescription</key>
-        <string>SparkX MIDI connects to your Spark Control X over Bluetooth so its footswitches can send MIDI.</string>
+        <string>{{.Info.ProductName}} connects to your Spark Control X over Bluetooth so its footswitches can send MIDI.</string>
         {{if .Info.FileAssociations}}
         <key>CFBundleDocumentTypes</key>
         <array>

@@ -10,6 +10,9 @@ React 19 + TS + Tailwind v4, bun 1.3.14, Biome, vitest, golangci-lint v2.
 
 ## Names
 
+`product.env` is the source for the build and release tooling (see docs/RELEASING.md,
+"Renaming"); the Go and TS constants below must match it.
+
 - App / product: **SparkX MIDI** (bundle id `com.silversol.sparkxmidi`)
 - Virtual MIDI source: **Spark Control X**
 - Virtual MIDI destination (LED feedback): **Spark Control X LEDs**

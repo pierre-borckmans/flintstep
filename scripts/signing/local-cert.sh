@@ -8,10 +8,15 @@
 # app's designated requirement is "this bundle id, this certificate", which survives
 # rebuilds, and the permission sticks. `make app` uses this identity when it exists.
 #
-# Local only. Builds for other people need a Developer ID; release DMGs stay ad hoc.
+# Local only. Builds for other people need a Developer ID (docs/RELEASING.md).
+# The name comes from product.env: "<PRODUCT_NAME> Local Signing". After a rename, run
+# this again; the old certificate can be deleted in Keychain Access.
 set -euo pipefail
+# shellcheck source=../lib/common.sh
+. "$(dirname "$0")/../lib/common.sh"
+load_product
 
-NAME="SparkX MIDI Local Signing"
+NAME="$LOCAL_SIGN_ID"
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 
 if security find-certificate -c "$NAME" "$KEYCHAIN" >/dev/null 2>&1; then

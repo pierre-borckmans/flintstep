@@ -37,12 +37,17 @@ Download `SparkX-MIDI-<version>.dmg` from the
 [Releases](https://github.com/pierre-borckmans/spark-control-x-midi/releases) page, open it and
 drag **SparkX MIDI** onto Applications.
 
-The app is signed ad hoc and not notarised, so Gatekeeper blocks the first launch. Right-click
-the app in Applications and pick Open, then confirm. Or clear the quarantine flag once:
+The release notes say whether a build is notarised. A notarised build opens like any
+other app. One that isn't gets blocked on first launch: open it once, then go to System
+Settings > Privacy & Security and click Open Anyway (on macOS 14 and earlier, right-click
+the app and pick Open). Or clear the quarantine flag once:
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/SparkX MIDI.app"
 ```
+
+Each download comes with `SHA256SUMS.txt`; `shasum -a 256 -c SHA256SUMS.txt` checks the
+DMG. Universal build, Apple silicon and Intel, macOS 12 or later.
 
 macOS asks for Bluetooth access on first run. The app lives in the menu bar, not the Dock.
 
@@ -62,7 +67,8 @@ macOS asks for Bluetooth access on first run. The app lives in the menu bar, not
 | `frontend/` | React + Tailwind UI. |
 | `tools/probe/sparkx.swift` | The CoreBluetooth probe the protocol was checked with. |
 
-`docs/CONTRACTS.md` has the interfaces between the packages.
+`docs/CONTRACTS.md` has the interfaces between the packages. `docs/RELEASING.md` covers
+signing, notarisation and cutting a release. Names used by the build live in `product.env`.
 
 Data lives in `~/Library/Application Support/SparkX MIDI/`: `library.json` (the presets),
 `app.log`, `ble-trace.log`. Versions before presets kept one mapping in `config.json`; the
@@ -79,8 +85,9 @@ and golangci-lint v2.
 make install   # frontend deps
 make dev       # wails dev, live reload
 make cert      # once per Mac: local signing cert, so Bluetooth permission survives rebuilds
-make app       # build/bin/SparkX MIDI.app
+make app       # build/bin/SparkX MIDI.app (universal; PLATFORM=darwin/arm64 is faster)
 make dmg       # build/bin/SparkX-MIDI-<version>.dmg, version from git describe
+make release VERSION=v0.2.0   # signed DMG + checksums, notarised when credentials exist
 make cli       # build/bin/sparkx-midi
 make check     # lint + tests, what CI runs
 ```

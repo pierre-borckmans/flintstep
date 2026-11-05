@@ -70,5 +70,5 @@ if img.size != (size, size):
 img.convert("RGBA").save(ico, sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
 PY
 
-echo "icon: wrote ${PNG#$ROOT/} and ${ICO#$ROOT/} from ${SRC#$ROOT/}"
+echo "icon: wrote ${PNG#"$ROOT"/} and ${ICO#"$ROOT"/} from ${SRC#"$ROOT"/}"
 echo "      restart 'wails dev' (or rebuild) to see it; the Dock may cache the old one"

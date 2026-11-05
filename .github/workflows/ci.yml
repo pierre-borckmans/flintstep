@@ -14,6 +14,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      # wails.json and Info.plist carry copies of product.env; fail if they drifted
+      - run: scripts/product/sync.sh --check
       # package main embeds all:frontend/dist
       - run: make dist
       - name: gofmt
