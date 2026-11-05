@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { Backend } from "./api";
 import { ActivityLog } from "./components/Activity";
 import { ExpressionPanel } from "./components/ExpressionPanel";
+import { useSimControls } from "./components/ExpSim";
 import { Header } from "./components/Header";
 import { HistoryControls } from "./components/HistoryControls";
 import { IndicatorEditor } from "./components/IndicatorEditor";
@@ -26,6 +27,7 @@ const q = new URLSearchParams(window.location.search);
 export default function App({ backend }: { backend: Backend }) {
   const bridge = useBridge(backend);
   const { state, config, apply } = bridge;
+  const sim = useSimControls(backend, state);
   // What is selected on the canvas: a switch, an indicator lamp (Amp 0, App 1) or an
   // expression pedal, only ever one. `sel` remembers the last switch for the Switches
   // tab. ?sel=N|exp1|exp2 and ?lamp=amp|app open on one, for screenshots.
@@ -64,9 +66,10 @@ export default function App({ backend }: { backend: Backend }) {
     import("./mock").then(async ({ demoScript }) => {
       const pause = () => new Promise((r) => setTimeout(r, 400));
       for (const s of demoScript(demo)) {
-        if (s === "undo") {
-          bridge.undo();
-          await pause(); // an undo across a switch talks to Go
+        if (s === "undo" || s === "redo") {
+          if (s === "undo") bridge.undo();
+          else bridge.redo();
+          await pause();
         } else if ("preset" in s) {
           const p = bridge.presets.list.find((x) => x.name === s.preset);
           if (p) await bridge.presets.select(p.id, p.name);
@@ -204,6 +207,7 @@ export default function App({ backend }: { backend: Backend }) {
                     focus={exp}
                     apply={apply}
                     calibrate={bridge.calibrate}
+                    sim={sim}
                   />
                 ) : (
                   <SettingsPanel

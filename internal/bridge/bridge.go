@@ -76,10 +76,15 @@ type Bridge struct {
 
 	trig [sparkx.ExpInputs]bool // the expression triggers engaged, as last reported
 
+	sim     [sparkx.ExpInputs]simInput // the simulated expression pedals (sim.go)
+	simLoop bool                       // the sim loop is running
+	isDone  bool                       // Close was called
+
 	now        func() time.Time
 	onActivity func(Activity)
 	onStatus   func(ble.Status)
 	onTrigger  func([sparkx.ExpInputs]bool)
+	onSim      func()
 
 	ticking bool
 	stop    chan struct{}
@@ -95,6 +100,9 @@ type Options struct {
 	// OnTrigger is called when an expression trigger engages or lets go, with which
 	// are engaged now (mapping.Engine.ExpTriggers).
 	OnTrigger func([sparkx.ExpInputs]bool)
+	// OnSim is called, with no lock held, when a simulated expression pedal turns on or
+	// off or its value reaches the engine: what Status and ExpSim report changed.
+	OnSim func()
 	// Now is the clock; nil is time.Now. Tests set it.
 	Now func() time.Time
 }
@@ -114,6 +122,8 @@ func New(cfg mapping.Config, out MIDIOut, o Options) *Bridge {
 		onActivity: o.OnActivity,
 		onStatus:   o.OnStatus,
 		onTrigger:  o.OnTrigger,
+		onSim:      o.OnSim,
+		sim:        newSims(),
 		stop:       make(chan struct{}),
 	}
 }
@@ -133,8 +143,15 @@ func (b *Bridge) SetOut(out MIDIOut) {
 	b.mu.Unlock()
 }
 
-// Close stops the tick loop.
-func (b *Bridge) Close() { b.closed.Do(func() { close(b.stop) }) }
+// Close stops the tick loop and the simulation loop. Simulation calls fail after it.
+func (b *Bridge) Close() {
+	b.closed.Do(func() {
+		b.mu.Lock()
+		b.isDone = true
+		b.mu.Unlock()
+		close(b.stop)
+	})
+}
 
 // Config is the mapping in use.
 func (b *Bridge) Config() mapping.Config {
@@ -155,6 +172,7 @@ func (b *Bridge) Apply(cfg mapping.Config) (mapping.Config, error) {
 	b.mu.Lock()
 	b.cfg = cfg
 	releases := b.eng.SetConfig(cfg)
+	b.simRepushLocked() // a new calibration applies to a parked simulated pedal at once
 	b.mu.Unlock()
 	b.send(releases)
 	b.syncLamps()
@@ -197,6 +215,20 @@ func (b *Bridge) onExp(n, raw int) {
 	b.step.Lock()
 	defer b.step.Unlock()
 	b.mu.Lock()
+	if n >= 0 && n < sparkx.ExpInputs && b.sim[n].on {
+		// The jack is simulated: a real value can only come from a cable the next status
+		// will report, and that status hands the jack back (takeOverLocked).
+		b.mu.Unlock()
+		return
+	}
+	b.mu.Unlock()
+	b.expStep(n, raw)
+}
+
+// expStep feeds one raw expression value to the engine and sends what comes out: real
+// values and simulated ones go the same way. The caller holds step.
+func (b *Bridge) expStep(n, raw int) {
+	b.mu.Lock()
 	msgs := b.eng.Exp(n, raw, b.now())
 	pending := b.eng.Pending()
 	b.mu.Unlock()
@@ -216,19 +248,26 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 	b.connected = st.State == ble.StateConnected
 	b.powered = b.connected && st.Powered
 	b.mu.Unlock()
+	simChanged := false
 	if st.State != ble.StateConnected {
 		b.mu.Lock()
 		releases := b.eng.Reset()
+		b.simRepushLocked() // a simulated pedal engages again from where it is
 		b.lit = false
 		b.mu.Unlock()
 		b.send(releases)
 	} else {
 		// A jack without a cable lets go of its trigger: a pedal pulled out mid-sweep
-		// must not leave the effect it engaged stuck on.
+		// must not leave the effect it engaged stuck on. A simulated jack has a cable as
+		// far as the engine knows; a real cable in it ends the simulation.
 		var releases [][]byte
 		b.mu.Lock()
 		for n, in := range st.Cables {
-			if !in {
+			switch {
+			case in && b.sim[n].on:
+				releases = append(releases, b.takeOverLocked(n)...)
+				simChanged = true
+			case !in && !b.sim[n].on:
 				releases = append(releases, b.eng.ExpRelease(n)...)
 			}
 		}
@@ -243,6 +282,9 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 	b.step.Unlock()
 	if b.onStatus != nil {
 		b.onStatus(st)
+	}
+	if simChanged {
+		b.simChanged()
 	}
 }
 

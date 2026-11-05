@@ -3,13 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import * as H from "../lib/history";
 import { relTime } from "../lib/midi";
 import { hasOwnUndo, historyKey } from "../lib/shortcuts";
-
+import type { Config } from "../types";
 import { Button } from "../ui/Button";
 import { cx } from "../ui/cx";
 import { Kicker } from "../ui/Kicker";
 import { Lamp } from "../ui/Lamp";
 import { Popover } from "../ui/Popover";
-import type { Bridge, Snap } from "../useBridge";
+import type { Bridge } from "../useBridge";
 
 /** ⌘Z, ⇧⌘Z and ⌘Y anywhere but a text field, which keeps its own undo. */
 function useHistoryKeys(undo: () => void, redo: () => void, flush: () => void) {
@@ -43,60 +43,77 @@ function useNow(on: boolean, every = 1000) {
   return now;
 }
 
-/** The session's changes, newest first. The lit row is what the pedal has now; rows
- *  above it were undone and are still there to redo. Clicking a row goes to it, the same
- *  as undoing or redoing that far. */
+/** One preset's changes this session, newest first. The lit row is what the pedal has
+ *  now; rows above it were undone and are still there to redo. Clicking a row goes to
+ *  it, the same as undoing or redoing that far. Each preset has its own; switching
+ *  presets is not a change. */
 function HistoryList({
   history,
+  preset,
   onJump,
 }: {
-  history: H.History<Snap>;
+  history: H.History<Config>;
+  preset: string;
   onJump: (i: number) => void;
 }) {
   const now = useNow(true);
   const rows = history.entries.map((e, i) => ({ ...e, i })).reverse();
+  const title = preset ? `History · ${preset}` : "History";
 
   return (
     <>
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-edge px-3">
-        <Kicker>History</Kicker>
-        <div className="flex-1" />
-        <span className="text-ui-2xs text-faint">this session</span>
+        <h2 className="flex min-w-0 flex-1 items-baseline gap-1.5" title={title}>
+          <Kicker className="shrink-0">History</Kicker>
+          {preset && (
+            <span className="truncate text-ui-xs text-text/90">
+              <span className="text-faint">· </span>
+              {preset}
+            </span>
+          )}
+        </h2>
+        <span className="shrink-0 text-ui-2xs text-faint">this session</span>
       </div>
-      <ol className="scroll-y min-h-0 flex-1 py-1">
-        {rows.map((e) => {
-          const here = e.i === history.cursor;
-          const undone = e.i > history.cursor;
-          return (
-            <li key={`${e.i}-${e.at}`}>
-              <button
-                type="button"
-                onClick={() => onJump(e.i)}
-                aria-current={here ? "step" : undefined}
-                className={cx(
-                  "grid w-full grid-cols-[6px_1fr_auto] items-center gap-2.5 px-3 py-[5px] text-left transition-[color,background-color] duration-(--dur) ease-(--ease)",
-                  here ? "bg-panel2" : "hover:warm",
-                )}
-              >
-                <Lamp on={here} colour="beam" size={5} />
-                <span
+      {history.entries.length === 1 ? (
+        <p className="px-3 py-4 text-ui-sm text-muted">
+          No changes to {preset ? <span className="text-text">{preset}</span> : "this preset"} yet.
+        </p>
+      ) : (
+        <ol className="scroll-y min-h-0 flex-1 py-1">
+          {rows.map((e) => {
+            const here = e.i === history.cursor;
+            const undone = e.i > history.cursor;
+            return (
+              <li key={`${e.i}-${e.at}`}>
+                <button
+                  type="button"
+                  onClick={() => onJump(e.i)}
+                  aria-current={here ? "step" : undefined}
                   className={cx(
-                    "truncate text-ui-sm",
-                    here ? "text-bone" : undone ? "text-faint" : "text-text/90",
-                    e.i === 0 && !here && "text-muted",
+                    "grid w-full grid-cols-[6px_1fr_auto] items-center gap-2.5 px-3 py-[5px] text-left transition-[color,background-color] duration-(--dur) ease-(--ease)",
+                    here ? "bg-panel2" : "hover:warm",
                   )}
-                  title={e.label}
                 >
-                  {e.label}
-                </span>
-                <span className="font-mono text-ui-2xs text-faint tabular-nums">
-                  {relTime(e.at, now)}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+                  <Lamp on={here} colour="beam" size={5} />
+                  <span
+                    className={cx(
+                      "truncate text-ui-sm",
+                      here ? "text-bone" : undone ? "text-faint" : "text-text/90",
+                      e.i === 0 && !here && "text-muted",
+                    )}
+                    title={e.label}
+                  >
+                    {e.label}
+                  </span>
+                  <span className="font-mono text-ui-2xs text-faint tabular-nums">
+                    {relTime(e.at, now)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </>
   );
 }
@@ -112,6 +129,7 @@ export function HistoryControls({
   initialOpen?: boolean;
 }) {
   const { saveStatus: st, savedAt, history, undo, redo, jump, flush } = bridge;
+  const preset = bridge.presets.list.find((p) => p.id === bridge.presets.active)?.name ?? "";
   const [open, setOpen] = useState(initialOpen);
   const [justSaved, setJustSaved] = useState(false);
   const close = useCallback(() => setOpen(false), []);
@@ -193,7 +211,7 @@ export function HistoryControls({
         label="History"
         className="absolute top-[calc(100%+10px)] right-0 z-30 flex max-h-[min(360px,calc(100vh-80px))] w-[300px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
       >
-        {history && <HistoryList history={history} onJump={jump} />}
+        {history && <HistoryList history={history} preset={preset} onJump={jump} />}
       </Popover>
     </div>
   );

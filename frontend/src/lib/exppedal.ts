@@ -4,6 +4,8 @@
 // and the cable from each jack. All in CSS px of the viewer's fitted layout, as
 // functions of w, the Spark's case width; nothing here touches the DOM.
 
+import type { ExpConfig } from "../types";
+import { RAW_MAX } from "./exp";
 import { TRIGGER } from "./trigger";
 
 /** The drawn Spark (components/Pedal.tsx): the case's height per unit of width, the
@@ -60,6 +62,20 @@ export function tiltDeg(f: number): number {
 export function dragFraction(f0: number, dy: number, span: number): number {
   if (span <= 0) return f0;
   return Math.min(1, Math.max(0, f0 - dy / span));
+}
+
+/** Where on the jack (0..1 of its raw range, what SetSimExp takes) a simulated pedal
+ *  must sit to read as calibrated position f: expFraction run backwards, through the
+ *  invert and the heel/toe calibration (and its whole-jack fallback). */
+export function jackFraction(f: number, cfg: Pick<ExpConfig, "min" | "max" | "invert">): number {
+  const c = Math.min(1, Math.max(0, cfg.invert ? 1 - f : f));
+  let heel = cfg.min;
+  let toe = cfg.max;
+  if (heel === toe) {
+    heel = 0;
+    toe = RAW_MAX;
+  }
+  return Math.min(1, Math.max(0, (heel + c * (toe - heel)) / RAW_MAX));
 }
 
 /** The gauge's marks, each as a fraction 0..1 along it from heel to toe. It reads the

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { expFraction, RAW_MAX } from "./exp";
 import {
   cableBeside,
   choosePlacement,
   dragFraction,
   fitWidth,
   gaugeMarks,
+  jackFraction,
   jackPoint,
   LABEL,
   layout,
@@ -41,6 +43,22 @@ describe("dragFraction", () => {
     expect(dragFraction(0.5, 25, 100)).toBe(0.25);
   });
   it("stays in 0..1", () => expect(dragFraction(0.2, 500, 100)).toBe(0));
+});
+
+describe("jackFraction", () => {
+  it("undoes expFraction through the calibration and invert", () => {
+    const cfg = { min: 1000, max: 61000, invert: false };
+    for (const f of [0, 0.25, 0.5, 1]) {
+      expect(expFraction(jackFraction(f, cfg) * RAW_MAX, cfg)).toBeCloseTo(f, 4);
+      const inv = { ...cfg, invert: true };
+      expect(expFraction(jackFraction(f, inv) * RAW_MAX, inv)).toBeCloseTo(f, 4);
+      const low = { min: 60000, max: 2000, invert: false }; // toe reads lower
+      expect(expFraction(jackFraction(f, low) * RAW_MAX, low)).toBeCloseTo(f, 4);
+    }
+  });
+  it("uses the whole jack for a one-point calibration", () => {
+    expect(jackFraction(0.5, { min: 7, max: 7, invert: false })).toBeCloseTo(0.5);
+  });
 });
 
 describe("gaugeMarks", () => {

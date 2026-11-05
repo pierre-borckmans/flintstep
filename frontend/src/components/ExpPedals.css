@@ -97,12 +97,13 @@
   top: 0;
   right: 2px;
   padding: 0 4px;
-  border: 1px dashed color-mix(in srgb, var(--color-cold) 55%, transparent);
-  border-radius: 3px;
+  /* the same tag as on the input's card (ExpSim's SimTag) */
+  border: 1px solid color-mix(in srgb, var(--color-beam) 50%, transparent);
+  border-radius: var(--radius-ui-sm);
   font: 600 8px/12px var(--font-mono);
-  letter-spacing: 0.12em;
+  letter-spacing: var(--tracking-kicker);
   text-transform: uppercase;
-  color: var(--color-cold);
+  color: var(--color-beam);
   pointer-events: none;
 }
 .exp-sim-tag[data-mirror] {

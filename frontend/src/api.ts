@@ -11,14 +11,16 @@ export interface Backend {
   ChoosePedal(address: string, name: string): Promise<void>;
   ForgetPedal(): Promise<void>;
   CalibrateExp(n: number, edge: ExpEdge): Promise<Config>;
-  /** A simulated expression pedal in jack n, for trying things without one: while on,
-   *  State reports cables[n] and expRaw[n] as if it were plugged in. */
-  SimulateExp(n: number, on: boolean): Promise<void>;
-  /** The simulated pedal's position, 0 heel .. 1 toe. */
-  SetSimExp(n: number, fraction: number): Promise<void>;
-  /** The simulated pedal rocks back and forth by itself. */
-  SimSweep(n: number, on: boolean): Promise<void>;
   SetLaunchAtLogin(on: boolean): Promise<void>;
+  /** Turns input n's simulated expression pedal on (at the heel) or off. Refused while a
+   *  real cable is in the jack; a real cable plugged in later turns it off. Not saved. */
+  SimulateExp(n: number, on: boolean): Promise<void>;
+  /** Moves input n's simulated pedal to `fraction` 0 (heel) .. 1 (toe), raw 0..65535
+   *  linearly. Turns the simulation on if needed and stops a sweep. */
+  SetSimExp(n: number, fraction: number): Promise<void>;
+  /** Sweeps input n's simulated pedal heel → toe → heel every 4 s, eased, from where it
+   *  is; on turns the simulation on if needed. */
+  SimSweep(n: number, on: boolean): Promise<void>;
   RevealLogs(): Promise<void>;
   /** Themes the native window (appearance, background) and keeps it for the next launch. */
   SetTheme(mode: ThemeMode): Promise<void>;
@@ -74,10 +76,10 @@ function wailsBackend(app: GoApp, rt: WailsRuntime): Backend {
     ChoosePedal: (address, name) => app.ChoosePedal(address, name),
     ForgetPedal: () => app.ForgetPedal(),
     CalibrateExp: (n, edge) => app.CalibrateExp(n, edge),
-    SimulateExp: (n, on) => app.SimulateExp(n, on),
-    SetSimExp: (n, fraction) => app.SetSimExp(n, fraction),
-    SimSweep: (n, on) => app.SimSweep(n, on),
     SetLaunchAtLogin: (on) => app.SetLaunchAtLogin(on),
+    SimulateExp: (n, on) => app.SimulateExp(n, on),
+    SetSimExp: (n, f) => app.SetSimExp(n, f),
+    SimSweep: (n, on) => app.SimSweep(n, on),
     RevealLogs: () => app.RevealLogs(),
     SetTheme: (mode) => app.SetTheme(mode),
     ListPresets: () => app.ListPresets(),

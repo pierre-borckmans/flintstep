@@ -8,6 +8,7 @@ import {
   cableBeside,
   dragFraction,
   gaugeMarks,
+  jackFraction,
   jackPoint,
   LABEL,
   type Layout,
@@ -425,7 +426,8 @@ export function ExpPedals({
     const go = () => {
       sent.current[n] = performance.now();
       trailing.current[n] = null;
-      backend.SetSimExp(n, f).catch(() => {});
+      const x = config?.exp[n];
+      backend.SetSimExp(n, x ? jackFraction(f, x) : f).catch(() => {});
     };
     if (now - sent.current[n] >= 16) go();
     else trailing.current[n] = setTimeout(go, 16 - (now - sent.current[n]));

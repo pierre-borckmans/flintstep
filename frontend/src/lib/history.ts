@@ -102,24 +102,3 @@ export function jump<T>(h: History<T>, i: number): History<T> {
 export const undoLabel = <T>(h: History<T>) => (canUndo(h) ? h.entries[h.cursor].label : null);
 /** The label redo would apply, or null. */
 export const redoLabel = <T>(h: History<T>) => (canRedo(h) ? h.entries[h.cursor + 1].label : null);
-
-/** The history without the entries `gone` picks (a deleted preset's), runs of equal
- *  states that leaves merged into their first. The cursor goes to the last kept entry
- *  at or before it. Null when nothing is left. */
-export function drop<T>(
-  h: History<T>,
-  gone: (state: T) => boolean,
-  same: (a: T, b: T) => boolean,
-): History<T> | null {
-  const entries: Entry<T>[] = [];
-  let cursor = 0;
-  h.entries.forEach((e, i) => {
-    if (gone(e.state)) return;
-    const prev = entries[entries.length - 1];
-    if (!prev || !same(prev.state, e.state)) entries.push(e);
-    if (i <= h.cursor) cursor = entries.length - 1;
-  });
-  if (!entries.length) return null;
-  if (entries.length === h.entries.length) return h;
-  return { entries, cursor, open: false };
-}

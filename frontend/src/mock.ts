@@ -1,6 +1,7 @@
 import type { Backend } from "./api";
 import { cc, defaultConfig, mappingOf, type Op, validate } from "./lib/config";
 import { expFraction, expValue, RAW_MAX } from "./lib/exp";
+import { fractionRaw, sweepFraction, sweepOffset } from "./lib/expsim";
 import { indicatorLit } from "./lib/indicators";
 import { describeMidi } from "./lib/midi";
 import {
@@ -66,9 +67,13 @@ export interface SimOptions {
   triggers?: [TriggerMode, TriggerMode];
   /** Pin each pedal at a travel percent instead of sweeping it (null: sweep). */
   expAt?: [number | null, number | null];
-  /** Start with these jacks' pedals simulated (App.SimulateExp). */
-  simulated?: [boolean, boolean];
+  /** Start each input's simulated pedal (bridge/sim.go) at a travel percent of the jack,
+   *  or sweeping; null leaves it off. */
+  simAt?: [SimStart, SimStart];
 }
+
+/** How a simulated pedal starts: at a percent of the jack's range, or sweeping. */
+export type SimStart = number | "sweep" | null;
 
 /** ?cycle: one round of searching, connecting and connected (ms). */
 const CYCLE_MS = 11600;
@@ -130,17 +135,24 @@ export function createSim(opts: SimOptions = {}) {
 
   const cables = opts.cables ?? [true, false];
   const raw = [21000, -1];
-  // App.SimulateExp: a pretend pedal in a jack, held where SetSimExp put it or sweeping.
-  const fake = {
-    on: [...(opts.simulated ?? [false, false])],
-    at: [0.35, 0.7],
-    sweep: [false, false],
-  };
-  /** A cable as the pedal reports it: a real one (only while connected) or a fake one. */
-  const plugged = (n: number, live: boolean) => (live && cables[n]) || fake.on[n];
   const lastExpSent = [-1, -1];
   let lastExpAt = [0, 0];
   let trig: TriggerState[] = [idleTrigger(), idleTrigger()];
+  // The simulated pedals, like the bridge's: on, where they are (0..1 of the jack), and
+  // when a sweep was at the heel going up (null: not sweeping).
+  const simOn = [false, false];
+  const simFrac = [0, 0];
+  const simFrom: (number | null)[] = [null, null];
+  const simPos = (n: number) => {
+    const from = simFrom[n];
+    return from === null ? simFrac[n] : sweepFraction(t - from);
+  };
+  opts.simAt?.forEach((s, n) => {
+    if (s === null) return;
+    simOn[n] = true;
+    if (s === "sweep") simFrom[n] = 0;
+    else simFrac[n] = Math.min(1, Math.max(0, s / 100));
+  });
 
   let held = opts.holdMask ?? 0;
   const pressedAt: number[] = Array(SWITCHES).fill(0);
@@ -288,14 +300,15 @@ export function createSim(opts: SimOptions = {}) {
     // the triggers visibly engage and let go.
     for (let n = 0; n < 2; n++) {
       const x = config.exp[n];
-      if (!plugged(n, live)) {
+      const pin = opts.expAt?.[n];
+      if (simOn[n]) {
+        // Simulated: the jack's raw value is the simulated one, whatever the link does,
+        // and it goes the same way as a real pedal's.
+        raw[n] = fractionRaw(simPos(n));
+      } else if (!live || !cables[n]) {
         raw[n] = -1;
         letGo(n);
         continue;
-      }
-      const pin = opts.expAt?.[n];
-      if (fake.on[n] && !fake.sweep[n]) {
-        raw[n] = Math.round(x.min + (x.max - x.min) * fake.at[n]);
       } else if (pin !== undefined && pin !== null) {
         raw[n] = Math.round(x.min + ((x.max - x.min) * pin) / 100);
       } else {
@@ -365,7 +378,7 @@ export function createSim(opts: SimOptions = {}) {
       profileName: live ? "Live Set" : "",
       battery: live ? Math.floor(battery) : -1,
       powered: live && powered,
-      cables: [plugged(0, live), plugged(1, live)],
+      cables: cables.map((c, n) => simOn[n] || (live && c)),
       exp: raw.map((r, n) => (r < 0 ? -1 : lastExpSent[n])),
       held: live ? held : 0,
       lamps,
@@ -385,20 +398,45 @@ export function createSim(opts: SimOptions = {}) {
     /** Which inputs' triggers are engaged now (State.expTrigger). */
     triggers(): boolean[] {
       const live = connState === "connected";
-      return trig.map((s, n) => plugged(n, live) && triggerLit(s, config.exp[n].trigger));
+      return trig.map(
+        (s, n) => (simOn[n] || (live && cables[n])) && triggerLit(s, config.exp[n].trigger),
+      );
     },
-    /** Which jacks hold a simulated pedal (State.expSim). */
-    simulated: () => [...fake.on],
+    /** Which inputs are simulated, and which of those sweep (State.expSim, expSweep). */
+    simState() {
+      return { on: [...simOn], sweep: simOn.map((o, n) => o && simFrom[n] !== null) };
+    },
+    /** App.SimulateExp: on at the heel, refused with a real cable; off lets go. */
     simulate(n: number, on: boolean) {
-      fake.on[n] = on;
-      if (!on) fake.sweep[n] = false;
+      if (on === simOn[n]) return;
+      if (on && connState === "connected" && cables[n]) {
+        throw new Error(`a real pedal is plugged into jack ${n + 1}`);
+      }
+      simOn[n] = on;
+      simFrac[n] = 0;
+      simFrom[n] = null;
+      if (!on) {
+        letGo(n);
+        lastExpSent[n] = -1;
+        raw[n] = -1;
+      }
     },
-    setSim(n: number, f: number) {
-      fake.at[n] = Math.min(1, Math.max(0, f));
-      fake.sweep[n] = false;
+    /** App.SetSimExp: on if needed, a sweep stops. */
+    simPosition(n: number, f: number) {
+      if (!simOn[n]) this.simulate(n, true);
+      simFrom[n] = null;
+      simFrac[n] = Math.min(1, Math.max(0, f));
+      raw[n] = fractionRaw(simFrac[n]);
     },
+    /** App.SimSweep: from where the pedal is; off leaves it where the sweep got to. */
     simSweep(n: number, on: boolean) {
-      fake.sweep[n] = on;
+      if (on && !simOn[n]) this.simulate(n, true);
+      if (!simOn[n] || on === (simFrom[n] !== null)) return;
+      if (on) simFrom[n] = t - sweepOffset(simFrac[n]);
+      else {
+        simFrac[n] = simPos(n);
+        simFrom[n] = null;
+      }
     },
     setConfig(c: Config) {
       // Like Engine.SetConfig: a trigger whose input, mode or action changed lets go.
@@ -580,14 +618,16 @@ function pickFile(): Promise<{ text: string; name: string } | null> {
   });
 }
 
-/** A demo step: an edit, an undo, or switching to the preset of that name. */
-export type DemoStep = Op | "undo" | { preset: string };
+/** A demo step: an edit, an undo or redo, or switching to the preset of that name. */
+export type DemoStep = Op | "undo" | "redo" | { preset: string };
 
 /** Edits to replay on load (?demo=...), so the history and the save status can be
  *  screenshotted without clicking: "history" makes a few changes and undoes the last
- *  two; "invalid" ends on a config that does not validate; "presets" edits, switches to
- *  "Ableton live", edits there, and undoes back across the switch; "presets-redo" stops
- *  on Ableton live. */
+ *  two; "invalid" ends on a config that does not validate. The preset ones show that
+ *  each preset has its own history: "presets-b" makes two edits in My mapping, switches
+ *  to Ableton live, makes two there and undoes one (only Ableton live's); "presets" then
+ *  goes back to My mapping, whose two edits are still there, and undoes both and redoes
+ *  one. */
 export function demoScript(name: string): DemoStep[] {
   const edits: Op[] = [
     { type: "tap", sw: 1, patch: { kind: "note", number: 60 } },
@@ -598,14 +638,16 @@ export function demoScript(name: string): DemoStep[] {
     { type: "ledMode", mode: "feedback" },
   ];
   if (name === "history") return [...edits, "undo", "undo"];
-  const across: DemoStep[] = [
+  const inB: DemoStep[] = [
     edits[0],
+    edits[4],
     { preset: "Ableton live" },
     edits[1],
     { type: "brightness", value: 60 },
+    "undo",
   ];
-  if (name === "presets") return [...across, "undo", "undo", "undo"];
-  if (name === "presets-redo") return across;
+  if (name === "presets-b") return inB;
+  if (name === "presets") return [...inB, { preset: "My mapping" }, "undo", "undo", "redo"];
   if (name === "invalid")
     return [...edits.slice(0, 2), { type: "combo", index: 0, patch: { b: 0 } }];
   return [];
@@ -614,11 +656,12 @@ export function demoScript(name: string): DemoStep[] {
 /** The Backend over a running simulator. URL parameters shape it for screenshots:
  *  ?state=off|idle|searching|connecting|connected, ?cycle (walk through them for ever:
  *  searching, connecting, connected, link lost), ?freeze=N (LinkOverlay), ?seed=N, ?hold=I,A (switch names),
- *  ?cables=11 (exp1, exp2), ?sim=01 (simulated pedals, App.SimulateExp), ?midi=error, ?still (no automatic presses), ?save=error
+ *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
  *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
  *  ?lamp=amp|app (open on an indicator lamp), ?trigger=engage,toe (the two inputs'
  *  trigger modes; unset, engage,off), ?exp=60,98 (pin each pedal at a travel percent;
- *  "-" or unset sweeps it), ?presets=one (a single preset; otherwise four samples),
+ *  "-" or unset sweeps it), ?sim=40,sweep (start each input's simulated
+ *  pedal at a percent of the jack, or sweeping; "-" or unset leaves it off), ?presets=one (a single preset; otherwise four samples),
  *  ?library=corrupt (the library error Go shows after a damaged file),
  *  ?picker=open|rename|delete (App opens the preset picker). See also demoScript (?demo=). */
 export function createMockBackend(q: URLSearchParams): Backend {
@@ -629,19 +672,20 @@ export function createMockBackend(q: URLSearchParams): Backend {
     .filter((i) => i >= 0)
     .reduce((m, i) => m | (1 << i), 0);
   const cablesQ = q.get("cables");
-  const simQ = q.get("sim");
   const modeQ = (s: string | undefined): TriggerMode => (s === "engage" || s === "toe" ? s : "off");
   const trigQ = q.get("trigger")?.split(",");
   const expQ = q.get("exp")?.split(",");
   const pinQ = (s: string | undefined) => (s && /^\d+(\.\d+)?$/.test(s) ? Number(s) : null);
+  const simQ = q.get("sim")?.split(",");
+  const simStart = (s: string | undefined): SimStart => (s === "sweep" ? "sweep" : pinQ(s));
   const sim = createSim({
     triggers: trigQ ? [modeQ(trigQ[0]), modeQ(trigQ[1])] : undefined,
     expAt: expQ ? [pinQ(expQ[0]), pinQ(expQ[1])] : undefined,
+    simAt: simQ ? [simStart(simQ[0]), simStart(simQ[1])] : undefined,
     seed: Number(q.get("seed") ?? 7),
     fixedState: (q.get("state") as BleState | null) ?? undefined,
     cycle: q.has("cycle"),
     cables: cablesQ ? [cablesQ[0] === "1", cablesQ[1] === "1"] : undefined,
-    simulated: simQ ? [simQ[0] === "1", simQ[1] === "1"] : undefined,
     holdMask,
     autoPress: !q.has("still"),
     powered: q.has("power") ? q.get("power") === "usb" : undefined,
@@ -677,8 +721,30 @@ export function createMockBackend(q: URLSearchParams): Backend {
     activePreset: lib.activeId(),
     libraryError,
     expTrigger: sim.triggers(),
-    expSim: sim.simulated(),
+    expSim: sim.simState().on,
+    expSweep: sim.simState().sweep,
   });
+
+  // For browser checks: window.__mockMenu("Ableton live") switches the way Go's menu-bar
+  // menu does, without asking the UI (the next state tick tells it), and
+  // window.__mockPreset(name) is what the library holds for a preset.
+  if (typeof window !== "undefined") {
+    const byName = (name: string) => lib.list().find((x) => x.name === name);
+    Object.assign(window, {
+      __mockMenu: (name: string) => {
+        const p = byName(name);
+        if (p) run(lib.select(p.id));
+      },
+      __mockPreset: (name: string) => {
+        const p = byName(name);
+        if (!p) return null;
+        const was = lib.activeId();
+        const c = lib.select(p.id);
+        lib.select(was);
+        return c;
+      },
+    });
+  }
 
   let last = performance.now();
   setInterval(() => {
@@ -728,7 +794,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
       return structuredClone(sim.config);
     },
     SimulateExp: async (n, on) => sim.simulate(n, on),
-    SetSimExp: async (n, fraction) => sim.setSim(n, fraction),
+    SetSimExp: async (n, f) => sim.simPosition(n, f),
     SimSweep: async (n, on) => sim.simSweep(n, on),
     SetLaunchAtLogin: async (on) => {
       launchAtLogin = on;
