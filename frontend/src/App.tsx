@@ -3,7 +3,7 @@ import type { Backend } from "./api";
 import { ActivityLog } from "./components/Activity";
 import { ExpressionPanel } from "./components/ExpressionPanel";
 import { Header } from "./components/Header";
-import { HistoryBar } from "./components/HistoryBar";
+import { HistoryControls } from "./components/HistoryControls";
 import { IndicatorEditor } from "./components/IndicatorEditor";
 import { PedalViewer } from "./components/PedalViewer";
 import { type PickerStart, PresetPicker } from "./components/PresetPicker";
@@ -80,7 +80,10 @@ export default function App({ backend }: { backend: Backend }) {
 
   return (
     <div className="app-shell">
-      <Header state={state} />
+      <Header state={state}>
+        <PresetPicker presets={bridge.presets} start={(q.get("picker") as PickerStart) || null} />
+        <HistoryControls bridge={bridge} initialOpen={q.get("history") === "open"} />
+      </Header>
       <main className="workspace">
         <div
           ref={workspace}
@@ -148,7 +151,6 @@ export default function App({ backend }: { backend: Backend }) {
             <span className="eyebrow">Configuration</span>
             <span className="inspector-meta">6 switches · 2 inputs</span>
           </div>
-          <PresetPicker presets={bridge.presets} start={(q.get("picker") as PickerStart) || null} />
           <Tabs
             className="inspector-tabs"
             label="Controller sections"
@@ -191,7 +193,6 @@ export default function App({ backend }: { backend: Backend }) {
               </TabPanel>
             )}
           </div>
-          <HistoryBar bridge={bridge} initialOpen={q.get("history") === "open"} />
         </aside>
       </main>
     </div>

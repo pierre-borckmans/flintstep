@@ -617,13 +617,16 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   flex-direction: column;
 }
+/* Above the workspace, so the preset and history popovers hang over it. */
 .app-header {
+  position: relative;
+  z-index: 30;
   height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 0 22px 0 88px;
+  gap: 16px;
+  padding: 0 20px 0 88px;
   border-bottom: 1px solid var(--color-edge);
   background: var(--color-chrome);
 }
@@ -859,8 +862,26 @@ input[type="range"]::-webkit-slider-thumb {
     gap: 12px;
     grid-template-columns: minmax(0, 1fr) 330px;
   }
-  .header-meta,
-  .header-midi {
+  .app-header {
+    gap: 12px;
+    padding-right: 14px;
+  }
+  .header-midi-port {
+    display: none;
+  }
+}
+/* The header gives up words before it gives up controls: firmware and profile first
+   (they are in the battery's tooltip), then the port name, then the labels. */
+@media (max-width: 1280px) {
+  .header-meta {
+    display: none;
+  }
+}
+@media (max-width: 920px) {
+  .app-header .app-wordmark > span,
+  .conn-prefix,
+  .preset-kicker,
+  .history-word:not([data-fault]) {
     display: none;
   }
 }
@@ -907,13 +928,8 @@ input[type="range"]::-webkit-slider-thumb {
   .app-header .app-wordmark > span {
     display: none;
   }
-  .app-header > div:first-of-type span {
-    font-size: 10px;
-  }
-  .app-header > div:first-of-type span > span {
-    display: none;
-  }
-  .app-header > span:nth-child(2) {
+  .conn-prefix,
+  .header-rule {
     display: none;
   }
 }

@@ -376,8 +376,8 @@ function PresetMenu({
   );
 }
 
-/** The editor's preset: its name, and a menu to switch, add, rename, delete, import
- *  and export them. */
+/** The editor's preset, as a pill in the window header: its name, and a menu below it
+ *  to switch, add, rename, delete, import and export them. */
 export function PresetPicker({ presets, start = null }: { presets: Presets; start?: PickerStart }) {
   const [open, setOpen] = useState(start !== null);
   // ?picker= opens it once in a given state (screenshots); reopening starts plain.
@@ -387,26 +387,29 @@ export function PresetPicker({ presets, start = null }: { presets: Presets; star
     setInitial(null);
   }, []);
   const current = presets.list.find((x) => x.id === presets.active);
+  const fault = presets.libraryError || presets.error;
   return (
-    <div className="relative shrink-0 border-b border-edge">
+    <div className="preset-picker relative flex min-w-[120px] shrink">
       <button
         type="button"
         data-preset-toggle
         aria-haspopup="dialog"
         aria-expanded={open}
+        aria-label={`Preset: ${current?.name ?? ""}`}
+        title={fault || "Presets"}
         onClick={() => (open ? close() : setOpen(true))}
         className={cx(
-          "flex h-10 w-full items-center gap-2.5 px-3 text-left transition-[background-image] duration-(--dur) ease-(--ease)",
-          open ? "warm" : "hover:warm",
+          "rim flex h-7 min-w-0 max-w-[240px] items-center gap-2 rounded-ui-md bg-panel2 pr-2 pl-2.5 text-left transition-[background-color,background-image] duration-(--dur) ease-(--ease)",
+          open ? "warm bg-panel3" : "hover:warm hover:bg-panel3",
         )}
       >
-        <Kicker className="shrink-0">Preset</Kicker>
-        <span className="min-w-0 flex-1 truncate text-ui-base font-semibold text-bone">
+        <Kicker className="preset-kicker shrink-0">Preset</Kicker>
+        <span className="min-w-0 flex-1 truncate text-ui-sm font-semibold text-bone">
           {current?.name ?? "…"}
         </span>
-        {(presets.libraryError || presets.error) && <Lamp on colour="hot" size={6} />}
+        {fault && <Lamp on colour="hot" size={6} />}
         <ChevronDown
-          size={14}
+          size={13}
           className={cx(
             "shrink-0 text-muted transition-transform duration-(--dur) ease-(--ease)",
             open && "rotate-180",
@@ -418,7 +421,7 @@ export function PresetPicker({ presets, start = null }: { presets: Presets; star
         onClose={close}
         ignore="[data-preset-toggle]"
         label="Presets"
-        className="absolute top-[calc(100%+4px)] right-2 left-2 z-20 flex max-h-[420px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
+        className="absolute top-[calc(100%+10px)] left-0 z-30 flex max-h-[min(420px,calc(100vh-80px))] w-[340px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
       >
         <PresetMenu presets={presets} onClose={close} start={initial} />
       </Popover>

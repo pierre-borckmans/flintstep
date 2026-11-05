@@ -101,9 +101,10 @@ function HistoryList({
   );
 }
 
-/** Where the mapping stands: saved, saving, or why it is not, with undo and redo and
- *  the session's history. Edits save themselves; nothing here needs pressing. */
-export function HistoryBar({
+/** Where the mapping stands (saved, saving, or not, and why in the tooltip), with undo,
+ *  redo and the session's history: a compact group in the window header. Edits save
+ *  themselves; nothing here needs pressing. */
+export function HistoryControls({
   bridge,
   initialOpen = false,
 }: {
@@ -123,70 +124,74 @@ export function HistoryBar({
     return () => clearTimeout(t);
   }, [savedAt]);
 
+  // A small lamp and one short word; the whole story (the error) is in the tooltip.
   let lamp = <Lamp on={justSaved} colour="live" size={6} />;
-  let text = <span className="text-faint">Saved</span>;
+  let word = <span className="text-faint">Saved</span>;
+  let tip = savedAt ? "Saved. Every change saves itself." : "Every change saves itself.";
   if (st.kind === "invalid" || st.kind === "failed") {
     lamp = <Lamp on colour="hot" size={6} />;
-    text = <span className="text-hot">Not saved: {st.error}</span>;
+    word = <span className="text-hot">Not saved</span>;
+    tip = `Not saved: ${st.error}`;
   } else if (st.kind === "pending" || st.kind === "saving") {
     lamp = <Lamp on colour="beam" size={6} />;
-    text = <span className="text-muted">Saving…</span>;
+    word = <span className="text-muted">Saving…</span>;
+    tip = "Saving…";
   }
 
   const undoLabel = history && H.undoLabel(history);
   const redoLabel = history && H.redoLabel(history);
   const changes = history ? history.entries.length - 1 : 0;
+  const fault = st.kind === "invalid" || st.kind === "failed";
 
   return (
-    <div className="relative flex min-h-11 shrink-0 items-center gap-2.5 border-t border-edge bg-panel py-2 pr-2 pl-4">
-      {lamp}
+    <div className="history-controls relative flex shrink-0 items-center gap-0.5">
       <span
-        className="min-w-0 flex-1 text-ui-sm leading-tight"
+        className="history-status flex items-center gap-1.5 pr-1.5 pl-1 text-ui-sm leading-none"
         role="status"
-        title={"error" in st ? st.error : undefined}
+        title={tip}
       >
-        {text}
+        {lamp}
+        <span className="history-word whitespace-nowrap" data-fault={fault || undefined}>
+          {word}
+        </span>
       </span>
-      <div className="flex items-center gap-0.5">
-        <Button
-          size="sm"
-          kind="ghost"
-          aria-label="Undo"
-          title={undoLabel ? `Undo ${undoLabel} (⌘Z)` : "Nothing to undo"}
-          disabled={!undoLabel}
-          onClick={undo}
-          icon={<Undo2 size={13} />}
-        />
-        <Button
-          size="sm"
-          kind="ghost"
-          aria-label="Redo"
-          title={redoLabel ? `Redo ${redoLabel} (⇧⌘Z)` : "Nothing to redo"}
-          disabled={!redoLabel}
-          onClick={redo}
-          icon={<Redo2 size={13} />}
-        />
-        <Button
-          size="sm"
-          kind={open ? "primary" : "ghost"}
-          data-history-toggle
-          aria-label="History"
-          aria-expanded={open}
-          title="History"
-          disabled={!history}
-          onClick={() => setOpen((o) => !o)}
-          icon={<HistoryIcon size={13} />}
-        >
-          {changes > 0 && <span className="font-mono tabular-nums">{changes}</span>}
-        </Button>
-      </div>
+      <Button
+        size="sm"
+        kind="ghost"
+        aria-label="Undo"
+        title={undoLabel ? `Undo ${undoLabel} (⌘Z)` : "Nothing to undo"}
+        disabled={!undoLabel}
+        onClick={undo}
+        icon={<Undo2 size={13} />}
+      />
+      <Button
+        size="sm"
+        kind="ghost"
+        aria-label="Redo"
+        title={redoLabel ? `Redo ${redoLabel} (⇧⌘Z)` : "Nothing to redo"}
+        disabled={!redoLabel}
+        onClick={redo}
+        icon={<Redo2 size={13} />}
+      />
+      <Button
+        size="sm"
+        kind={open ? "primary" : "ghost"}
+        data-history-toggle
+        aria-label="History"
+        aria-expanded={open}
+        title={changes > 0 ? `History: ${changes} change${changes === 1 ? "" : "s"}` : "History"}
+        disabled={!history}
+        onClick={() => setOpen((o) => !o)}
+        icon={<HistoryIcon size={13} />}
+      >
+        {changes > 0 && <span className="font-mono tabular-nums">{changes}</span>}
+      </Button>
       <Popover
         open={open && !!history}
         onClose={close}
-        side="above"
         ignore="[data-history-toggle]"
         label="History"
-        className="absolute right-2 bottom-[calc(100%+6px)] left-2 z-10 flex max-h-[320px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
+        className="absolute top-[calc(100%+10px)] right-0 z-30 flex max-h-[min(360px,calc(100vh-80px))] w-[300px] flex-col overflow-hidden rounded-ui-lg border border-edge-strong bg-panel shadow-pop"
       >
         {history && <HistoryList history={history} onJump={jump} />}
       </Popover>

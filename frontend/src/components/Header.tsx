@@ -1,5 +1,5 @@
 import { Plug, Zap } from "lucide-react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { batteryInfo } from "../lib/battery";
 import { levelColour } from "../lib/power";
 import type { State } from "../types";
@@ -7,6 +7,7 @@ import { cx } from "../ui/cx";
 import { Lamp } from "../ui/Lamp";
 
 const DRAG = { "--wails-draggable": "drag" } as CSSProperties;
+const NO_DRAG = { "--wails-draggable": "no-drag" } as CSSProperties;
 
 function Connection({ state }: { state: State | null }) {
   const p = state?.pedal;
@@ -23,7 +24,7 @@ function Connection({ state }: { state: State | null }) {
             ? "Bluetooth off"
             : "Not connected";
   return (
-    <div className="flex min-w-0 items-center gap-2" title={p?.detail}>
+    <div className="flex min-w-0 shrink-[3] items-center gap-2" title={p?.detail}>
       <span className="relative grid place-items-center">
         <Lamp
           on={s !== "idle"}
@@ -43,7 +44,7 @@ function Connection({ state }: { state: State | null }) {
         )}
       </span>
       <span className={cx("truncate text-ui-md", s === "connected" ? "text-text" : "text-muted")}>
-        {s === "connected" && <span className="text-muted">Connected to </span>}
+        {s === "connected" && <span className="conn-prefix text-muted">Connected to </span>}
         {words}
       </span>
     </div>
@@ -53,13 +54,13 @@ function Connection({ state }: { state: State | null }) {
 /** Four cells, like the pedal's own app shows it, coloured like the pedal's POWER lamp
  *  (red, yellow, green by lib/power's thresholds). On
  *  USB a bolt says it is charging, a plug that it is full and running off the cable. */
-function Battery({ level, powered }: { level: number; powered: boolean }) {
+function Battery({ level, powered, meta }: { level: number; powered: boolean; meta?: string }) {
   if (level < 0) return null;
   const cells = Math.ceil(level / 25);
   const colour = ({ red: "hot", yellow: "warn", green: "live" } as const)[levelColour(level)];
   const { power, tooltip } = batteryInfo(level, powered);
   return (
-    <div className="flex items-center gap-1.5" title={tooltip}>
+    <div className="flex items-center gap-1.5" title={meta ? `${tooltip}\n${meta}` : tooltip}>
       {power === "charging" && (
         <Zap size={11} className="text-live" fill="currentColor" aria-label="Charging" />
       )}
@@ -81,7 +82,11 @@ function Battery({ level, powered }: { level: number; powered: boolean }) {
   );
 }
 
-export function Header({ state }: { state: State | null }) {
+/** The window's top bar. Left: the app and the link. Middle: what is being edited (the
+ *  preset, its save state and history), passed in as children. Right: the pedal's
+ *  battery and the MIDI port, compact, with the details in tooltips. The bar drags the
+ *  window; everything that takes a click opts out (NO_DRAG). */
+export function Header({ state, children }: { state: State | null; children?: ReactNode }) {
   const p = state?.pedal;
   const live = p?.state === "connected";
   const midi = state?.midi;
@@ -96,28 +101,35 @@ export function Header({ state }: { state: State | null }) {
       <span className="app-wordmark">
         SparkX <span className="text-muted">MIDI</span>
       </span>
-      <span className="h-4 w-px bg-edge-strong" />
+      <span className="header-rule h-4 w-px shrink-0 bg-edge-strong" />
       <Connection state={state} />
-      <div className="flex-1" />
-      {meta && <span className="header-meta truncate text-ui-sm text-muted">{meta}</span>}
-      {live && <Battery level={p?.battery ?? -1} powered={!!p?.powered} />}
-      {midi && (
-        <div
-          className="header-midi flex max-w-[260px] min-w-0 items-center gap-2"
-          title={midi.ok ? `Virtual MIDI: ${midi.source} → / ← ${midi.dest}` : midi.error}
-        >
-          <Lamp on colour={midi.ok ? "cold" : "hot"} size={6} />
-          <span className={cx("truncate text-ui-sm", midi.ok ? "text-muted" : "text-hot")}>
-            {midi.ok ? (
-              <>
-                MIDI <span className="text-text">{midi.source}</span>
-              </>
-            ) : (
-              `MIDI: ${midi.error || "unavailable"}`
-            )}
-          </span>
+      <div className="min-w-2 flex-1" />
+      {children && (
+        <div style={NO_DRAG} className="header-edit flex min-w-0 shrink items-center gap-2">
+          {children}
         </div>
       )}
+      <span className="header-rule h-4 w-px shrink-0 bg-edge-strong" />
+      <div style={NO_DRAG} className="header-device flex shrink-0 items-center gap-3.5">
+        {meta && <span className="header-meta truncate text-ui-xs text-faint">{meta}</span>}
+        {live && <Battery level={p?.battery ?? -1} powered={!!p?.powered} meta={meta} />}
+        {midi && (
+          <div
+            className="flex items-center gap-1.5"
+            title={
+              midi.ok
+                ? `Virtual MIDI ports: "${midi.source}" out, "${midi.dest}" in`
+                : `MIDI: ${midi.error || "unavailable"}`
+            }
+          >
+            <Lamp on colour={midi.ok ? "cold" : "hot"} size={6} />
+            <span className={cx("text-ui-sm", midi.ok ? "text-muted" : "text-hot")}>
+              MIDI
+              <span className="header-midi-port text-text"> {midi.source}</span>
+            </span>
+          </div>
+        )}
+      </div>
     </header>
   );
 }
