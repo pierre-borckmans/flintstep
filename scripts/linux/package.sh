@@ -25,11 +25,16 @@ case "$(uname -m)" in
 esac
 
 # deb_version turns a git describe into a Debian version: v1.2.3 -> 1.2.3,
-# v1.2.3-4-gabc -> 1.2.3+4.gabc, a bare hash -> 0.0.0+gitabc. "-dirty" becomes ".dirty".
+# v1.2.3-rc.1 -> 1.2.3~rc.1 (sorts before 1.2.3), v1.2.3-4-gabc -> 1.2.3+4.gabc,
+# a bare hash -> 0.0.0+gitabc. "-dirty" becomes ".dirty".
 deb_version() {
   local v="${1#v}"
   if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
     local base="${BASH_REMATCH[0]}" rest="${v:${#BASH_REMATCH[0]}}"
+    if [[ "$rest" =~ ^-([A-Za-z][^-]*)(.*)$ ]]; then
+      base="$base~${BASH_REMATCH[1]}"
+      rest="${BASH_REMATCH[2]}"
+    fi
     rest="${rest#-}"
     if [ -n "$rest" ]; then echo "$base+${rest//-/.}"; else echo "$base"; fi
   else
