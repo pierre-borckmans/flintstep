@@ -15,6 +15,7 @@ import "C"
 import (
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 )
 
@@ -55,6 +56,9 @@ func Start(templateIconPNG []byte, onClick func(id string)) {
 	}
 	C.trayStart(p, C.int(len(templateIconPNG)))
 }
+
+// Available reports whether there is a menu bar to put the item in: on macOS always.
+func Available(time.Duration) bool { return true }
 
 // SetMenu replaces the item's menu. It may be called before Start; the menu is shown
 // once the item exists. Items with an empty ID do nothing when chosen.

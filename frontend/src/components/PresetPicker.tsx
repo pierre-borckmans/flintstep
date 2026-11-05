@@ -17,12 +17,17 @@ export type PickerStart = "open" | "rename" | "delete" | null;
 
 function IconButton({
   label,
+  title,
+  kbd,
   onClick,
   disabled,
   danger,
   children,
 }: {
   label: string;
+  /** The tooltip, when it says more than the label. */
+  title?: string;
+  kbd?: string;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
@@ -32,7 +37,8 @@ function IconButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
+      title={title ?? label}
+      data-kbd={kbd}
       disabled={disabled}
       tabIndex={-1}
       onClick={(e) => {
@@ -315,17 +321,28 @@ function PresetMenu({
                   i === hi && "opacity-100",
                 )}
               >
-                <IconButton label="Rename" onClick={() => startRename(x.id)}>
+                <IconButton label="Rename" kbd="F2" onClick={() => startRename(x.id)}>
                   <Pencil size={12} />
                 </IconButton>
-                <IconButton label="Duplicate" onClick={() => void duplicate(x)}>
+                <IconButton
+                  label="Duplicate"
+                  title="Duplicate as a new preset"
+                  onClick={() => void duplicate(x)}
+                >
                   <Copy size={12} />
                 </IconButton>
-                <IconButton label="Export…" onClick={() => void act(() => p.export(x.id))}>
+                <IconButton
+                  label="Export…"
+                  title="Export to a .flintstep.json file"
+                  onClick={() => void act(() => p.export(x.id))}
+                >
                   <Download size={12} />
                 </IconButton>
                 <IconButton
                   label={list.length === 1 ? "The last preset cannot be deleted" : "Delete…"}
+                  title={
+                    list.length === 1 ? "The last preset cannot be deleted" : "Delete. Asks first"
+                  }
                   disabled={list.length === 1}
                   danger
                   onClick={() => setMode({ kind: "delete", id: x.id })}
@@ -366,7 +383,9 @@ function PresetMenu({
           size="sm"
           kind="ghost"
           icon={<Upload size={12} />}
-          title="Add a preset from a .flintstep.json file (older .sparkx.json exports and config.json work too)"
+          title={
+            "Add a preset from a .flintstep.json file\nOlder .sparkx.json exports and config.json work too"
+          }
           onClick={() => void importOne()}
         >
           Import…
@@ -396,7 +415,11 @@ export function PresetPicker({ presets, start = null }: { presets: Presets; star
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`Preset: ${current?.name ?? ""}`}
-        title={fault || "Presets"}
+        title={
+          fault
+            ? `${current?.name ?? "Preset"}\n${fault}`
+            : `${current?.name ?? "Preset"}\nSwitch, add, rename or export presets`
+        }
         onClick={() => (open ? close() : setOpen(true))}
         className={cx(
           "rim flex h-7 min-w-0 max-w-[240px] items-center gap-2 rounded-ui-md bg-panel2 pr-2 pl-2.5 text-left transition-[background-color,background-image] duration-(--dur) ease-(--ease)",

@@ -138,11 +138,29 @@ export interface Device {
   system: boolean;
 }
 
+/** mapping.Source: what produced a message. "release" is a release forced by a
+ *  disconnect or a cable coming out; "feedback" is MIDI in from the LED port. */
+export type ActivitySource =
+  | "switch"
+  | "long"
+  | "combo"
+  | "exp"
+  | "trigger"
+  | "feedback"
+  | "release";
+
 export interface Activity {
   dir: "out" | "in";
   bytes: number[];
   label: string;
   at: number; // unix milliseconds
+  source: ActivitySource;
+  /** The switch 0..5, expression input 0..1 or combo index; -1 for none. */
+  index: number;
+  /** A combo's two switches. */
+  pair: [number, number];
+  /** For "release": what it lets go of ("switch" | "long" | "combo" | "trigger"). */
+  of?: ActivitySource;
 }
 
 export type ExpEdge = "min" | "max";

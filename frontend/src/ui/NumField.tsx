@@ -37,6 +37,7 @@ export function NumField({
   className,
   disabled,
   wide,
+  hint,
 }: {
   value: number;
   onChange: (v: number, gesture?: Gesture) => void;
@@ -50,6 +51,8 @@ export function NumField({
   className?: string;
   disabled?: boolean;
   wide?: boolean;
+  /** What the value is, for the tooltip ("MIDI channel"); the label otherwise. */
+  hint?: string;
 }) {
   const range: Range = { min, max, step };
   const show = format ?? String;
@@ -150,7 +153,11 @@ export function NumField({
       aria-disabled={disabled || undefined}
       data-scrubbing={scrubbing || undefined}
       data-editing={editing || undefined}
-      title={disabled || editing ? undefined : "Drag to change · click to type"}
+      title={
+        disabled || editing
+          ? undefined
+          : `${hint ?? label}, ${show(min)}–${show(max)}\nDrag to change, click to type`
+      }
       onPointerDown={(e) => {
         if (disabled || editing || e.button !== 0) return;
         e.preventDefault(); // no text selection; focus by hand, without scrolling

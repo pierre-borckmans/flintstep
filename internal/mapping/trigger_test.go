@@ -58,9 +58,9 @@ func runT(t *testing.T, e *Engine, steps []tstep) {
 	for i, s := range steps {
 		var got [][]byte
 		if s.raw < 0 {
-			got = e.Tick(at(s.ms))
+			got = e.Tick(at(s.ms)).Msgs()
 		} else {
-			got = e.Exp(0, s.raw, at(s.ms))
+			got = e.Exp(0, s.raw, at(s.ms)).Msgs()
 		}
 		got = trig(got)
 		if len(got) == 0 && len(s.want) == 0 {
@@ -93,8 +93,8 @@ func TestTriggerEngageOnRise(t *testing.T) {
 
 func TestTriggerEngageSendsPressBeforeTheCC(t *testing.T) {
 	e := NewEngine(engageCfg(nil))
-	e.Exp(0, 0, at(0))
-	got := e.Exp(0, raw(50), at(10))
+	e.Exp(0, 0, at(0)).Msgs()
+	got := e.Exp(0, raw(50), at(10)).Msgs()
 	want := [][]byte{on, cc(1, 11, 64)}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %s, want %s", describeAll(got), describeAll(want))
@@ -136,11 +136,11 @@ func TestTriggerOffDelayHoldsThroughAHeelTouch(t *testing.T) {
 
 func TestTriggerOffDelayIsPending(t *testing.T) {
 	e := NewEngine(engageCfg(nil))
-	e.Exp(0, raw(50), at(0))
+	e.Exp(0, raw(50), at(0)).Msgs()
 	if e.Pending() {
 		t.Fatal("Pending while the pedal is up")
 	}
-	e.Exp(0, 0, at(100))
+	e.Exp(0, 0, at(100)).Msgs()
 	if !e.Pending() {
 		t.Fatal("not Pending during the off delay")
 	}
@@ -184,7 +184,7 @@ func TestTriggerToeToggle(t *testing.T) {
 	if !e.ExpTriggers()[0] {
 		t.Fatal("a toggled-on toe click should read as engaged")
 	}
-	e.Exp(0, raw(50), at(60))
+	e.Exp(0, raw(50), at(60)).Msgs()
 	if !e.ExpTriggers()[0] {
 		t.Fatal("a toggle stays engaged after the toe comes back")
 	}
@@ -208,14 +208,14 @@ func TestTriggerFollowsCalibrationAndInvert(t *testing.T) {
 
 func TestTriggerResetReleases(t *testing.T) {
 	e := NewEngine(engageCfg(nil))
-	e.Exp(0, raw(50), at(0))
-	if got := trig(e.Reset()); !reflect.DeepEqual(got, [][]byte{off}) {
+	e.Exp(0, raw(50), at(0)).Msgs()
+	if got := trig(e.Reset().Msgs()); !reflect.DeepEqual(got, [][]byte{off}) {
 		t.Fatalf("Reset() = %s, want the release", describeAll(got))
 	}
 	if e.ExpTriggers()[0] || e.Pending() {
 		t.Fatal("trigger still engaged or pending after Reset")
 	}
-	if got := e.Reset(); len(got) != 0 {
+	if got := e.Reset().Msgs(); len(got) != 0 {
 		t.Fatalf("second Reset() = %s", describeAll(got))
 	}
 	// The next value engages afresh.
@@ -224,9 +224,9 @@ func TestTriggerResetReleases(t *testing.T) {
 
 func TestTriggerResetDuringOffDelay(t *testing.T) {
 	e := NewEngine(engageCfg(nil))
-	e.Exp(0, raw(50), at(0))
-	e.Exp(0, 0, at(10))
-	if got := trig(e.Reset()); !reflect.DeepEqual(got, [][]byte{off}) {
+	e.Exp(0, raw(50), at(0)).Msgs()
+	e.Exp(0, 0, at(10)).Msgs()
+	if got := trig(e.Reset().Msgs()); !reflect.DeepEqual(got, [][]byte{off}) {
 		t.Fatalf("Reset() = %s, want the release", describeAll(got))
 	}
 	runT(t, e, []tstep{tickT(1000)})
@@ -234,8 +234,8 @@ func TestTriggerResetDuringOffDelay(t *testing.T) {
 
 func TestTriggerResetKeepsToggles(t *testing.T) {
 	e := NewEngine(toeCfg(trigTog))
-	e.Exp(0, raw(100), at(0))
-	if got := e.Reset(); len(got) != 0 {
+	e.Exp(0, raw(100), at(0)).Msgs()
+	if got := e.Reset().Msgs(); len(got) != 0 {
 		t.Fatalf("Reset() = %s, a toggle has no release", describeAll(got))
 	}
 	if !e.ExpTriggers()[0] {
@@ -245,21 +245,21 @@ func TestTriggerResetKeepsToggles(t *testing.T) {
 
 func TestTriggerCableOutReleases(t *testing.T) {
 	e := NewEngine(engageCfg(nil))
-	e.Exp(0, raw(50), at(0))
-	if got := e.ExpRelease(1); len(got) != 0 {
+	e.Exp(0, raw(50), at(0)).Msgs()
+	if got := e.ExpRelease(1).Msgs(); len(got) != 0 {
 		t.Fatalf("ExpRelease(1) = %s, input 2 holds nothing", describeAll(got))
 	}
-	if got := e.ExpRelease(0); !reflect.DeepEqual(got, [][]byte{off}) {
+	if got := e.ExpRelease(0).Msgs(); !reflect.DeepEqual(got, [][]byte{off}) {
 		t.Fatalf("ExpRelease(0) = %s, want the release", describeAll(got))
 	}
-	if got := e.ExpRelease(0); len(got) != 0 {
+	if got := e.ExpRelease(0).Msgs(); len(got) != 0 {
 		t.Fatalf("second ExpRelease(0) = %s", describeAll(got))
 	}
-	if e.ExpRelease(-1) != nil || e.ExpRelease(2) != nil {
+	if e.ExpRelease(-1).Msgs() != nil || e.ExpRelease(2).Msgs() != nil {
 		t.Fatal("ExpRelease of an input that does not exist sent something")
 	}
 	// Plugged back in at the same place: the CC is sent again, and the trigger engages.
-	got := e.Exp(0, raw(50), at(10))
+	got := e.Exp(0, raw(50), at(10)).Msgs()
 	if want := [][]byte{on, cc(1, 11, 64)}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("after replug: %s, want %s", describeAll(got), describeAll(want))
 	}
@@ -281,9 +281,9 @@ func TestTriggerConfigChangeReleases(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			cfg := engageCfg(nil)
 			e := NewEngine(cfg)
-			e.Exp(0, raw(50), at(0))
+			e.Exp(0, raw(50), at(0)).Msgs()
 			c.edit(&cfg)
-			if got := trig(e.SetConfig(cfg)); !reflect.DeepEqual(got, c.want) {
+			if got := trig(e.SetConfig(cfg).Msgs()); !reflect.DeepEqual(got, c.want) {
 				t.Fatalf("SetConfig = %s, want %s", describeAll(got), describeAll(c.want))
 			}
 			if c.want != nil && (e.ExpTriggers()[0] || e.Pending()) {
@@ -296,10 +296,10 @@ func TestTriggerConfigChangeReleases(t *testing.T) {
 func TestTriggerConfigChangeDuringOffDelay(t *testing.T) {
 	cfg := engageCfg(nil)
 	e := NewEngine(cfg)
-	e.Exp(0, raw(50), at(0))
-	e.Exp(0, 0, at(10))
+	e.Exp(0, raw(50), at(0)).Msgs()
+	e.Exp(0, 0, at(10)).Msgs()
 	cfg.Exp[0].Trigger.Mode = TriggerToe
-	if got := trig(e.SetConfig(cfg)); !reflect.DeepEqual(got, [][]byte{off}) {
+	if got := trig(e.SetConfig(cfg).Msgs()); !reflect.DeepEqual(got, [][]byte{off}) {
 		t.Fatalf("SetConfig = %s, want the release", describeAll(got))
 	}
 	runT(t, e, []tstep{tickT(1000)})
@@ -309,16 +309,16 @@ func TestTriggerReleaseEndsWhatWasPressed(t *testing.T) {
 	// The release half is the action that pressed, even after a threshold edit.
 	cfg := engageCfg(nil)
 	e := NewEngine(cfg)
-	e.Exp(0, raw(50), at(0))
+	e.Exp(0, raw(50), at(0)).Msgs()
 	cfg.Exp[0].Trigger.Threshold = 20
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	runT(t, e, []tstep{feed(10, raw(30)), feed(20, raw(10)), tickT(420, off)})
 }
 
 func TestTriggerOffSendsOnlyTheCC(t *testing.T) {
 	e := NewEngine(Default())
 	for i, r := range []int{0, raw(50), raw(100), 0} {
-		for _, m := range e.Exp(0, r, at(i*10)) {
+		for _, m := range e.Exp(0, r, at(i*10)).Msgs() {
 			if m[1] != 11 {
 				t.Fatalf("trigger off sent %s", Describe(m))
 			}
@@ -333,7 +333,7 @@ func TestTriggerDisabledInputDoesNothing(t *testing.T) {
 	cfg := engageCfg(nil)
 	cfg.Exp[0].Enabled = false
 	e := NewEngine(cfg)
-	if got := e.Exp(0, raw(50), at(0)); len(got) != 0 {
+	if got := e.Exp(0, raw(50), at(0)).Msgs(); len(got) != 0 {
 		t.Fatalf("disabled input sent %s", describeAll(got))
 	}
 }

@@ -218,3 +218,25 @@ func TestDropReleasesHeldSwitch(t *testing.T) {
 		t.Fatalf("after a drop mid-press sent % x, want CC 85 = 0 last", sent)
 	}
 }
+
+func TestActivityCarriesOrigin(t *testing.T) {
+	b, _, _, _, acts := setup(t, mapping.Default())
+	h := b.Handlers()
+	h.Switch(sparkx.Edge{Switch: 5, Down: true})
+	h.Status(ble.Status{State: ble.StateSearching})
+	b.Feedback([]byte{0xB0, 84, 127})
+	want := []Activity{
+		{Dir: "out", Source: "switch", Index: 5},
+		{Dir: "out", Source: "release", Of: "switch", Index: 5},
+		{Dir: "in", Source: "feedback", Index: -1},
+	}
+	if len(*acts) != len(want) {
+		t.Fatalf("activity = %+v, want %d entries", *acts, len(want))
+	}
+	for i, w := range want {
+		g := (*acts)[i]
+		if g.Dir != w.Dir || g.Source != w.Source || g.Index != w.Index || g.Of != w.Of {
+			t.Errorf("activity %d = %+v, want dir %q source %q index %d of %q", i, g, w.Dir, w.Source, w.Index, w.Of)
+		}
+	}
+}

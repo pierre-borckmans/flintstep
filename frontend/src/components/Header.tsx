@@ -24,8 +24,22 @@ function Connection({ state }: { state: State | null }) {
           : s === "off"
             ? "Bluetooth off"
             : "Not connected";
+  // The words in the bar get truncated and drop "Connected to" in a narrow window; the
+  // tooltip has the whole state, and which pedal it is once connected.
+  const head = p?.detail || words;
+  const more =
+    s === "connected"
+      ? [p?.address, p?.firmware && `Firmware ${p.firmware}`].filter(Boolean).join(" · ")
+      : s === "idle"
+        ? "Choose a pedal in Settings, under Pedal"
+        : s === "off"
+          ? "Turn Bluetooth on to connect"
+          : "";
   return (
-    <div className="flex min-w-0 shrink-[3] items-center gap-2" title={p?.detail}>
+    <div
+      className="flex min-w-0 shrink-[3] items-center gap-2"
+      title={more ? `${head}\n${more}` : head}
+    >
       <span className="relative grid place-items-center">
         <Lamp
           on={s !== "idle"}
@@ -62,10 +76,13 @@ function Battery({ level, powered, meta }: { level: number; powered: boolean; me
   const { power, tooltip } = batteryInfo(level, powered);
   return (
     <div className="flex items-center gap-1.5" title={meta ? `${tooltip}\n${meta}` : tooltip}>
-      {power === "charging" && (
-        <Zap size={11} className="text-live" fill="currentColor" aria-label="Charging" />
-      )}
-      {power === "usb" && <Plug size={11} className="text-muted" aria-label="On USB power" />}
+      {/* A fixed slot, so the cable coming and going does not shift the header. */}
+      <span className="grid w-[11px] shrink-0 place-items-center">
+        {power === "charging" && (
+          <Zap size={11} className="text-live" fill="currentColor" aria-label="Charging" />
+        )}
+        {power === "usb" && <Plug size={11} className="text-muted" aria-label="On USB power" />}
+      </span>
       <div className="flex items-center gap-[2px] rounded-[3px] border border-edge-strong p-[2px]">
         {[0, 1, 2, 3].map((i) => (
           <Lamp
@@ -78,7 +95,9 @@ function Battery({ level, powered, meta }: { level: number; powered: boolean; me
           />
         ))}
       </div>
-      <span className="font-mono text-ui-sm text-muted tabular-nums">{level}%</span>
+      <span className="min-w-[4ch] text-right font-mono text-ui-sm text-muted tabular-nums">
+        {level}%
+      </span>
     </div>
   );
 }
@@ -97,6 +116,13 @@ export function Header({ state, children }: { state: State | null; children?: Re
   ]
     .filter(Boolean)
     .join(" · ");
+  // The same, spelled out, under the battery's tooltip (the words above hide first).
+  const about = [
+    live && p?.firmware ? `Firmware ${p.firmware}` : "",
+    live && p?.profileName ? `Profile ${p.profileName}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <header style={DRAG} className="app-header">
       <span className="app-wordmark">{PRODUCT_NAME}</span>
@@ -111,14 +137,14 @@ export function Header({ state, children }: { state: State | null; children?: Re
       <span className="header-rule h-4 w-px shrink-0 bg-edge-strong" />
       <div style={NO_DRAG} className="header-device flex shrink-0 items-center gap-3.5">
         {meta && <span className="header-meta truncate text-ui-xs text-faint">{meta}</span>}
-        {live && <Battery level={p?.battery ?? -1} powered={!!p?.powered} meta={meta} />}
+        {live && <Battery level={p?.battery ?? -1} powered={!!p?.powered} meta={about} />}
         {midi && (
           <div
             className="flex items-center gap-1.5"
             title={
               midi.ok
-                ? `Virtual MIDI ports: "${midi.source}" out, "${midi.dest}" in`
-                : `MIDI: ${midi.error || "unavailable"}`
+                ? `Virtual MIDI ports\nTo your apps: ${midi.source}\nLED feedback from your DAW: ${midi.dest}`
+                : `MIDI unavailable\n${midi.error || "The virtual ports could not be created"}`
             }
           >
             <Lamp on colour={midi.ok ? "cold" : "hot"} size={6} />

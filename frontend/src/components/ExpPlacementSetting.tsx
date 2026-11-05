@@ -12,9 +12,13 @@ export function ExpPlacementSetting() {
         label="Expression pedals"
         size="sm"
         options={[
-          { value: "auto", label: "Auto" },
-          { value: "behind", label: "Behind" },
-          { value: "beside", label: "Beside" },
+          {
+            value: "auto",
+            label: "Auto",
+            title: "Behind or beside the Spark, whichever draws it bigger",
+          },
+          { value: "behind", label: "Behind", title: "Behind the Spark, cables straight back" },
+          { value: "beside", label: "Beside", title: "To the right of the Spark" },
         ]}
         value={mode}
         onChange={setExpPlacement}

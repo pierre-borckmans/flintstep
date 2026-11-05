@@ -18,6 +18,13 @@ jobs:
       - run: scripts/product/sync.sh --check
       # package main embeds all:frontend/dist
       - run: make dist
+      # internal/coremidi binds ALSA on Linux (cgo). snd-seq, when the runner's kernel
+      # has it, lets the ALSA loopback test run instead of skipping.
+      - name: ALSA headers and sequencer
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev
+          sudo modprobe snd-seq || echo "no snd-seq module: the ALSA loopback test will skip"
+          if [ -e /dev/snd/seq ]; then sudo chmod a+rw /dev/snd/seq; fi
       - name: gofmt
         run: |
           out=$(gofmt -l .)
@@ -41,6 +48,33 @@ jobs:
       - run: go build ./...
         env:
           CGO_ENABLED: "1"
+      - run: go test ./...
+
+  # The Linux app and its packages (experimental), built in the same Docker image as
+  # `make linux`, natively on each architecture, then smoke-tested under Xvfb.
+  linux:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the version comes from the tags
+      - run: make linux LINUX_ARCHES=${{ matrix.arch }}
+      - run: scripts/linux/docker.sh smoke ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            build/bin/linux/${{ matrix.arch }}/*.AppImage
+            build/bin/linux/${{ matrix.arch }}/*.deb
+            build/bin/linux/smoke/
+          if-no-files-found: error
 
   # THIRD_PARTY_NOTICES.md must list what the binaries contain: regenerate and compare.
   # Needs both the Go module cache and frontend/node_modules.

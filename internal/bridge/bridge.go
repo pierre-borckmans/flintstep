@@ -43,6 +43,15 @@ type Activity struct {
 	Bytes []int  `json:"bytes"`
 	Label string `json:"label"`
 	At    int64  `json:"at"` // unix ms
+	// Where it came from (mapping.Origin): "switch" | "long" | "combo" | "exp" |
+	// "trigger" | "release" for out, "feedback" for in.
+	Source string `json:"source"`
+	// Index is the switch (0..5), expression input (0..1) or combo; -1 for none.
+	Index int `json:"index"`
+	// Pair is a combo's two switches.
+	Pair [2]int `json:"pair"`
+	// Of is what a "release" lets go of: "switch" | "long" | "combo" | "trigger".
+	Of string `json:"of,omitempty"`
 }
 
 // tickEvery is how often pending long presses and combos are checked. A long press
@@ -260,7 +269,7 @@ func (b *Bridge) onPedalStatus(st ble.Status) {
 		// A jack without a cable lets go of its trigger: a pedal pulled out mid-sweep
 		// must not leave the effect it engaged stuck on. A simulated jack has a cable as
 		// far as the engine knows; a real cable in it ends the simulation.
-		var releases [][]byte
+		var releases mapping.Outs
 		b.mu.Lock()
 		for n, in := range st.Cables {
 			switch {
@@ -296,7 +305,7 @@ func (b *Bridge) Feedback(msg []byte) {
 	b.eng.Feedback(msg)
 	b.inUntil = b.now().Add(flashFor)
 	b.mu.Unlock()
-	b.activity("in", msg)
+	b.activity("in", msg, mapping.Origin{Source: mapping.SrcFeedback, Index: -1})
 	b.syncLamps()
 	b.startTicking()
 }
@@ -364,7 +373,7 @@ func (b *Bridge) startTicking() {
 	}()
 }
 
-func (b *Bridge) send(msgs [][]byte) {
+func (b *Bridge) send(msgs mapping.Outs) {
 	if len(msgs) == 0 {
 		return
 	}
@@ -374,14 +383,14 @@ func (b *Bridge) send(msgs [][]byte) {
 	b.mu.Unlock()
 	for _, m := range msgs {
 		if out != nil {
-			_ = out.Send(m)
+			_ = out.Send(m.Msg)
 		}
-		b.activity("out", m)
+		b.activity("out", m.Msg, m.Src)
 	}
 	b.startTicking()
 }
 
-func (b *Bridge) activity(dir string, msg []byte) {
+func (b *Bridge) activity(dir string, msg []byte, src mapping.Origin) {
 	if b.onActivity == nil {
 		return
 	}
@@ -389,7 +398,10 @@ func (b *Bridge) activity(dir string, msg []byte) {
 	for i, c := range msg {
 		bs[i] = int(c)
 	}
-	b.onActivity(Activity{Dir: dir, Bytes: bs, Label: mapping.Describe(msg), At: b.now().UnixMilli()})
+	b.onActivity(Activity{
+		Dir: dir, Bytes: bs, Label: mapping.Describe(msg), At: b.now().UnixMilli(),
+		Source: string(src.Source), Index: src.Index, Pair: src.Pair, Of: string(src.Of),
+	})
 }
 
 // lampsLocked is what all eight lamps should show now.

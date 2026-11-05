@@ -1,7 +1,10 @@
 import { History as HistoryIcon, Redo2, Undo2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SaveStatus } from "../lib/autosave";
 import * as H from "../lib/history";
 import { relTime } from "../lib/midi";
+import { keys } from "../lib/platform";
+import { calmStart, type Shown, settle, shownOf } from "../lib/savestatus";
 import { hasOwnUndo, historyKey } from "../lib/shortcuts";
 import type { Config } from "../types";
 import { Button } from "../ui/Button";
@@ -31,6 +34,32 @@ function useHistoryKeys(undo: () => void, redo: () => void, flush: () => void) {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, flush]);
 }
+
+/** What the save word shows: the status, calmed (lib/savestatus) so quick saves do not
+ *  flicker "Saving…" and a shown "Saving…" does not vanish at once. */
+function useCalmStatus(st: SaveStatus): Shown {
+  const actual = shownOf(st);
+  const calm = useRef(calmStart);
+  const [shown, setShown] = useState<Shown>(calmStart.shown);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const look = () => {
+      const r = settle(calm.current, actual, Date.now());
+      calm.current = r.calm;
+      setShown(r.calm.shown);
+      if (r.wakeIn !== null) timer = setTimeout(look, r.wakeIn);
+    };
+    look();
+    return () => clearTimeout(timer);
+  }, [actual]);
+  return shown;
+}
+
+const WORDS: { id: Shown; text: string; className: string }[] = [
+  { id: "saved", text: "Saved", className: "text-faint" },
+  { id: "saving", text: "Saving…", className: "text-muted" },
+  { id: "fault", text: "Not saved", className: "text-hot" },
+];
 
 function useNow(on: boolean, every = 1000) {
   const [now, setNow] = useState(Date.now());
@@ -89,6 +118,13 @@ function HistoryList({
                   type="button"
                   onClick={() => onJump(e.i)}
                   aria-current={here ? "step" : undefined}
+                  title={`${e.label}\n${
+                    here
+                      ? "Where the preset is now"
+                      : undone
+                        ? "Undone. Click to redo up to here"
+                        : "Click to go back to here"
+                  }`}
                   className={cx(
                     "grid w-full grid-cols-[6px_1fr_auto] items-center gap-2.5 px-3 py-[5px] text-left transition-[color,background-color] duration-(--dur) ease-(--ease)",
                     here ? "bg-panel2" : "hover:warm",
@@ -101,7 +137,6 @@ function HistoryList({
                       here ? "text-bone" : undone ? "text-faint" : "text-text/90",
                       e.i === 0 && !here && "text-muted",
                     )}
-                    title={e.label}
                   >
                     {e.label}
                   </span>
@@ -143,23 +178,24 @@ export function HistoryControls({
   }, [savedAt]);
 
   // A small lamp and one short word; the whole story (the error) is in the tooltip.
+  // The three words share one slot as wide as the widest, so nothing moves when it
+  // changes: they cross-fade in place.
+  const shown = useCalmStatus(st);
   let lamp = <Lamp on={justSaved} colour="live" size={6} />;
-  let word = <span className="text-faint">Saved</span>;
-  let tip = savedAt ? "Saved. Every change saves itself." : "Every change saves itself.";
-  if (st.kind === "invalid" || st.kind === "failed") {
+  let tip = savedAt
+    ? `Saved at ${new Date(savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}\nEvery change saves itself`
+    : "Every change saves itself";
+  if (shown === "fault") {
     lamp = <Lamp on colour="hot" size={6} />;
-    word = <span className="text-hot">Not saved</span>;
-    tip = `Not saved: ${st.error}`;
-  } else if (st.kind === "pending" || st.kind === "saving") {
+    tip = st.kind === "invalid" || st.kind === "failed" ? `Not saved\n${st.error}` : "Not saved";
+  } else if (shown === "saving") {
     lamp = <Lamp on colour="beam" size={6} />;
-    word = <span className="text-muted">Saving…</span>;
-    tip = "Saving…";
+    tip = "Saving the latest change";
   }
 
   const undoLabel = history && H.undoLabel(history);
   const redoLabel = history && H.redoLabel(history);
   const changes = history ? history.entries.length - 1 : 0;
-  const fault = st.kind === "invalid" || st.kind === "failed";
 
   return (
     <div className="history-controls relative flex shrink-0 items-center gap-0.5">
@@ -169,15 +205,25 @@ export function HistoryControls({
         title={tip}
       >
         {lamp}
-        <span className="history-word whitespace-nowrap" data-fault={fault || undefined}>
-          {word}
+        <span className="history-word" data-shown={shown}>
+          {WORDS.map((w) => (
+            <span
+              key={w.id}
+              data-word={w.id}
+              className={w.className}
+              aria-hidden={w.id !== shown || undefined}
+            >
+              {w.text}
+            </span>
+          ))}
         </span>
       </span>
       <Button
         size="sm"
         kind="ghost"
         aria-label="Undo"
-        title={undoLabel ? `Undo ${undoLabel} (⌘Z)` : "Nothing to undo"}
+        title={undoLabel ? `Undo ${undoLabel}` : "Nothing to undo"}
+        data-kbd={undoLabel ? keys("⌘Z") : undefined}
         disabled={!undoLabel}
         onClick={undo}
         icon={<Undo2 size={13} />}
@@ -186,7 +232,8 @@ export function HistoryControls({
         size="sm"
         kind="ghost"
         aria-label="Redo"
-        title={redoLabel ? `Redo ${redoLabel} (⇧⌘Z)` : "Nothing to redo"}
+        title={redoLabel ? `Redo ${redoLabel}` : "Nothing to redo"}
+        data-kbd={redoLabel ? keys("⇧⌘Z") : undefined}
         disabled={!redoLabel}
         onClick={redo}
         icon={<Redo2 size={13} />}
@@ -197,12 +244,19 @@ export function HistoryControls({
         data-history-toggle
         aria-label="History"
         aria-expanded={open}
-        title={changes > 0 ? `History: ${changes} change${changes === 1 ? "" : "s"}` : "History"}
+        title={
+          changes > 0
+            ? `History\n${changes} change${changes === 1 ? "" : "s"} to ${preset || "this preset"} this session`
+            : "History\nNo changes this session yet"
+        }
         disabled={!history}
         onClick={() => setOpen((o) => !o)}
         icon={<HistoryIcon size={13} />}
       >
-        {changes > 0 && <span className="font-mono tabular-nums">{changes}</span>}
+        {/* Always there and two digits wide, so the first change does not widen it. */}
+        <span className="min-w-[2ch] text-left font-mono tabular-nums">
+          {changes > 0 ? changes : ""}
+        </span>
       </Button>
       <Popover
         open={open && !!history}

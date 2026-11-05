@@ -117,3 +117,18 @@ precommit: ## Fast pre-commit gate: format check + lint
 
 clean:
 	rm -rf $(FRONTEND)/dist build/bin build/dmg
+
+# ---- Linux (experimental) ----
+# Built in Docker (build/linux/Dockerfile), from macOS or Linux. Hardware-untested: see
+# the Linux section of README.md and docs/PORTING.md.
+LINUX_ARCHES ?= amd64 arm64
+.PHONY: linux linux-test linux-smoke
+
+linux: ## Build the Linux app, AppImage and .deb in Docker (LINUX_ARCHES="amd64 arm64")
+	scripts/linux/docker.sh build "$(VERSION)" $(LINUX_ARCHES)
+
+linux-test: ## go vet + go test for Linux with cgo, in Docker (host arch)
+	scripts/linux/docker.sh test
+
+linux-smoke: ## Launch the built Linux binary under Xvfb in Docker (run 'make linux' first)
+	scripts/linux/docker.sh smoke

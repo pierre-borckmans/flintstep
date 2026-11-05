@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Backend } from "./api";
 import { errorText } from "./api";
+import { type LogEntry, pushActivity } from "./lib/activity";
 import { type Autosave, browserTimers, createAutosave, type SaveStatus } from "./lib/autosave";
 import {
   edit,
@@ -16,7 +17,7 @@ import * as H from "./lib/history";
 import { createSaveRouter } from "./lib/saveinto";
 import type { Gesture } from "./lib/scrub";
 import * as S from "./lib/stacks";
-import type { Activity, Config, ExpEdge, PedalRef, PresetSource, State } from "./types";
+import type { Config, ExpEdge, PedalRef, PresetSource, State } from "./types";
 
 export const LOG_SIZE = 50;
 /** How long the edits must settle before they are saved. */
@@ -24,7 +25,7 @@ export const SAVE_DELAY_MS = 300;
 /** Histories of this many presets are kept, the least recently used going first. */
 export const KEPT_HISTORIES = 20;
 
-export type LoggedActivity = Activity & { id: number };
+export type LoggedActivity = LogEntry;
 
 /** Everything the UI holds: the live State from Go, the mapping being edited with its
  *  undo history, and the recent MIDI.
@@ -42,6 +43,8 @@ export function useBridge(backend: Backend) {
   const [history, setHistory] = useState<H.History<Config> | null>(null);
   const [shownPreset, setShownPreset] = useState("");
   const [log, setLog] = useState<LoggedActivity[]>([]);
+  /** Messages since the log was last cleared, a sweep's folded ones included. */
+  const [logTotal, setLogTotal] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ kind: "saved" });
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [presetError, setPresetError] = useState<string | null>(null);
@@ -223,8 +226,9 @@ export function useBridge(backend: Backend) {
       if (moved && !busy.current) void checkExternal();
     });
     const offAct = backend.onActivity((a) => {
-      const row = { ...a, id: ++seq.current };
-      setLog((l) => [row, ...l].slice(0, LOG_SIZE));
+      const id = ++seq.current;
+      setLog((l) => pushActivity(l, a, id, LOG_SIZE));
+      setLogTotal((n) => n + 1);
     });
     return () => {
       alive = false;
@@ -441,6 +445,12 @@ export function useBridge(backend: Backend) {
     state,
     config,
     log,
+    logTotal,
+    /** Empties the activity log (the UI's own: Go keeps no history). */
+    clearLog: () => {
+      setLog([]);
+      setLogTotal(0);
+    },
     saveStatus,
     savedAt,
     /** The active preset's undo history. */

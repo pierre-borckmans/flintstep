@@ -42,7 +42,7 @@ func level(pct int) int { return pct * ExpRawMax }
 // trigger runs input n's trigger on its scaled travel (0..ExpRawMax, inverted as the CC
 // is). It returns the press half to send before the CC and the release half to send
 // after it.
-func (e *Engine) trigger(n, scaled int, at time.Time) (press, release [][]byte) {
+func (e *Engine) trigger(n, scaled int, at time.Time) (press, release Outs) {
 	tr := e.cfg.Exp[n].Trigger
 	t := &e.trig[n]
 	if tr.Mode != TriggerEngage && tr.Mode != TriggerToe {
@@ -55,7 +55,7 @@ func (e *Engine) trigger(n, scaled int, at time.Time) (press, release [][]byte) 
 	switch {
 	case !t.held && x >= level(tr.Threshold):
 		t.held, t.active, t.due = true, tr.Action, time.Time{}
-		return e.pressHalf(tr.Action, &t.on), nil
+		return tag(e.pressHalf(tr.Action, &t.on), Origin{Source: SrcTrigger, Index: n}), nil
 	case t.held && tr.Mode == TriggerEngage && x >= level(tr.Threshold):
 		t.due = time.Time{} // back up inside the off delay: stay on
 	case t.held && x < offAt:
@@ -71,19 +71,19 @@ func (e *Engine) trigger(n, scaled int, at time.Time) (press, release [][]byte) 
 }
 
 // letGo ends input n's held trigger: the release half of what it pressed.
-func (e *Engine) letGo(n int) [][]byte {
+func (e *Engine) letGo(n int) Outs {
 	t := &e.trig[n]
 	if !t.held {
 		return nil
 	}
 	a := t.active
 	t.held, t.active, t.due = false, Action{}, time.Time{}
-	return e.releaseHalf(a)
+	return tag(e.releaseHalf(a), Origin{Source: SrcTrigger, Index: n})
 }
 
 // tickTriggers fires the off delays due by at.
-func (e *Engine) tickTriggers(at time.Time) [][]byte {
-	var out [][]byte
+func (e *Engine) tickTriggers(at time.Time) Outs {
+	var out Outs
 	for n := range e.trig {
 		t := e.trig[n]
 		if t.held && !t.due.IsZero() && !at.Before(t.due) {
@@ -104,12 +104,12 @@ func (e *Engine) triggerPending() bool {
 
 // ExpRelease is input n losing its cable: its held trigger lets go (the release half
 // is returned) and its next value is sent whatever it is. A toggle keeps its state.
-func (e *Engine) ExpRelease(n int) [][]byte {
+func (e *Engine) ExpRelease(n int) Outs {
 	if n < 0 || n >= sparkx.ExpInputs {
 		return nil
 	}
 	e.exp.Reset(n)
-	return e.letGo(n)
+	return released(e.letGo(n))
 }
 
 // ExpTriggers says which inputs' triggers are engaged now, for the UI's lamp: held for

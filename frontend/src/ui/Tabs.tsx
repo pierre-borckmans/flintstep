@@ -5,6 +5,8 @@ import { useIndicator } from "./useIndicator";
 export interface TabDef<T extends string> {
   id: T;
   label: string;
+  /** A tooltip saying what is in the tab. */
+  title?: string;
 }
 
 const tabId = (base: string, id: string) => `${base}-tab-${id}`;
@@ -63,6 +65,7 @@ export function Tabs<T extends string>({
             role="tab"
             aria-selected={on}
             aria-controls={panelId(base, t.id)}
+            title={t.title}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(t.id)}
             className={cx("tab", on && "is-active")}

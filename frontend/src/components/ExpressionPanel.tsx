@@ -39,6 +39,7 @@ function Meter({
     <div className="flex flex-col gap-1.5">
       <div className={cx("flex items-end gap-3", !!trigger && "pt-2.5")}>
         <span
+          title={has ? "The value going out now, 0–127" : "No reading: no pedal on this jack"}
           className={cx(
             "w-10 font-mono text-[22px] leading-none font-medium tabular-nums",
             has ? "text-bone" : "text-faint",
@@ -74,7 +75,10 @@ function Meter({
       </div>
       <div className="flex items-center gap-3">
         <Kicker className="w-10 !text-faint">raw</Kicker>
-        <div className="relative h-3 flex-1">
+        <div
+          className="relative h-3 flex-1"
+          title={"Raw reading from the jack\nH and T mark where heel and toe were set"}
+        >
           <div className="absolute top-1/2 h-px w-full -translate-y-1/2 bg-edge-strong" />
           {/* min is the heel and max the toe, whichever reads higher: a pedal whose toe
               reads lower has its toe mark left of its heel mark. */}
@@ -93,7 +97,7 @@ function Meter({
           ).map(([edge, m]) => (
             <span
               key={edge}
-              title={`${edge} ${m}`}
+              title={`${edge === "heel" ? "Heel" : "Toe"} calibrated at raw ${m}`}
               className="absolute top-0 h-3 w-px bg-muted"
               style={{ left: `${rawFraction(m) * 100}%` }}
             >
@@ -190,6 +194,7 @@ function ExpCard({
         <span className="text-ui-xs text-muted">{x.enabled ? "On" : "Off"}</span>
         <Toggle
           label={`EXP ${n + 1} enabled`}
+          title={x.enabled ? "Stop this input sending MIDI" : "Let this input send MIDI"}
           on={x.enabled}
           onChange={(enabled) => apply({ type: "exp", n, patch: { enabled } })}
         />
@@ -222,6 +227,7 @@ function ExpCard({
       <div className={cx("grid grid-cols-2 gap-2", !x.enabled && "opacity-50")}>
         <NumField
           label="Ch"
+          hint="MIDI channel"
           value={x.channel}
           min={1}
           max={16}
@@ -229,6 +235,7 @@ function ExpCard({
         />
         <NumField
           label="CC"
+          hint="Controller number the pedal's position goes out on"
           value={x.cc}
           min={0}
           max={127}
@@ -242,7 +249,11 @@ function ExpCard({
           kind={flash === "min" ? "primary" : "plain"}
           disabled={!cable}
           onClick={() => set("min")}
-          title="Rock the pedal fully back, then click"
+          title={
+            cable
+              ? "Rock the pedal fully back, then click to make that 0"
+              : "Plug in or simulate a pedal first"
+          }
         >
           Set heel
         </Button>
@@ -251,7 +262,11 @@ function ExpCard({
           kind={flash === "max" ? "primary" : "plain"}
           disabled={!cable}
           onClick={() => set("max")}
-          title="Push the pedal fully forward, then click"
+          title={
+            cable
+              ? "Push the pedal fully forward, then click to make that 127"
+              : "Plug in or simulate a pedal first"
+          }
         >
           Set toe
         </Button>
@@ -259,6 +274,7 @@ function ExpCard({
         <span className="text-ui-xs text-muted">Invert</span>
         <Toggle
           label={`Invert EXP ${n + 1}`}
+          title="Send 127 at the heel and 0 at the toe"
           on={x.invert}
           onChange={(invert) => apply({ type: "exp", n, patch: { invert } })}
         />

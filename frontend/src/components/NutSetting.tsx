@@ -15,9 +15,17 @@ export function NutSetting() {
         label="Nut rotation"
         size="sm"
         options={[
-          { value: "aligned", label: "Aligned" },
-          { value: "shuffled", label: "Shuffled" },
-          { value: "custom", label: "Match my pedal" },
+          { value: "aligned", label: "Aligned", title: "Every nut square, as drawn" },
+          {
+            value: "shuffled",
+            label: "Shuffled",
+            title: "Each nut turned at random, as a real one stops when tightened",
+          },
+          {
+            value: "custom",
+            label: "Match my pedal",
+            title: "Turn each nut by hand on the drawing to match yours",
+          },
         ]}
         value={mode}
         onChange={nuts.setMode}
@@ -31,12 +39,23 @@ export function NutSetting() {
               : "Scroll over a nut or drag round it to turn it. Shift for fine steps, double-click for 0°."}
         </p>
         {mode === "shuffled" && (
-          <Button size="sm" icon={<Shuffle size={12} />} onClick={nuts.shuffle}>
+          <Button
+            size="sm"
+            icon={<Shuffle size={12} />}
+            title="Turn every nut to a new random angle"
+            onClick={nuts.shuffle}
+          >
             Shuffle
           </Button>
         )}
         {mode === "custom" && (
-          <Button size="sm" kind="ghost" icon={<RotateCcw size={12} />} onClick={nuts.resetAll}>
+          <Button
+            size="sm"
+            kind="ghost"
+            icon={<RotateCcw size={12} />}
+            title="Turn every nut back to 0°"
+            onClick={nuts.resetAll}
+          >
             Square all
           </Button>
         )}

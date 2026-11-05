@@ -5,11 +5,11 @@ import { Collapse } from "../ui/Collapse";
 import { NumField } from "../ui/NumField";
 import { Seg } from "../ui/Seg";
 
-const KINDS: { value: ActionKind; label: string }[] = [
+const KINDS: { value: ActionKind; label: string; title?: string }[] = [
   { value: "off", label: "Off" },
-  { value: "cc", label: "CC" },
-  { value: "note", label: "Note" },
-  { value: "pc", label: "Program" },
+  { value: "cc", label: "CC", title: "Control change: a controller number and a value" },
+  { value: "note", label: "Note", title: "Note on when pressed, note off when let go" },
+  { value: "pc", label: "Program", title: "Program change: picks a patch or preset in your app" },
 ];
 
 /** One action: kind, then the fields that kind uses. `allowOff` is false where "off"
@@ -40,6 +40,7 @@ export function ActionEditor({
         <div className={a.kind === "pc" ? "grid grid-cols-2 gap-2" : "grid grid-cols-3 gap-2"}>
           <NumField
             label="Ch"
+            hint="MIDI channel"
             value={a.channel}
             min={1}
             max={16}
@@ -49,6 +50,7 @@ export function ActionEditor({
             <NumField
               key="note"
               label="Note"
+              hint="Note number (or type a name, like C3)"
               value={a.number}
               min={0}
               max={127}
@@ -60,6 +62,7 @@ export function ActionEditor({
             <NumField
               key={a.kind}
               label={a.kind === "cc" ? "CC" : "Prog"}
+              hint={a.kind === "cc" ? "Controller number" : "Program number, counting from 0"}
               value={a.number}
               min={0}
               max={127}
@@ -69,6 +72,7 @@ export function ActionEditor({
           {a.kind !== "pc" && (
             <NumField
               label={a.kind === "note" ? "Vel" : "Value"}
+              hint={a.kind === "note" ? "Velocity" : "Value sent when pressed"}
               value={a.value}
               min={1}
               max={127}
@@ -82,8 +86,12 @@ export function ActionEditor({
           size="sm"
           label="CC mode"
           options={[
-            { value: "momentary", label: "Momentary" },
-            { value: "toggle", label: "Toggle" },
+            {
+              value: "momentary",
+              label: "Momentary",
+              title: "Sends the value while held, 0 when let go",
+            },
+            { value: "toggle", label: "Toggle", title: "Each press flips between the value and 0" },
           ]}
           value={a.mode}
           onChange={(mode) => onChange({ mode })}

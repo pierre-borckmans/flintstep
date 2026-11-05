@@ -1,3 +1,4 @@
+import { systemLookName } from "../lib/platform";
 import type { ThemeMode } from "../lib/theme";
 import { Seg } from "../ui/Seg";
 import { setTheme, useTheme } from "../useTheme";
@@ -12,7 +13,11 @@ export function ThemeSetting() {
         label="Theme"
         size="sm"
         options={[
-          { value: "system", label: "System" },
+          {
+            value: "system",
+            label: "System",
+            title: `Follow ${systemLookName()}: dark or light with it`,
+          },
           { value: "dark", label: "Dark" },
           { value: "light", label: "Light" },
         ]}
@@ -21,7 +26,7 @@ export function ThemeSetting() {
       />
       <p className="text-ui-xs leading-snug text-faint">
         {mode === "system"
-          ? `Follows macOS, which is ${resolved} right now.`
+          ? `Follows ${systemLookName()}, which is ${resolved} right now.`
           : "The pedal stays black: it's drawn as the hardware is."}
       </p>
     </div>

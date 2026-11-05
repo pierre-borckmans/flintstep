@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Backend } from "../api";
 import { errorText } from "../api";
 import { type Apply, LONG_PRESS } from "../lib/config";
+import { revealLabel, thisComputer } from "../lib/platform";
 import { MIDI_LED_PORT_NAME, PRODUCT_NAME } from "../product";
 import type { Config, State } from "../types";
 import { Button } from "../ui/Button";
@@ -83,11 +84,22 @@ function PedalPicker({ backend, state }: { backend: Backend; state: State }) {
             {remembered.address || "connects to the first pedal it finds"}
           </span>
         </div>
-        <Button size="sm" onClick={scan.scan} disabled={scan.scanning} icon={<Radar size={12} />}>
+        <Button
+          size="sm"
+          onClick={scan.scan}
+          disabled={scan.scanning}
+          icon={<Radar size={12} />}
+          title="Look for Spark Control X pedals nearby"
+        >
           {scan.scanning ? "Scanning…" : "Scan"}
         </Button>
         {remembered.address && (
-          <Button size="sm" kind="ghost" onClick={scan.forget}>
+          <Button
+            size="sm"
+            kind="ghost"
+            onClick={scan.forget}
+            title="Connect to the first pedal found instead of this one"
+          >
             Forget
           </Button>
         )}
@@ -121,8 +133,16 @@ export function SettingsPanel({
         <Seg
           label="LED mode"
           options={[
-            { value: "local", label: "Local" },
-            { value: "feedback", label: "MIDI feedback" },
+            {
+              value: "local",
+              label: "Local",
+              title: "The pedal lights its own switches as you press them",
+            },
+            {
+              value: "feedback",
+              label: "MIDI feedback",
+              title: "Your DAW lights the switches by sending MIDI back",
+            },
           ]}
           value={config.ledMode}
           onChange={(mode) => apply({ type: "ledMode", mode })}
@@ -178,6 +198,7 @@ export function SettingsPanel({
         <Row label="Launch at login">
           <Toggle
             label="Launch at login"
+            title={`Open ${PRODUCT_NAME} when you log in to ${thisComputer()}`}
             on={login}
             onChange={(on) => {
               setLogin(on);
@@ -192,9 +213,10 @@ export function SettingsPanel({
           <Button
             size="sm"
             icon={<FolderOpen size={12} />}
+            title="Open the folder with the app's logs, for a bug report"
             onClick={() => backend.RevealLogs().catch((e) => setErr(errorText(e)))}
           >
-            Reveal in Finder
+            {revealLabel()}
           </Button>
         </Row>
         <Row label="Mapping">
@@ -220,6 +242,7 @@ export function SettingsPanel({
               size="sm"
               kind="danger"
               icon={<RotateCcw size={12} />}
+              title="Put every switch, combo and input back as it came. Asks first"
               onClick={() => setConfirm(true)}
             >
               Reset to defaults
@@ -233,7 +256,12 @@ export function SettingsPanel({
           </p>
         </Collapse>
         <Row label="Open-source licences">
-          <Button size="sm" icon={<ScrollText size={12} />} onClick={() => setAcks(true)}>
+          <Button
+            size="sm"
+            icon={<ScrollText size={12} />}
+            title="The open-source components and their licences"
+            onClick={() => setAcks(true)}
+          >
             Acknowledgements
           </Button>
         </Row>

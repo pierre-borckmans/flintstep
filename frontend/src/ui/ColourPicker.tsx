@@ -19,7 +19,7 @@ function Swatch({
   return (
     <button
       type="button"
-      title={name}
+      title={`${name}\n${toHex(colour).toUpperCase()}`}
       aria-label={name}
       aria-pressed={on}
       onClick={onPick}
@@ -62,7 +62,7 @@ export function ColourPicker({
         />
       ))}
       <label
-        title="Custom colour"
+        title={curated ? "Pick any colour" : "Custom colour. Click to pick another"}
         className={cx(
           "relative ml-1 flex h-7 cursor-pointer items-center gap-1.5 rounded-full border px-2 text-ui-xs",
           curated ? "border-edge text-muted hover:text-text" : "border-key/70 text-text",
