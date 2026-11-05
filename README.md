@@ -1,5 +1,9 @@
 # SparkX MIDI
 
+[![CI](https://github.com/pierre-borckmans/spark-control-x-midi/actions/workflows/ci.yml/badge.svg)](https://github.com/pierre-borckmans/spark-control-x-midi/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/pierre-borckmans/spark-control-x-midi)](https://github.com/pierre-borckmans/spark-control-x-midi/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A macOS menu-bar app that connects to a Positive Grid Spark Control X over Bluetooth and
 publishes it as a normal MIDI device named **Spark Control X**. Logic, Ableton, MainStage,
 a browser or anything else that takes MIDI can then use the pedal as a foot controller.
@@ -102,3 +106,11 @@ a time.
 
 Paul Hamshere's [Spark-Control-X](https://github.com/paulhamsh/Spark-Control-X) notes
 first wrote the protocol down.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security
+reports: [SECURITY.md](SECURITY.md).
+
+Spark and Spark Control X are trademarks of Positive Grid; this project is not
+affiliated with or endorsed by Positive Grid.
