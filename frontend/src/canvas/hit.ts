@@ -3,7 +3,7 @@
 // so the same geometry that placed everything says what a point lands on, and a switch
 // cannot be somewhere other than where it can be clicked.
 //
-// Points are in LAYOUT px — the fitted layout's own coordinates (lib/exppedal), which is
+// Points are in LAYOUT units — the layout's own coordinates (lib/exppedal), which is
 // the world with the layout's centring taken off.
 
 import { ART_ASPECT, LABEL, type Layout, SPARK, type UnitBox } from "../lib/exppedal";

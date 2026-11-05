@@ -28,24 +28,20 @@ export interface SceneData {
   simulated: boolean[];
   nuts: { mode: NutMode; angles: number[]; peek: boolean };
   palette: Palette;
-  /** Where everything is headed: the layout fitted to the canvas. The scene springs
-   *  toward it on its own clock. */
+  /** Where everything is headed, in world units: it depends on the pedals plugged in and
+   *  the placement, never on the canvas's size. The scene springs toward it on its own
+   *  clock. */
   layout: Layout;
-  /** The canvas size `layout` was fitted to: the rig's settled room. Mid-drag the canvas
-   *  is already another size, and the camera scales this layout to it. */
-  room: { w: number; h: number };
   placement: Placement;
   /** Each expression pedal's presence target, 0 or 1 (or a frozen fraction). */
   presence: [number, number];
-  /** Bumped when the layout should land at once rather than spring (a resize, the
-   *  first frame, reduced motion). */
+  /** Bumped when the layout should land at once rather than spring (the first frame, a
+   *  frozen dev still). */
   snap: number;
   link: { view: LinkView | null; phase: LinkPhase; sweepAt: number | null };
   /** Browser dev only: ?freeze=N holds the link rings N ms into their cycle. */
   freezeMs: number | null;
   reducedMotion: boolean;
-  /** The captions' short form (a narrow pedal). */
-  short: boolean;
 }
 
 export class SceneStore {
@@ -115,7 +111,8 @@ export class Hover {
 export class ZoomWatch {
   /** The scale the scene was last drawn at. */
   scale = 1;
-  /** Settled scale: what re-bakes and re-rasterising key on, a beat after a gesture. */
+  /** Settled scale: what re-bakes and re-rasterising key on, a beat after a gesture or
+   *  a resize. They only ever go up for it. */
   settled = 1;
   private hairlines = new Set<(px: number) => void>();
   private settles = new Set<(scale: number) => void>();
@@ -138,19 +135,14 @@ export class ZoomWatch {
     return () => this.settles.delete(fn);
   }
 
-  /** Called by the ticker with the camera's scale. `held` while the canvas is being
-   *  resized: the scale is moving because the window is, the layout for the new size is
-   *  on its way and lands back near 1, so nothing re-bakes or re-rasterises for it. */
-  update(scale: number, held = false): void {
+  /** Called by the ticker with the camera's scale: the zoom and the canvas's fit in one
+   *  number, since a bigger window is a bigger scale. */
+  update(scale: number): void {
     this.scale = scale;
     // Hairlines redraw when the zoom has moved enough to see: a few short paths.
     if (Math.abs(scale / this.drawnAt - 1) > 0.02) {
       this.drawnAt = scale;
       for (const fn of this.hairlines) fn(1 / scale);
-    }
-    if (held) {
-      clearTimeout(this.timer);
-      return;
     }
     if (scale !== this.settled) {
       clearTimeout(this.timer);

@@ -1,8 +1,8 @@
 // EXPRESSION PEDALS ON THE CANVAS. The maths behind the pedals drawn next to the Spark:
 // how far the treadle tilts, where the gauge puts its marks, where the pedals sit
-// (behind the Spark or beside it), how big everything can be in the space there is,
-// and the cable from each jack. All in CSS px of the viewer's fitted layout, as
-// functions of w, the Spark's case width; nothing here touches the DOM.
+// (behind the Spark or beside it), and the cable from each jack. All in world units, as
+// functions of w, the Spark's case width (CASE_W on the canvas); nothing here touches
+// the DOM, and nothing depends on the canvas's size: the camera fits the result to it.
 
 import { STORAGE_PREFIX } from "../product";
 import type { ExpConfig } from "../types";
@@ -24,7 +24,11 @@ export const SPARK = {
   plug: 12,
 };
 
-/** The fitted object keeps this much spare height, as it always has. */
+/** The Spark's case width in world units: the size the whole scene is laid out at, once.
+ *  Every caption, label and gap is drawn to it, and the camera scales the lot. */
+export const CASE_W = 560;
+
+/** Auto's fitted object keeps this much spare height when weighing the placements. */
 const SLACK_Y = 16;
 
 /** One expression pedal: its drawing is UNIT of the Spark's case width and ART_ASPECT
@@ -291,7 +295,7 @@ export function fitWidth(
 }
 
 /** How much bigger the other placement must make the Spark before auto switches to it,
- *  so a resize near the boundary does not flip back and forth. */
+ *  so a canvas near the boundary does not flip back and forth as pedals come and go. */
 export const HYSTERESIS = 1.05;
 
 /** Auto: the placement that gives the Spark the larger fitted size, keeping `current`

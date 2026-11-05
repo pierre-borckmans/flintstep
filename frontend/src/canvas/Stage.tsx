@@ -23,15 +23,10 @@ import { World } from "./World";
 // store.ts; Pixi's `resizeTo` only hears window.resize, so the renderer follows our own
 // ResizeObserver (shell.tsx); headless Chrome with --disable-gpu silently skips sprites.
 //
-// A RESIZE IS A CAMERA MOVE UNTIL IT STOPS. Laying the scene out again for every step of
-// a window drag meant a React render of the whole scene, a fresh bake of the case's SVG
-// each time its size crossed a step, and a new drawing buffer, sixty times a second. Now
-// a step only scales the layout the scene already has (rig.setView) and stretches the
-// drawing buffer it already has (shell's Resizer). The layout, the bakes and the buffer
-// for the new size come once, SETTLE_MS after the last step (rig.settle).
-
-/** How long the canvas's size has to hold still before the scene is laid out for it. */
-const SETTLE_MS = 250;
+// A RESIZE IS A CAMERA FIT. The scene is laid out once, in world units that do not
+// depend on the canvas's size, so a window or divider drag never reaches React: each step
+// resizes the renderer and fits the camera (rig.setView), and the picture scales with the
+// hand. Nothing is laid out again when the drag ends, so nothing changes shape.
 
 // Pixi's classes have to be registered before they can be written as JSX.
 extend({ Container, Graphics, Sprite, Text });
@@ -45,33 +40,20 @@ function Gestures({ scene, handlers }: { scene: Scene; handlers: PointerHandlers
 }
 
 /**
- * Follows the host's size into the rig. Observed directly, not through React state: a
- * step of a drag is one write to the rig, and React only hears the settled size.
- *
+ * Follows the host's size into the rig. Observed directly, not through React state.
  * ResizeObserver reports at most once a frame, after layout, so reading the element's
- * size here forces no extra layout. The first size settles at once: there is nothing on
- * screen yet to keep.
+ * size here forces no extra layout.
  */
 function useFollowHost(host: RefObject<HTMLDivElement | null>, rig: CameraRig) {
   // EFFECT: observing the host's size.
   useLayoutEffect(() => {
     const el = host.current;
     if (!el) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const read = () => {
-      rig.setView({ w: el.clientWidth, h: el.clientHeight });
-      clearTimeout(timer);
-      const { w, h } = rig.room;
-      if (w <= 0 || h <= 0) rig.settle();
-      else timer = setTimeout(() => rig.settle(), SETTLE_MS);
-    };
+    const read = () => rig.setView({ w: el.clientWidth, h: el.clientHeight });
     read();
     const ro = new ResizeObserver(read);
     ro.observe(el);
-    return () => {
-      clearTimeout(timer);
-      ro.disconnect();
-    };
+    return () => ro.disconnect();
   }, [host, rig]);
 }
 

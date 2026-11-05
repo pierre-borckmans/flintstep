@@ -56,9 +56,10 @@ export function useHover(): HoverTarget | null {
  *
  * Synchronous when the cache already has it, so a sprite that has its texture on its
  * first render never pops in (Beam's useArtTexture). On top of that it RE-BAKES PAST THE
- * HEADROOM: once a zoom gesture settles beyond what the bake can take, the art is baked
- * again for the new zoom and swapped onto the sprite directly — a texture and a scale on
- * one display object, not a React render. Pass `zoom: false` for art that is soft anyway
+ * HEADROOM: once a zoom or a resize settles beyond what the bake can take, the art is
+ * baked again for the new scale in the background and swapped onto the sprite directly —
+ * a texture and a scale on one display object, not a React render. Never down: a bigger
+ * bake is still sharp smaller. Pass `zoom: false` for art that is soft anyway
  * (glows, shadows). `unit` is how many world px one unit of the sprite's parent is (a
  * sprite inside the case is drawn in viewBox units, `k` px each).
  */
@@ -73,13 +74,15 @@ export function useBaked(
   const bucket = () => (follows ? zoomBucket(zoom.settled) : 2);
   const [tex, setTex] = useState(() => peekTexture(key, drawWidth, bucket()));
   const sprite = useRef<Sprite | null>(null);
+  const baked = useRef(bucket());
   const unit = opts.unit ?? 1;
   const live = useRef({ key, drawWidth, render, unit });
   live.current = { key, drawWidth, render, unit };
   useRepaint();
 
   useEffect(() => {
-    const b = bucket();
+    const b = Math.max(baked.current, bucket());
+    baked.current = b;
     const ready = peekTexture(key, drawWidth, b);
     if (ready) {
       setTex(ready);
@@ -99,8 +102,11 @@ export function useBaked(
   useEffect(() => {
     if (!follows) return;
     return zoom.onSettle((scale) => {
+      const b = zoomBucket(scale);
+      if (b <= baked.current) return;
+      baked.current = b;
       const { key: k, drawWidth: w, render: r } = live.current;
-      textureFor(k, w, r, zoomBucket(scale)).then((t) => {
+      textureFor(k, w, r, b).then((t) => {
         const s = sprite.current;
         if (!t || !s || s.destroyed || live.current.key !== k || s.texture === t) return;
         s.texture = t;

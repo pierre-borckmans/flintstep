@@ -849,8 +849,8 @@ function Caption({ n, data, hot }: { n: number; data: SceneData; hot: boolean })
   const p = data.palette;
   const top = n < 3;
   const sw = data.config?.switches[n];
-  const main = sw ? actionCaption(sw.tap, data.short) : data.short ? "—" : "Not assigned";
-  const hold = sw ? longCaption(sw.long, data.short) : "";
+  const main = sw ? actionCaption(sw.tap) : "Not assigned";
+  const hold = sw ? longCaption(sw.long) : "";
   const mainStyle = useMemo(
     () => new TextStyle({ fontFamily: p.font, fontSize: 11, fill: hot ? p.cold : p.muted }),
     [p.font, p.cold, p.muted, hot],

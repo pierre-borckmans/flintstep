@@ -23,8 +23,8 @@ import { type PointerState, usePedalPointer } from "../canvas/usePedalPointer";
 import { actionCaption, longCaption } from "../lib/caption";
 import { expValue } from "../lib/exp";
 import {
+  CASE_W,
   choosePlacement,
-  fitWidth,
   jackPoint,
   type Layout,
   layout as layoutFor,
@@ -48,8 +48,8 @@ import { freezeMs, LinkCard, useLink } from "./LinkOverlay";
 // work on a pedal that is pixels.
 //
 // This component re-renders when the pedal's status, the mapping, the selection, the
-// theme or the viewer's settled size changes. It never re-renders because the camera moved
-// or the window is mid-drag: the camera lives in the rig, and everything that follows it
+// theme or the plugged-in pedals change. It never re-renders because the camera moved or
+// the canvas was resized: the camera lives in the rig, and everything that follows it
 // does so by subscription.
 
 /** Browser dev only: ?zoom=2.5,0.3,0.4 opens zoomed 2.5x on that point of the layout. */
@@ -77,44 +77,48 @@ function useStable<T>(value: T): T {
   return last.current.value;
 }
 
-/** The fitted object keeps this much room round it, as the DOM viewer's padding did. */
+/** The viewer's padding round the drawing, for weighing behind against beside. */
 const INSET = 64;
 
-/** Where the plugged-in expression pedals go and how big everything is: the TARGET
- *  layout for the space there is. The canvas springs toward it on its own clock, so
- *  appearing, leaving and switching placement all glide; `snap` says when it should land
- *  at once instead (the first size, a resize, a frozen dev still). */
-function useTargetLayout(avail: { w: number; h: number } | null, present: [boolean, boolean]) {
+/**
+ * Where the plugged-in expression pedals go: the TARGET layout, in world units. The
+ * canvas springs toward it on its own clock, so appearing, leaving and switching
+ * placement all glide; `snap` says when it should land at once instead (the window
+ * opening, a frozen dev still).
+ *
+ * It depends on the pedals plugged in and the placement setting, NEVER on the canvas's
+ * size: the camera fits it to whatever size that is. Auto weighs behind against beside
+ * for the canvas's shape when there is something to weigh, which is at startup, when the
+ * set of pedals changes, or when Auto is picked; a resize leaves it alone.
+ */
+function useTargetLayout(rig: CameraRig, present: [boolean, boolean]) {
   const pref = useExpPlacement();
   const [FREEZE] = useState(freezeFromQuery);
-  const auto = useRef<Placement>("behind");
-  let placement: Placement = pref === "auto" ? auto.current : pref;
-  if (pref === "auto" && avail) {
-    placement = choosePlacement(avail, present, auto.current);
-    auto.current = placement;
+  // Re-renders once, when the canvas first has a size to weigh with; not per resize.
+  const sized = useSyncExternalStore(
+    useCallback((fn) => rig.subscribeView(fn), [rig]),
+    () => rig.size.w > 0 && rig.size.h > 0,
+  );
+  const auto = useRef<{ key: string; placement: Placement }>({ key: "", placement: "behind" });
+  const key = `${present}|${pref}|${sized}`;
+  if (pref === "auto" && sized && auto.current.key !== key) {
+    const { w, h } = rig.size;
+    const avail = { w: Math.max(0, w - INSET), h: Math.max(0, h - INSET) };
+    auto.current = { key, placement: choosePlacement(avail, present, auto.current.placement) };
   }
-  const size = avail ?? { w: 480, h: 480 };
-  const w = fitWidth(placement, present, size);
-  let target: Layout = layoutFor(placement, present, w);
+  const placement: Placement = pref === "auto" ? auto.current.placement : pref;
+  let target: Layout = layoutFor(placement, present, CASE_W);
   const want: [number, number] = [present[0] ? 1 : 0, present[1] ? 1 : 0];
   if (FREEZE !== null) {
-    const none = layoutFor(placement, [false, false], fitWidth(placement, [false, false], size));
-    target = lerpLayout(none, target, FREEZE);
+    target = lerpLayout(layoutFor(placement, [false, false], CASE_W), target, FREEZE);
     want[0] *= FREEZE;
     want[1] *= FREEZE;
   }
-  // Nothing glides while the window opens (the first size and State land as they are),
-  // nor when a resize settles (the drag already showed this size); a placement that flips
-  // as a resize settles still glides to its new side.
+  // Nothing glides while the window opens: the first State lands as it is.
   const born = useRef(performance.now());
-  const last = useRef({ size: "", placement, snap: 0 });
-  const sizeKey = avail ? `${avail.w}x${avail.h}` : "";
-  const opening = performance.now() - born.current < 800;
-  const resized = sizeKey !== last.current.size && placement === last.current.placement;
-  const snap =
-    !avail || opening || resized || FREEZE !== null ? last.current.snap + 1 : last.current.snap;
-  last.current = { size: sizeKey, placement, snap };
-  return { placement, layout: target, presence: want, snap };
+  const snap = useRef(0);
+  if (FREEZE !== null || performance.now() - born.current < 800) snap.current++;
+  return { placement, layout: target, presence: want, snap: snap.current };
 }
 
 export function PedalViewer({
@@ -156,7 +160,7 @@ export function PedalViewer({
       store: new SceneStore(),
       zoom: new ZoomWatch(),
       motion: {
-        layout: layoutFor("behind", [false, false], 0),
+        layout: layoutFor("behind", [false, false], CASE_W),
         presence: [0, 0],
         version: 0,
       } as Motion,
@@ -165,24 +169,13 @@ export function PedalViewer({
   );
   const { rig, store } = scene;
   const viewer = useRef<HTMLElement>(null);
-  // The settled size, not the live one: a window drag re-renders nothing here until it
-  // stops, and then the layout (and the auto placement) is worked out once for the size
-  // it stopped at. Mid-drag the canvas scales the layout it has.
-  const size = useSyncExternalStore(
-    useCallback((fn) => rig.subscribeRoom(fn), [rig]),
-    () => rig.room,
-  );
-  const avail =
-    size.w > 0 && size.h > 0
-      ? { w: Math.max(0, size.w - INSET), h: Math.max(0, size.h - INSET) }
-      : null;
   // The bridge hands over a fresh State object on every push, changed or not; the canvas
   // keys its scene on these, so an unchanged status keeps its identity.
   const status = useStable(statusIn);
   const config = useStable(configIn);
   const link = useLink(status, config);
   const present: [boolean, boolean] = [!!status?.cables?.[0], !!status?.cables?.[1]];
-  const target = useTargetLayout(avail, present);
+  const target = useTargetLayout(rig, present);
   const theme = useTheme();
   const palette = useMemo(() => readPalette(theme.resolved === "light"), [theme.resolved]);
   const nuts = useNuts();
@@ -202,15 +195,12 @@ export function PedalViewer({
       nuts: { mode: nuts.mode, angles: nuts.angles, peek: nuts.peek },
       palette,
       layout: target.layout,
-      room: size,
       placement: target.placement,
       presence: target.presence,
       snap: target.snap,
       link,
       freezeMs: FREEZE_MS,
       reducedMotion,
-      // The DOM pedal's @max-md container query: its content box (the case) under 28rem.
-      short: target.layout.spark.w < 448,
     }),
     // Rebuilt when any of it changes; the arrays are compared by content.
     [
@@ -227,7 +217,6 @@ export function PedalViewer({
       nuts.peek,
       palette,
       JSON.stringify(target.layout),
-      size,
       target.placement,
       target.presence.join(),
       target.snap,
@@ -244,7 +233,7 @@ export function PedalViewer({
   const pending = useRef(zoomFromQuery());
   useEffect(() => {
     const z = pending.current;
-    if (!z || !avail) return;
+    if (!z) return;
     // Once the canvas has handed the rig its content (across the Application boundary,
     // so a frame or two later).
     let raf = 0;
@@ -259,7 +248,7 @@ export function PedalViewer({
     };
     raf = requestAnimationFrame(go);
     return () => cancelAnimationFrame(raf);
-  }, [avail !== null]);
+  }, []);
 
   const pointer = useRef<PointerState>({
     data,

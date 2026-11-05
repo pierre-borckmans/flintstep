@@ -20,9 +20,9 @@ const LAYOUT_OMEGA = 15;
  * an expression pedal comes or goes: the containers React built at the target are moved
  * and scaled toward it a frame at a time.
  *
- * World coordinates are the fitted layout's px with its centre at (0, 0), so a fitted
- * camera is scale 1 at the middle of the canvas and the layout's own spring cannot pull
- * the drawing off-centre while its box changes size.
+ * World coordinates are the layout's units with its centre at (0, 0), so the layout's own
+ * spring cannot pull the drawing off-centre while its box changes size. They do not
+ * depend on the canvas: a resize only changes the camera's scale.
  *
  * The effects here, named: handing the rig the box the camera may travel in (and a fit,
  * animated, when an expression pedal comes or goes); keeping text crisp after a zoom
@@ -39,27 +39,19 @@ export function World() {
   const spring = useRef<{ x: number[]; v: number[]; snap: number } | null>(null);
   const { app, isInitialised } = useApplication();
 
-  // EFFECT: the box the camera may travel in, centred on the world's origin, and the room
-  // it was laid out for. And a fit, animated, when the set of pedals on the canvas
-  // changes: the layout is a new one, and a zoom framed on the old one is framed on
-  // something that has moved. A layout effect: after a resize the new layout and the
-  // camera that frames it must reach the same frame, or one frame shows the new layout
-  // at the drag's scale.
+  // EFFECT: the box the camera may travel in, centred on the world's origin. It moves
+  // only when the layout does (a pedal plugged in or out, the placement), and the camera
+  // glides to fit the new one.
   const box = data?.layout.box;
-  const room = data?.room;
-  const pedals = data ? `${data.presence[0] > 0.5}/${data.presence[1] > 0.5}` : "";
-  const shown = useRef(pedals);
   useLayoutEffect(() => {
-    if (!box || !room) return;
-    rig.setContent(contentBounds({ x: -box.w / 2, y: -box.h / 2, w: box.w, h: box.h }), room);
-    if (pedals !== shown.current) {
-      shown.current = pedals;
-      if (!rig.isFitted()) rig.fit(store.current?.reducedMotion ? 0 : 340);
-    }
-  }, [rig, box?.w, box?.h, room?.w, room?.h, pedals]);
+    if (!box) return;
+    const content = contentBounds({ x: -box.w / 2, y: -box.h / 2, w: box.w, h: box.h });
+    rig.setContent(content, store.current?.reducedMotion ? 0 : 340);
+  }, [rig, store, box?.w, box?.h]);
 
-  // EFFECT: text re-rasterised for the zoom once a gesture settles, and whenever new
-  // text arrives (a mapping edit while zoomed in).
+  // EFFECT: text re-rasterised once a zoom or a resize settles, and whenever new text
+  // arrives (a mapping edit while zoomed in). Only ever UP: text rasterised for a bigger
+  // view is still crisp in a smaller one, and the geometry does not change either way.
   useEffect(() => {
     if (!isInitialised) return;
     let raf = 0;
@@ -71,7 +63,7 @@ export function World() {
         const res = textResolution(zoom.settled);
         let changed = false;
         for (const t of textsIn(root)) {
-          if (t.resolution !== res) {
+          if (t.resolution < res) {
             t.resolution = res;
             changed = true;
           }
@@ -96,7 +88,7 @@ export function World() {
       const cam = rig.tick(performance.now());
       w.position.set(cam.x, cam.y);
       w.scale.set(cam.scale);
-      zoom.update(cam.scale, rig.resizing);
+      zoom.update(cam.scale);
 
       const d = store.current;
       if (!d) return;
