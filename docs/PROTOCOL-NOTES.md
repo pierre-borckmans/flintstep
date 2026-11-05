@@ -58,3 +58,16 @@ notifies on a profile change is still open: rerun the probe from a non-looper pr
   it moves.
 - A TS (mono, one black ring) cable is detected (`0d` reports the jack plugged) but reads
   0 at every position: the jack needs TRS (two rings) for the pedal's wiper.
+
+## Correction: 0x11 / 90D9A098 mean "charging", not "USB connected" (2026-11-05)
+
+Left plugged in overnight: the pedal's POWER LED went steady green and both flags read
+`00` with the cable still in. Unplugging changed nothing; replugging set both to `01`
+within ~2 s and the LED started blinking green. So the flag is "charging now": plugged in
+but done charging is indistinguishable from on battery. Battery still read 61 % (0x0f and
+2A19 agree), so the pedal's charger stops before its gauge says 100.
+
+POWER LED colours seen: blinking yellow at ~30 % (charging), steady green at 61 % (not
+charging), blinking green at 61 % (charging). Green therefore starts somewhere in 31..61 %.
+
+`2BEA` read `02 13` while charging and `02 10` when not: bits 0-1 track charging too.

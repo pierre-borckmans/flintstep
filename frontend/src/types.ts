@@ -89,7 +89,7 @@ export interface Status {
   profile: number; // -1 until read
   profileName: string;
   battery: number; // 0..100, -1 until read
-  powered: boolean; // on USB power; charging = powered && battery < 100
+  powered: boolean; // the pedal's "charging now" flag (not "USB connected")
   cables: boolean[]; // 2
   exp: number[]; // 0..127 per input, -1 = none
   held: number; // switch bitmask
