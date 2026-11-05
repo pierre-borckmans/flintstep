@@ -20,8 +20,9 @@ concurrency:
 
 jobs:
   deploy:
-    # Pages needs a public repo (or a paid plan); skip quietly until it goes public.
-    if: ${{ !github.event.repository.private }}
+    # Off by default: Railway serves flintstep.app (site/README.md). To host on Pages
+    # instead, set the repository variable PAGES_DEPLOY to "true".
+    if: ${{ vars.PAGES_DEPLOY == 'true' && !github.event.repository.private }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

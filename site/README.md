@@ -32,5 +32,8 @@ as a static site and serves it with Caddy, so no config file is needed:
 4. Optional: Settings > Build > Watch Paths: `/site/**`, so only changes to the site
    redeploy it. Without it, every push to main does.
 
-`.github/workflows/pages.yml` can also deploy this folder to GitHub Pages once the repo
-is public. Use one host for the domain, not both.
+The service is connected to `pierre-borckmans/flintstep` on `main`, with root directory
+`/site` and watch path `/site/**`.
+
+`.github/workflows/pages.yml` can deploy this folder to GitHub Pages instead: set the
+repository variable `PAGES_DEPLOY` to `true`. Use one host for the domain, not both.
