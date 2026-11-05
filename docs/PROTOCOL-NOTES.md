@@ -152,3 +152,19 @@ charging), blinking green at 61 % (charging). Green therefore starts somewhere i
   The Spark Control X expects a 3-wire TRS expression pedal (reference voltage + wiper),
   so it detects the plug and reads a constant 0. The same goes for other TS-only
   "expression" pedals.
+
+## Expression polarity: the M-Audio EX-P needs "M-Audio" on the Spark (2026-11-05)
+
+Correction to the notes above. On the EX-P's polarity switch:
+
+- **"M-Audio"** is the right setting for the Spark Control X: raw 8792 (heel) to 29848 (toe),
+  straight (evenly spaced steps both ways), about 133 distinct values over a sweep
+  (polling `BD066DA4` at 60 Hz), stable across passes.
+- **"Other"** is the wrong polarity. It sometimes looked usable (256 to 27500, strongly bent:
+  fast near the heel, slow near the toe) and sometimes collapsed to ~24000-28000 with only
+  ~50 distinct values; empty jacks then read odd values (0, or ~25000 instead of 65535).
+  The "taper" noted above was this mismatch, not the pot.
+
+So for any TRS expression pedal: if the range is bent, short, or drifts between sessions,
+try the other polarity before anything else. The 0x0c stream and `BD066DA4` agree; polling
+gives the same resolution as the stream, so the steps come from the pedal's own converter.

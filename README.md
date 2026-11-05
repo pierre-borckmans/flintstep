@@ -59,7 +59,7 @@ Control and what is not.
 The app never sends the commands that rewrite the profiles stored in the pedal (types 03,
 07, 0a, 0e, 13). LED colours are volatile: a power cycle clears them.
 
-> **Expression pedals:** use a standard **TRS** expression pedal on a TRS cable (the M-Audio EX-P is tested and works). Two-wire pedals made for one brand, like the **Line 6 EX-1**, are detected but always read zero. After plugging in, set heel and toe in the Expression tab.
+> **Expression pedals:** use a standard **TRS** expression pedal on a TRS cable (the M-Audio EX-P is tested and works, with its polarity switch on **M-Audio**). If the range looks bent, short or wanders, flip the pedal's polarity switch. Two-wire pedals made for one brand, like the **Line 6 EX-1**, are detected but always read zero. After plugging in, set heel and toe in the Expression tab.
 
 ## Install
 
