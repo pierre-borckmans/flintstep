@@ -809,6 +809,7 @@ export function createMockBackend(q: URLSearchParams): Backend {
     RevealLogs: async () => {
       console.info("[mock] RevealLogs");
     },
+    GetTheme: async () => "system",
     SetTheme: async () => {},
     ListPresets: async () => lib.list(),
     SelectPreset: async (id) => {

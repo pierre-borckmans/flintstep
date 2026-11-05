@@ -28,3 +28,22 @@ export function resolveTheme(mode: ThemeMode, systemDark: boolean): Resolved {
   if (mode !== "system") return mode;
   return systemDark ? "dark" : "light";
 }
+
+/** How the theme starts: `mode` to show, whether to tell Go (`push`) and whether to keep
+ *  it in localStorage (`save`). A stored theme wins and is pushed, so the native window
+ *  matches it. With none stored (first launch, or a new bundle id and so an empty
+ *  WebKit storage) Go's prefs.json is the truth: adopt it and keep it, never push the
+ *  "system" default over it. If Go can't say, show system and leave prefs.json alone. */
+export async function startupTheme(
+  stored: string | null,
+  askGo: () => Promise<string>,
+): Promise<{ mode: ThemeMode; push: boolean; save: boolean }> {
+  if (MODES.includes(stored as ThemeMode)) {
+    return { mode: stored as ThemeMode, push: true, save: false };
+  }
+  try {
+    return { mode: parseTheme(await askGo()), push: false, save: true };
+  } catch {
+    return { mode: "system", push: false, save: false };
+  }
+}

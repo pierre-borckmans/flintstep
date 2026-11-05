@@ -12,7 +12,7 @@ migrateStorage(localStore());
 
 loadBackend().then(({ backend, mock }) => {
   if (mock) document.documentElement.dataset.mock = "1";
-  initTheme((mode) => backend.SetTheme(mode));
+  void initTheme(backend);
   root.render(
     <React.StrictMode>
       <App backend={backend} />
