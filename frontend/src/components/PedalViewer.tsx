@@ -48,8 +48,9 @@ import { freezeMs, LinkCard, useLink } from "./LinkOverlay";
 // work on a pedal that is pixels.
 //
 // This component re-renders when the pedal's status, the mapping, the selection, the
-// theme or the viewer's size changes. It never re-renders because the camera moved:
-// the camera lives in the rig, and everything that follows it does so by subscription.
+// theme or the viewer's settled size changes. It never re-renders because the camera moved
+// or the window is mid-drag: the camera lives in the rig, and everything that follows it
+// does so by subscription.
 
 /** Browser dev only: ?zoom=2.5,0.3,0.4 opens zoomed 2.5x on that point of the layout. */
 function zoomFromQuery(): [number, number, number] | null {
@@ -103,8 +104,8 @@ function useTargetLayout(avail: { w: number; h: number } | null, present: [boole
     want[1] *= FREEZE;
   }
   // Nothing glides while the window opens (the first size and State land as they are),
-  // nor while it is resized, where the canvas follows the hand; a placement that flips
-  // during a resize still glides to its new side.
+  // nor when a resize settles (the drag already showed this size); a placement that flips
+  // as a resize settles still glides to its new side.
   const born = useRef(performance.now());
   const last = useRef({ size: "", placement, snap: 0 });
   const sizeKey = avail ? `${avail.w}x${avail.h}` : "";
@@ -164,9 +165,12 @@ export function PedalViewer({
   );
   const { rig, store } = scene;
   const viewer = useRef<HTMLElement>(null);
+  // The settled size, not the live one: a window drag re-renders nothing here until it
+  // stops, and then the layout (and the auto placement) is worked out once for the size
+  // it stopped at. Mid-drag the canvas scales the layout it has.
   const size = useSyncExternalStore(
-    useCallback((fn) => rig.subscribeView(fn), [rig]),
-    () => rig.size,
+    useCallback((fn) => rig.subscribeRoom(fn), [rig]),
+    () => rig.room,
   );
   const avail =
     size.w > 0 && size.h > 0
@@ -198,6 +202,7 @@ export function PedalViewer({
       nuts: { mode: nuts.mode, angles: nuts.angles, peek: nuts.peek },
       palette,
       layout: target.layout,
+      room: size,
       placement: target.placement,
       presence: target.presence,
       snap: target.snap,
@@ -222,6 +227,7 @@ export function PedalViewer({
       nuts.peek,
       palette,
       JSON.stringify(target.layout),
+      size,
       target.placement,
       target.presence.join(),
       target.snap,

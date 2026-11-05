@@ -56,7 +56,15 @@ export default function App({ backend }: { backend: Backend }) {
   const status = state?.pedal ?? null;
   const [split, setSplit] = useState(() => readViewPreference(SPLIT_KEY, 72, 40, 82));
   const workspace = useRef<HTMLDivElement>(null);
-  const drag = useRef(false);
+  // The divider's split while it is being dragged, or null. Written straight to the
+  // column's CSS variable rather than state: re-rendering the whole app on every pointer
+  // move was most of what a divider drag cost. Committed to state when it lets go. The
+  // column's box is measured once, when the drag starts: only its rows change under it.
+  const drag = useRef<{ split: number; top: number; height: number } | null>(null);
+  const endDrag = () => {
+    if (drag.current) setSplit(drag.current.split);
+    drag.current = null;
+  };
   useEffect(() => saveViewPreference(SPLIT_KEY, split), [split]);
 
   // Browser dev only: replay ?demo=... edits once the history exists (see mock.ts).
@@ -140,21 +148,25 @@ export default function App({ backend }: { backend: Backend }) {
             title="Drag to resize · arrow keys to adjust · double-click to reset"
             onDoubleClick={() => setSplit(72)}
             onPointerDown={(e) => {
-              drag.current = true;
+              const rect = workspace.current?.getBoundingClientRect();
+              if (!rect) return;
+              drag.current = { split, top: rect.top, height: rect.height };
               e.currentTarget.setPointerCapture(e.pointerId);
             }}
             onPointerMove={(e) => {
-              if (!drag.current || !workspace.current) return;
-              const rect = workspace.current.getBoundingClientRect();
-              setSplit(Math.max(40, Math.min(82, ((e.clientY - rect.top) / rect.height) * 100)));
+              const col = workspace.current;
+              const d = drag.current;
+              if (!d || !col) return;
+              const next = Math.max(40, Math.min(82, ((e.clientY - d.top) / d.height) * 100));
+              d.split = next;
+              col.style.setProperty("--viewer-split", `${next}%`);
+              e.currentTarget.setAttribute("aria-valuenow", String(Math.round(next)));
             }}
             onPointerUp={(e) => {
-              drag.current = false;
+              endDrag();
               e.currentTarget.releasePointerCapture(e.pointerId);
             }}
-            onLostPointerCapture={() => {
-              drag.current = false;
-            }}
+            onLostPointerCapture={endDrag}
             onKeyDown={(e) => {
               if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                 e.preventDefault();

@@ -31,6 +31,9 @@ export interface SceneData {
   /** Where everything is headed: the layout fitted to the canvas. The scene springs
    *  toward it on its own clock. */
   layout: Layout;
+  /** The canvas size `layout` was fitted to: the rig's settled room. Mid-drag the canvas
+   *  is already another size, and the camera scales this layout to it. */
+  room: { w: number; h: number };
   placement: Placement;
   /** Each expression pedal's presence target, 0 or 1 (or a frozen fraction). */
   presence: [number, number];
@@ -135,13 +138,19 @@ export class ZoomWatch {
     return () => this.settles.delete(fn);
   }
 
-  /** Called by the ticker with the camera's scale. */
-  update(scale: number): void {
+  /** Called by the ticker with the camera's scale. `held` while the canvas is being
+   *  resized: the scale is moving because the window is, the layout for the new size is
+   *  on its way and lands back near 1, so nothing re-bakes or re-rasterises for it. */
+  update(scale: number, held = false): void {
     this.scale = scale;
     // Hairlines redraw when the zoom has moved enough to see: a few short paths.
     if (Math.abs(scale / this.drawnAt - 1) > 0.02) {
       this.drawnAt = scale;
       for (const fn of this.hairlines) fn(1 / scale);
+    }
+    if (held) {
+      clearTimeout(this.timer);
+      return;
     }
     if (scale !== this.settled) {
       clearTimeout(this.timer);

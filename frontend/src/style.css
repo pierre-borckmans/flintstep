@@ -681,10 +681,14 @@ input[type="range"]::-webkit-slider-thumb {
   inset: 0;
   overflow: hidden;
 }
-/* The pedal canvas (canvas/Stage): Pixi sizes it from our own ResizeObserver. */
+/* The pedal canvas (canvas/Stage). Always the size of the viewer: Pixi sizes only its
+   drawing buffer, from our own ResizeObserver, and a window drag stretches the one it
+   has until the drag settles (canvas/shell's Resizer). */
 .viewer-canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   touch-action: none;
 }

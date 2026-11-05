@@ -1,6 +1,6 @@
 import { useApplication, useTick } from "@pixi/react";
 import type { Container, Ticker } from "pixi.js";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { flatten, springStep, unflatten } from "../lib/exppedal";
 import { contentBounds } from "./camera/camera";
 import { useScene, useSceneData } from "./context";
@@ -39,20 +39,24 @@ export function World() {
   const spring = useRef<{ x: number[]; v: number[]; snap: number } | null>(null);
   const { app, isInitialised } = useApplication();
 
-  // EFFECT: the box the camera may travel in, centred on the world's origin. And a fit,
-  // animated, when the set of pedals on the canvas changes: the layout is a new one, and
-  // a zoom framed on the old one is framed on something that has moved.
+  // EFFECT: the box the camera may travel in, centred on the world's origin, and the room
+  // it was laid out for. And a fit, animated, when the set of pedals on the canvas
+  // changes: the layout is a new one, and a zoom framed on the old one is framed on
+  // something that has moved. A layout effect: after a resize the new layout and the
+  // camera that frames it must reach the same frame, or one frame shows the new layout
+  // at the drag's scale.
   const box = data?.layout.box;
+  const room = data?.room;
   const pedals = data ? `${data.presence[0] > 0.5}/${data.presence[1] > 0.5}` : "";
   const shown = useRef(pedals);
-  useEffect(() => {
-    if (!box) return;
-    rig.setContent(contentBounds({ x: -box.w / 2, y: -box.h / 2, w: box.w, h: box.h }));
+  useLayoutEffect(() => {
+    if (!box || !room) return;
+    rig.setContent(contentBounds({ x: -box.w / 2, y: -box.h / 2, w: box.w, h: box.h }), room);
     if (pedals !== shown.current) {
       shown.current = pedals;
       if (!rig.isFitted()) rig.fit(store.current?.reducedMotion ? 0 : 340);
     }
-  }, [rig, box?.w, box?.h, pedals]);
+  }, [rig, box?.w, box?.h, room?.w, room?.h, pedals]);
 
   // EFFECT: text re-rasterised for the zoom once a gesture settles, and whenever new
   // text arrives (a mapping edit while zoomed in).
@@ -92,7 +96,7 @@ export function World() {
       const cam = rig.tick(performance.now());
       w.position.set(cam.x, cam.y);
       w.scale.set(cam.scale);
-      zoom.update(cam.scale);
+      zoom.update(cam.scale, rig.resizing);
 
       const d = store.current;
       if (!d) return;

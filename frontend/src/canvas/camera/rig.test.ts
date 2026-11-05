@@ -100,12 +100,31 @@ describe("fit and the room", () => {
     expect(rig.current).toEqual({ x: 400, y: 250, scale: 1 });
   });
 
-  it("a new canvas size is a new world: back to fitted, at once", () => {
+  it("a new canvas size is back to fitted at once, scaling the layout it has", () => {
     const rig = viewer();
     rig.zoomAt({ x: 100, y: 100 }, 3);
     rig.setView({ w: 1000, h: 600 });
     expect(rig.gliding).toBe(false);
+    expect(rig.isFitted()).toBe(true);
+    // The 700 x 400 drawing, fitted inside the padding as the layout is: 936/700 vs
+    // 536/400 of the new room over 736/700 vs 436/400 of the old.
+    expect(rig.current.scale).toBeCloseTo(536 / 400 / (736 / 700), 2);
+    expect(rig.current.x).toBe(500);
+    expect(rig.current.y).toBe(300);
+  });
+
+  it("lands at 1 once the layout for the new room arrives", () => {
+    const rig = viewer();
+    rig.setView({ w: 1000, h: 600 });
+    rig.setContent(contentBounds({ x: -450, y: -250, w: 900, h: 500 }), { w: 1000, h: 600 });
     expect(rig.current).toEqual({ x: 500, y: 300, scale: 1 });
+  });
+
+  it("re-fits a new room's layout even when its box is the same", () => {
+    const rig = viewer();
+    rig.zoomAt({ x: 400, y: 250 }, 2);
+    rig.setContent(contentBounds({ x: -350, y: -200, w: 700, h: 400 }), { w: 800, h: 520 });
+    expect(rig.isFitted()).toBe(true);
   });
 
   it("frames the first content outright and keeps the camera the user's after that", () => {
@@ -123,5 +142,48 @@ describe("fit and the room", () => {
     expect(n).toBe(0);
     rig.zoomAt({ x: 400, y: 250 }, 2);
     expect(n).toBe(1);
+  });
+});
+
+describe("a resize in progress", () => {
+  it("keeps the room until it settles, and only then tells React", () => {
+    const rig = new CameraRig();
+    let rooms = 0;
+    let views = 0;
+    rig.subscribeRoom(() => rooms++);
+    rig.subscribeView(() => views++);
+    rig.setView({ w: 800, h: 500 });
+    rig.settle();
+    expect(rig.room).toEqual({ w: 800, h: 500 });
+    expect(rig.resizing).toBe(false);
+    for (let w = 790; w >= 600; w -= 10) rig.setView({ w, h: 500 });
+    expect(views).toBe(21);
+    expect(rooms).toBe(1);
+    expect(rig.resizing).toBe(true);
+    expect(rig.room).toEqual({ w: 800, h: 500 });
+    rig.settle();
+    expect(rooms).toBe(2);
+    expect(rig.room).toEqual({ w: 600, h: 500 });
+    rig.settle();
+    expect(rooms).toBe(2);
+  });
+
+  it("frames the canvas before the renderer hears about the new size", () => {
+    const rig = viewer();
+    let seen = 0;
+    rig.subscribeView(() => {
+      seen = rig.current.x;
+    });
+    rig.setView({ w: 1000, h: 500 });
+    expect(seen).toBe(500);
+  });
+
+  it("shrinks the fitted pedal with the canvas, and back", () => {
+    const rig = viewer();
+    rig.setView({ w: 432, h: 500 });
+    // Width binds: (432 - 64) / 700 of the old (800 - 64) / 700.
+    expect(rig.current.scale).toBeCloseTo(368 / 736, 3);
+    rig.setView({ w: 800, h: 500 });
+    expect(rig.current).toEqual({ x: 400, y: 250, scale: 1 });
   });
 });
