@@ -1,65 +1,88 @@
 <!--
-  SparkX MIDI app icon: SOURCE OF TRUTH. Edit, then run `make icon`.
+  Flintstep app icon: SOURCE OF TRUTH. Edit, then run `make icon`.
   Canvas 1024x1024 on Apple's macOS icon grid: the body is an 824x824 rounded square at
   (100,100), corner radius 185. Keep artwork inside the body.
-  The six footswitches of a Spark Control X in their 3+3 layout, rings lit.
+  The site's favicon mark (site/favicon.svg) drawn large: a knapped flint, its facets lit
+  from the top left, and the amber spark it strikes, glowing like a lit LED. The flint
+  group is the favicon's 32-unit drawing scaled 20x, centred on the body.
 -->
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#22252b"/>
-      <stop offset="1" stop-color="#0c0d10"/>
+      <stop offset="0" stop-color="#25272a"/>
+      <stop offset="1" stop-color="#0c0d0e"/>
     </linearGradient>
     <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#ffffff" stop-opacity=".22"/>
       <stop offset=".5" stop-color="#ffffff" stop-opacity=".03"/>
       <stop offset="1" stop-color="#000000" stop-opacity=".4"/>
     </linearGradient>
-    <radialGradient id="cap" cx=".4" cy=".35">
-      <stop offset="0" stop-color="#5a6169"/>
-      <stop offset="1" stop-color="#23272c"/>
+    <radialGradient id="key" cx=".25" cy="0" r="1">
+      <stop offset="0" stop-color="#fff4e4" stop-opacity=".09"/>
+      <stop offset=".7" stop-color="#fff4e4" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="halo00"><stop offset=".5" stop-color="#ffb454" stop-opacity=".55"/><stop offset="1" stop-color="#ffb454" stop-opacity="0"/></radialGradient>
-    <radialGradient id="halo01"><stop offset=".5" stop-color="#ffb454" stop-opacity=".55"/><stop offset="1" stop-color="#ffb454" stop-opacity="0"/></radialGradient>
-    <radialGradient id="halo02"><stop offset=".5" stop-color="#7fe3a0" stop-opacity=".55"/><stop offset="1" stop-color="#7fe3a0" stop-opacity="0"/></radialGradient>
-    <radialGradient id="halo10"><stop offset=".5" stop-color="#5fd3ff" stop-opacity=".55"/><stop offset="1" stop-color="#5fd3ff" stop-opacity="0"/></radialGradient>
-    <radialGradient id="halo11"><stop offset=".5" stop-color="#5fd3ff" stop-opacity=".55"/><stop offset="1" stop-color="#5fd3ff" stop-opacity="0"/></radialGradient>
-    <radialGradient id="halo12"><stop offset=".5" stop-color="#ff6fae" stop-opacity=".55"/><stop offset="1" stop-color="#ff6fae" stop-opacity="0"/></radialGradient>
+    <linearGradient id="lit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b9080"/>
+      <stop offset="1" stop-color="#5f6457"/>
+    </linearGradient>
+    <linearGradient id="side" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4c5046"/>
+      <stop offset="1" stop-color="#363a32"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2c2f29"/>
+      <stop offset="1" stop-color="#1c1e1a"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#ffb454" stop-opacity=".75"/>
+      <stop offset=".35" stop-color="#ffb454" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#ffb454" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="spark" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#fff3dc"/>
+      <stop offset=".35" stop-color="#ffd08a"/>
+      <stop offset="1" stop-color="#ffb454"/>
+    </radialGradient>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="18" stdDeviation="22" flood-opacity=".45"/>
     </filter>
+    <filter id="drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-opacity=".55"/>
+    </filter>
   </defs>
+
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#body)" filter="url(#shadow)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#key)"/>
   <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <!-- MIDI DIN, small, top left -->
-  <g transform="translate(250 228)" fill="none" stroke="#e7e4dc" stroke-opacity=".8" stroke-width="7">
-    <circle r="40"/>
-    <g fill="#e7e4dc" stroke="none"><circle cx="-22" cy="-4" r="6"/><circle cx="22" cy="-4" r="6"/><circle cx="-16" cy="16" r="6"/><circle cx="16" cy="16" r="6"/><circle cx="0" cy="22" r="6"/></g>
+
+  <!-- the spark's glow, under everything else -->
+  <circle cx="682" cy="342" r="230" fill="url(#glow)"/>
+
+  <g transform="translate(172 202) scale(20)">
+    <!-- the flint: the favicon's outline, knapped into six facets lit from the top
+         left, with the ripples a struck flake leaves -->
+    <g filter="url(#drop)">
+      <path d="M3 22 8.5 12 18 8.5 25 16 21.5 27.5 10 29.5Z" fill="#1d1f1b"/>
+    </g>
+    <path d="M8.5 12 18 8.5 14 13.5Z" fill="#9a9f8d"/>
+    <path d="M18 8.5 25 16 17 19 14 13.5Z" fill="url(#lit)"/>
+    <path d="M14 13.5 17 19 12.5 22.5Z" fill="#555a4e"/>
+    <path d="M3 22 8.5 12 14 13.5 12.5 22.5Z" fill="url(#side)"/>
+    <path d="M25 16 21.5 27.5 17 19Z" fill="#2f3229"/>
+    <path d="M17 19 21.5 27.5 10 29.5 12.5 22.5Z" fill="url(#shade)"/>
+    <g fill="none" stroke-linecap="round">
+      <path d="M17.3 11.2Q19.6 13.6 19.2 17" stroke="#d6d9c8" stroke-opacity=".16" stroke-width=".2"/>
+      <path d="M19.4 10.9Q22 13.4 21.6 16.1" stroke="#d6d9c8" stroke-opacity=".12" stroke-width=".2"/>
+      <path d="M8.6 15.6Q10.4 17.6 9.4 21.6" stroke="#d6d9c8" stroke-opacity=".08" stroke-width=".2"/>
+    </g>
+    <g fill="none" stroke-linejoin="round" stroke-width=".18">
+      <path d="M8.5 12 14 13.5 17 19 25 16M18 8.5 14 13.5 12.5 22.5 17 19" stroke="#e4e6d8" stroke-opacity=".22"/>
+      <path d="M12.5 22.5 10 29.5M17 19 21.5 27.5M3 22 12.5 22.5" stroke="#000" stroke-opacity=".3"/>
+    </g>
+    <path d="M3 22 8.5 12 18 8.5 25 16 21.5 27.5 10 29.5Z" fill="none" stroke="#a3a893" stroke-opacity=".6" stroke-width=".35" stroke-linejoin="round"/>
+    <!-- the spark: the favicon's four-point star, lit -->
+    <path d="M25.5 1.5 26.9 5.6 31 7 26.9 8.4 25.5 12.5 24.1 8.4 20 7 24.1 5.6Z" fill="url(#spark)"/>
+    <circle cx="25.5" cy="7" r=".9" fill="#fffaf0"/>
   </g>
-  <rect x="680" y="216" width="94" height="24" rx="12" fill="#7fe3a0" opacity=".9"/>
-  <circle cx="318" cy="400" r="112" fill="url(#halo00)"/>
-  <circle cx="318" cy="400" r="72" fill="none" stroke="#ffb454" stroke-width="10"/>
-  <circle cx="318" cy="400" r="60" fill="url(#cap)"/>
-  <circle cx="318" cy="400" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <circle cx="512" cy="400" r="112" fill="url(#halo01)"/>
-  <circle cx="512" cy="400" r="72" fill="none" stroke="#ffb454" stroke-width="10"/>
-  <circle cx="512" cy="400" r="60" fill="url(#cap)"/>
-  <circle cx="512" cy="400" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <circle cx="706" cy="400" r="112" fill="url(#halo02)"/>
-  <circle cx="706" cy="400" r="72" fill="none" stroke="#7fe3a0" stroke-width="10"/>
-  <circle cx="706" cy="400" r="60" fill="url(#cap)"/>
-  <circle cx="706" cy="400" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <circle cx="318" cy="640" r="112" fill="url(#halo10)"/>
-  <circle cx="318" cy="640" r="72" fill="none" stroke="#5fd3ff" stroke-width="10"/>
-  <circle cx="318" cy="640" r="60" fill="url(#cap)"/>
-  <circle cx="318" cy="640" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <circle cx="512" cy="640" r="112" fill="url(#halo11)"/>
-  <circle cx="512" cy="640" r="72" fill="none" stroke="#5fd3ff" stroke-width="10"/>
-  <circle cx="512" cy="640" r="60" fill="url(#cap)"/>
-  <circle cx="512" cy="640" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <circle cx="706" cy="640" r="112" fill="url(#halo12)"/>
-  <circle cx="706" cy="640" r="72" fill="none" stroke="#ff6fae" stroke-width="10"/>
-  <circle cx="706" cy="640" r="60" fill="url(#cap)"/>
-  <circle cx="706" cy="640" r="60" fill="none" stroke="url(#rim)" stroke-width="3"/>
-  <rect x="200" y="788" width="624" height="10" rx="5" fill="#ffffff" opacity=".06"/>
+
 </svg>
