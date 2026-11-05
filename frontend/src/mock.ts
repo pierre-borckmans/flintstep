@@ -174,64 +174,92 @@ export function createSim(opts: SimOptions = {}) {
   let lastIn = Number.NEGATIVE_INFINITY;
 
   const out: Activity[] = [];
-  const emit = (dir: Activity["dir"], bytes: number[]) => {
-    out.push({ dir, bytes, label: describeMidi(bytes), at: epoch + t });
+  /** What produced a message, as the bridge tags it (Activity.source...). */
+  type Src = Pick<Activity, "source" | "index"> & Partial<Pick<Activity, "pair" | "of">>;
+  const emit = (dir: Activity["dir"], bytes: number[], src: Src) => {
+    out.push({ dir, bytes, label: describeMidi(bytes), at: epoch + t, pair: [0, 0], ...src });
     if (dir === "out") lastOut = t;
     else lastIn = t;
-    if (dir === "out" && config.ledMode === "feedback" && bytes[0] >> 4 !== 0xc) {
+    // The DAW echoes what the switches send (a real one may, whatever the LED mode;
+    // the bridge records it either way). Not the pedals' sweeps.
+    const fromSwitch = src.source !== "exp" && src.source !== "trigger";
+    if (dir === "out" && fromSwitch && bytes[0] >> 4 !== 0xc) {
       echoes.push({ at: t + 25, bytes });
     }
   };
 
-  function down(sw: number, a: Action) {
+  function down(sw: number, a: Action, src: Src) {
     const ch = (a.channel - 1) & 15;
     if (a.kind === "cc") {
       if (a.mode === "toggle") {
         toggled[sw] = !toggled[sw];
-        emit("out", [0xb0 | ch, a.number, toggled[sw] ? a.value : 0]);
-      } else emit("out", [0xb0 | ch, a.number, a.value]);
-    } else if (a.kind === "note") emit("out", [0x90 | ch, a.number, a.value]);
-    else if (a.kind === "pc") emit("out", [0xc0 | ch, a.number]);
+        emit("out", [0xb0 | ch, a.number, toggled[sw] ? a.value : 0], src);
+      } else emit("out", [0xb0 | ch, a.number, a.value], src);
+    } else if (a.kind === "note") emit("out", [0x90 | ch, a.number, a.value], src);
+    else if (a.kind === "pc") emit("out", [0xc0 | ch, a.number], src);
   }
-  function up(a: Action) {
+  function up(a: Action, src: Src) {
     const ch = (a.channel - 1) & 15;
-    if (a.kind === "cc" && a.mode === "momentary") emit("out", [0xb0 | ch, a.number, 0]);
-    else if (a.kind === "note") emit("out", [0x80 | ch, a.number, 0]);
+    if (a.kind === "cc" && a.mode === "momentary") emit("out", [0xb0 | ch, a.number, 0], src);
+    else if (a.kind === "note") emit("out", [0x80 | ch, a.number, 0], src);
   }
 
   // Expression triggers, sent like mapping.Engine sends them.
-  function triggerDown(a: Action, on: boolean) {
+  function triggerDown(a: Action, on: boolean, n: number) {
     const ch = (a.channel - 1) & 15;
+    const src: Src = { source: "trigger", index: n };
     if (a.kind === "cc")
-      emit("out", [0xb0 | ch, a.number, a.mode === "toggle" && !on ? 0 : a.value]);
-    else if (a.kind === "note") emit("out", [0x90 | ch, a.number, a.value]);
-    else if (a.kind === "pc") emit("out", [0xc0 | ch, a.number]);
+      emit("out", [0xb0 | ch, a.number, a.mode === "toggle" && !on ? 0 : a.value], src);
+    else if (a.kind === "note") emit("out", [0x90 | ch, a.number, a.value], src);
+    else if (a.kind === "pc") emit("out", [0xc0 | ch, a.number], src);
   }
-  const triggerUp = up;
-  /** Input n's trigger lets go: the cable came out, the link dropped, the config changed. */
-  function letGo(n: number) {
+  /** Input n's trigger lets go: the cable came out or the link dropped (forced), or the
+   *  config changed. */
+  function letGo(n: number, forced = true) {
     if (!trig[n].held) return;
     trig[n] = { ...trig[n], held: false, due: null };
-    triggerUp(config.exp[n].trigger.action);
+    up(
+      config.exp[n].trigger.action,
+      forced ? { source: "release", of: "trigger", index: n } : { source: "trigger", index: n },
+    );
   }
 
+  const tapSrc = (sw: number): Src => ({ source: "switch", index: sw });
   function press(sw: number) {
     held |= 1 << sw;
     pressedAt[sw] = t;
     longFired[sw] = false;
     const s = config.switches[sw];
-    if (s.long.kind === "off") down(sw, s.tap);
+    if (s.long.kind === "off") down(sw, s.tap, tapSrc(sw));
   }
   function unpress(sw: number) {
     held &= ~(1 << sw);
     const s = config.switches[sw];
-    if (s.long.kind === "off") up(s.tap);
-    else if (longFired[sw]) up(s.long);
+    if (s.long.kind === "off") up(s.tap, tapSrc(sw));
+    else if (longFired[sw]) up(s.long, { source: "long", index: sw });
     else {
-      down(sw, s.tap);
-      up(s.tap);
+      down(sw, s.tap, tapSrc(sw));
+      up(s.tap, tapSrc(sw));
     }
   }
+  /** The first combo pressed and let go, as the engine sends it. */
+  /** The link dropped: like Engine.Reset, what a held switch sounds is let go. */
+  function dropHeld() {
+    for (let sw = 0; sw < SWITCHES; sw++) {
+      if (!(held & (1 << sw))) continue;
+      const s = config.switches[sw];
+      const long = s.long.kind !== "off";
+      if (!long || longFired[sw]) {
+        up(long ? s.long : s.tap, { source: "release", of: long ? "long" : "switch", index: sw });
+      }
+    }
+    held = 0;
+    release = null;
+  }
+  const comboSrc = (): Src => {
+    const k = config.combos[0];
+    return { source: "combo", index: 0, pair: [k.a, k.b] };
+  };
 
   function step(dt: number): Activity[] {
     out.length = 0;
@@ -243,7 +271,7 @@ export function createSim(opts: SimOptions = {}) {
       if (next === "searching" && connState !== "searching") {
         searchFrom = t - p;
         lost = connState === "connected";
-        held = 0;
+        dropHeld();
       }
       connState = next;
     } else if (!opts.fixedState) {
@@ -257,13 +285,20 @@ export function createSim(opts: SimOptions = {}) {
     if (live && opts.autoPress !== false) {
       if (!release && t >= nextPress) {
         const sw = Math.floor(rand() * SWITCHES);
-        const long = config.switches[sw].long.kind !== "off" && rand() < 0.5;
-        press(sw);
-        const dur = long ? config.longPressMs + 300 : 140 + rand() * 520;
-        release = { sw, at: t + dur };
+        if (config.combos.length > 0 && rand() < 0.15) {
+          // Now and then, both switches of the first combo at once.
+          down(0, config.combos[0].action, comboSrc());
+          release = { sw: -1, at: t + 200 };
+        } else {
+          const long = config.switches[sw].long.kind !== "off" && rand() < 0.5;
+          press(sw);
+          const dur = long ? config.longPressMs + 300 : 140 + rand() * 520;
+          release = { sw, at: t + dur };
+        }
       }
       if (release && t >= release.at) {
-        unpress(release.sw);
+        if (release.sw < 0) up(config.combos[0].action, comboSrc());
+        else unpress(release.sw);
         release = null;
         nextPress = t + 900 + rand() * 2600;
       }
@@ -277,12 +312,12 @@ export function createSim(opts: SimOptions = {}) {
         t - pressedAt[sw] >= config.longPressMs
       ) {
         longFired[sw] = true;
-        down(sw, s.long);
+        down(sw, s.long, { source: "long", index: sw });
       }
     }
     while (echoes.length && echoes[0].at <= t) {
       const e = echoes.shift()!;
-      emit("in", e.bytes);
+      emit("in", e.bytes, { source: "feedback", index: -1 });
       const st = e.bytes[0] >> 4;
       config.switches.forEach((s, sw) => {
         const want = s.tap.kind === "cc" ? 0xb : s.tap.kind === "note" ? 0x9 : -1;
@@ -320,14 +355,14 @@ export function createSim(opts: SimOptions = {}) {
       const f = x.enabled ? expFraction(raw[n], x) : null;
       const r = stepTrigger(trig[n], x.trigger, f === null ? null : f * 100, t);
       trig[n] = r.state;
-      if (r.release) triggerUp(x.trigger.action);
-      if (r.press) triggerDown(x.trigger.action, r.state.on);
+      if (r.release) up(x.trigger.action, { source: "trigger", index: n });
+      if (r.press) triggerDown(x.trigger.action, r.state.on, n);
       if (x.enabled && t - lastExpAt[n] >= 90) {
         const v = expValue(raw[n], x) ?? 0;
         if (Math.abs(v - lastExpSent[n]) >= 2) {
           lastExpSent[n] = v;
           lastExpAt = lastExpAt.map((a, i) => (i === n ? t : a));
-          emit("out", [0xb0 | ((x.channel - 1) & 15), x.cc, v]);
+          emit("out", [0xb0 | ((x.channel - 1) & 15), x.cc, v], { source: "exp", index: n });
         }
       }
     }
@@ -445,7 +480,7 @@ export function createSim(opts: SimOptions = {}) {
         const was = config.exp[n];
         const sameAction = JSON.stringify(x.trigger.action) === JSON.stringify(was.trigger.action);
         if (x.enabled !== was.enabled || x.trigger.mode !== was.trigger.mode || !sameAction) {
-          letGo(n);
+          letGo(n, false);
           const keep =
             sameAction && x.trigger.action.kind === "cc" && x.trigger.action.mode === "toggle";
           trig = trig.map((s, i) => (i === n ? { ...s, on: s.on && keep } : s));
@@ -661,7 +696,7 @@ export function demoScript(name: string): DemoStep[] {
  *  ?state=off|idle|searching|connecting|connected, ?cycle (walk through them for ever:
  *  searching, connecting, connected, link lost), ?freeze=N (LinkOverlay), ?seed=N, ?hold=I,A (switch names),
  *  ?cables=11 (exp1, exp2), ?midi=error, ?still (no automatic presses), ?save=error
- *  (every save is refused), ?power=usb|battery (pin USB power; unset, it comes and goes),
+ *  (every save is refused), ?save=slow (every save takes a minute), ?power=usb|battery (pin USB power; unset, it comes and goes),
  *  ?lamp=amp|app (open on an indicator lamp), ?trigger=engage,toe (the two inputs'
  *  trigger modes; unset, engage,off), ?exp=60,98 (pin each pedal at a travel percent;
  *  "-" or unset sweeps it), ?sim=40,sweep (start each input's simulated
@@ -705,12 +740,13 @@ export function createMockBackend(q: URLSearchParams): Backend {
   const run = (c: Config) => sim.setConfig({ ...c, pedal: sim.config.pedal });
   const midiError = q.get("midi") === "error";
   const saveError = q.get("save") === "error";
+  const saveSlow = q.get("save") === "slow";
   /** Go's SaveConfigInto: stores into preset `id`, runs it only if `id` is active now. */
   const saveInto = async (id: string, cfg: Config) => {
     // Counted for browser checks (a scrub must save once).
     const w = window as unknown as { __mockSaves?: number };
     w.__mockSaves = (w.__mockSaves ?? 0) + 1;
-    await sleep(120);
+    await sleep(saveSlow ? 60_000 : 120);
     if (saveError) throw new Error("could not write config.json: read-only file system");
     const err = validate(cfg);
     if (err) throw new Error(err);

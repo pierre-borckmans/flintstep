@@ -172,7 +172,20 @@ export default function App({ backend }: { backend: Backend }) {
           >
             <span />
           </div>
-          <ActivityLog log={bridge.log} midi={state?.midi ?? null} />
+          <ActivityLog
+            log={bridge.log}
+            total={bridge.logTotal}
+            midi={state?.midi ?? null}
+            config={config}
+            onClear={bridge.clearLog}
+            onSelect={(t) =>
+              t.kind === "switch"
+                ? select(t.n)
+                : t.kind === "exp"
+                  ? selectExp(t.n)
+                  : selectIndicator(t.n)
+            }
+          />
         </div>
 
         <aside className="inspector" aria-label="Controller settings">

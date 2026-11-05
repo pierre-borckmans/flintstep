@@ -716,6 +716,23 @@ input[type="range"]::-webkit-slider-thumb {
 .viewer-divider:focus-visible > span {
   background: var(--color-beam);
 }
+/* The header's save word: Saved, Saving… and Not saved stacked in one cell, so the slot
+   is always as wide as the widest and the lamp and buttons never move. The shown one
+   fades in; a fade, not a switch, because it is words, not a lamp. */
+.history-word {
+  display: grid;
+  white-space: nowrap;
+}
+.history-word > span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity var(--dur-up) var(--ease);
+}
+.history-word[data-shown="saved"] > [data-word="saved"],
+.history-word[data-shown="saving"] > [data-word="saving"],
+.history-word[data-shown="fault"] > [data-word="fault"] {
+  opacity: 1;
+}
 .activity-panel {
   display: flex;
   flex-direction: column;
@@ -738,11 +755,147 @@ input[type="range"]::-webkit-slider-thumb {
   font: 10px var(--font-mono);
   color: var(--color-faint);
 }
+.activity-list {
+  min-height: 0;
+  flex: 1;
+  padding: 2px 0;
+}
+.activity-panel:focus {
+  outline: none;
+}
+/* One message per line, in columns: when · which way · what sent it · type · number ·
+   value · channel. Numbers in mono so a sweep's values do not dance. */
 .activity-row {
+  display: grid;
+  grid-template-columns: 24px 11px 80px 34px 50px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  height: 23px;
+  padding: 0 14px 0 10px;
+  font: 11px var(--font-mono);
+  font-variant-numeric: tabular-nums;
   border-bottom: 1px solid var(--row-line);
 }
 .activity-row:nth-child(even) {
   background-color: var(--row-stripe);
+}
+.act-time {
+  text-align: right;
+  font-size: 10px;
+  color: var(--color-faint);
+}
+.act-dir {
+  display: grid;
+  place-items: center;
+}
+/* What sent it, as a small key that shows it in the editor. */
+.act-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 17px;
+  padding: 0 6px;
+  border: 1px solid var(--color-edge);
+  border-radius: 3px;
+  background: var(--color-panel2);
+  color: var(--color-text);
+  font: 600 10px var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.act-chip:enabled:hover {
+  border-color: var(--color-edge-strong);
+  background: var(--color-panel3);
+  color: var(--color-bone);
+}
+.act-chip:disabled {
+  cursor: default;
+}
+.act-chip[data-tone="exp"] {
+  color: var(--color-muted);
+}
+.act-chip[data-tone="feedback"] {
+  color: var(--color-cold);
+  border-color: color-mix(in srgb, var(--color-cold) 28%, var(--color-edge));
+}
+.act-chip[data-tone="release"] {
+  color: var(--color-faint);
+  border-style: dashed;
+  background: transparent;
+}
+.act-chip[data-tone="none"] {
+  color: var(--color-faint);
+  background: transparent;
+  border-color: transparent;
+}
+/* The same source again: the chip steps back so a run reads as one group. */
+.act-chip[data-cont] {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-faint);
+}
+/* The message type: a tint of a light, not a fill. */
+.act-type {
+  justify-self: start;
+  padding: 0 4px;
+  border-radius: 3px;
+  font: 600 9px/14px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+.act-type[data-type="cc"] {
+  color: var(--color-cold);
+  background: color-mix(in srgb, var(--color-cold) 12%, transparent);
+}
+.act-type[data-type="note"] {
+  color: var(--color-beam);
+  background: color-mix(in srgb, var(--color-beam) 14%, transparent);
+}
+.act-type[data-type="pc"] {
+  color: var(--color-live);
+  background: color-mix(in srgb, var(--color-live) 12%, transparent);
+}
+.act-num {
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.act-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.act-value [data-tone="off"] {
+  color: var(--color-faint);
+}
+/* A CC value or velocity, 0..127, as a hairline gauge. Data: it jumps, no easing. */
+.act-bar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-edge);
+  overflow: hidden;
+}
+.act-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-cold);
+}
+.act-count,
+.act-ch {
+  font-size: 10px;
+  color: var(--color-faint);
 }
 .activity-empty {
   display: flex;
@@ -874,7 +1027,7 @@ input[type="range"]::-webkit-slider-thumb {
 @media (max-width: 920px) {
   .conn-prefix,
   .preset-kicker,
-  .history-word:not([data-fault]) {
+  .history-word {
     display: none;
   }
 }

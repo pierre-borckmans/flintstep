@@ -1,7 +1,9 @@
 import { History as HistoryIcon, Redo2, Undo2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { SaveStatus } from "../lib/autosave";
 import * as H from "../lib/history";
 import { relTime } from "../lib/midi";
+import { calmStart, type Shown, settle, shownOf } from "../lib/savestatus";
 import { hasOwnUndo, historyKey } from "../lib/shortcuts";
 import type { Config } from "../types";
 import { Button } from "../ui/Button";
@@ -31,6 +33,32 @@ function useHistoryKeys(undo: () => void, redo: () => void, flush: () => void) {
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo, flush]);
 }
+
+/** What the save word shows: the status, calmed (lib/savestatus) so quick saves do not
+ *  flicker "Saving…" and a shown "Saving…" does not vanish at once. */
+function useCalmStatus(st: SaveStatus): Shown {
+  const actual = shownOf(st);
+  const calm = useRef(calmStart);
+  const [shown, setShown] = useState<Shown>(calmStart.shown);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const look = () => {
+      const r = settle(calm.current, actual, Date.now());
+      calm.current = r.calm;
+      setShown(r.calm.shown);
+      if (r.wakeIn !== null) timer = setTimeout(look, r.wakeIn);
+    };
+    look();
+    return () => clearTimeout(timer);
+  }, [actual]);
+  return shown;
+}
+
+const WORDS: { id: Shown; text: string; className: string }[] = [
+  { id: "saved", text: "Saved", className: "text-faint" },
+  { id: "saving", text: "Saving…", className: "text-muted" },
+  { id: "fault", text: "Not saved", className: "text-hot" },
+];
 
 function useNow(on: boolean, every = 1000) {
   const [now, setNow] = useState(Date.now());
@@ -143,23 +171,22 @@ export function HistoryControls({
   }, [savedAt]);
 
   // A small lamp and one short word; the whole story (the error) is in the tooltip.
+  // The three words share one slot as wide as the widest, so nothing moves when it
+  // changes: they cross-fade in place.
+  const shown = useCalmStatus(st);
   let lamp = <Lamp on={justSaved} colour="live" size={6} />;
-  let word = <span className="text-faint">Saved</span>;
   let tip = savedAt ? "Saved. Every change saves itself." : "Every change saves itself.";
-  if (st.kind === "invalid" || st.kind === "failed") {
+  if (shown === "fault") {
     lamp = <Lamp on colour="hot" size={6} />;
-    word = <span className="text-hot">Not saved</span>;
-    tip = `Not saved: ${st.error}`;
-  } else if (st.kind === "pending" || st.kind === "saving") {
+    tip = st.kind === "invalid" || st.kind === "failed" ? `Not saved: ${st.error}` : "Not saved";
+  } else if (shown === "saving") {
     lamp = <Lamp on colour="beam" size={6} />;
-    word = <span className="text-muted">Saving…</span>;
     tip = "Saving…";
   }
 
   const undoLabel = history && H.undoLabel(history);
   const redoLabel = history && H.redoLabel(history);
   const changes = history ? history.entries.length - 1 : 0;
-  const fault = st.kind === "invalid" || st.kind === "failed";
 
   return (
     <div className="history-controls relative flex shrink-0 items-center gap-0.5">
@@ -169,8 +196,17 @@ export function HistoryControls({
         title={tip}
       >
         {lamp}
-        <span className="history-word whitespace-nowrap" data-fault={fault || undefined}>
-          {word}
+        <span className="history-word" data-shown={shown}>
+          {WORDS.map((w) => (
+            <span
+              key={w.id}
+              data-word={w.id}
+              className={w.className}
+              aria-hidden={w.id !== shown || undefined}
+            >
+              {w.text}
+            </span>
+          ))}
         </span>
       </span>
       <Button
@@ -202,7 +238,10 @@ export function HistoryControls({
         onClick={() => setOpen((o) => !o)}
         icon={<HistoryIcon size={13} />}
       >
-        {changes > 0 && <span className="font-mono tabular-nums">{changes}</span>}
+        {/* Always there and two digits wide, so the first change does not widen it. */}
+        <span className="min-w-[2ch] text-left font-mono tabular-nums">
+          {changes > 0 ? changes : ""}
+        </span>
       </Button>
       <Popover
         open={open && !!history}

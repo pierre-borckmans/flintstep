@@ -62,10 +62,13 @@ function Battery({ level, powered, meta }: { level: number; powered: boolean; me
   const { power, tooltip } = batteryInfo(level, powered);
   return (
     <div className="flex items-center gap-1.5" title={meta ? `${tooltip}\n${meta}` : tooltip}>
-      {power === "charging" && (
-        <Zap size={11} className="text-live" fill="currentColor" aria-label="Charging" />
-      )}
-      {power === "usb" && <Plug size={11} className="text-muted" aria-label="On USB power" />}
+      {/* A fixed slot, so the cable coming and going does not shift the header. */}
+      <span className="grid w-[11px] shrink-0 place-items-center">
+        {power === "charging" && (
+          <Zap size={11} className="text-live" fill="currentColor" aria-label="Charging" />
+        )}
+        {power === "usb" && <Plug size={11} className="text-muted" aria-label="On USB power" />}
+      </span>
       <div className="flex items-center gap-[2px] rounded-[3px] border border-edge-strong p-[2px]">
         {[0, 1, 2, 3].map((i) => (
           <Lamp
@@ -78,7 +81,9 @@ function Battery({ level, powered, meta }: { level: number; powered: boolean; me
           />
         ))}
       </div>
-      <span className="font-mono text-ui-sm text-muted tabular-nums">{level}%</span>
+      <span className="min-w-[4ch] text-right font-mono text-ui-sm text-muted tabular-nums">
+        {level}%
+      </span>
     </div>
   );
 }
