@@ -346,13 +346,13 @@ func (b *Bridge) anySimLocked() bool {
 
 // simOffLocked ends input n's simulation: its trigger lets go and its reading is
 // forgotten, as when a cable comes out. It returns the release to send.
-func (b *Bridge) simOffLocked(n int) [][]byte {
+func (b *Bridge) simOffLocked(n int) mapping.Outs {
 	b.sim[n] = simInput{sent: -1, raw: -1}
 	return b.eng.ExpRelease(n)
 }
 
 // takeOverLocked hands jack n to the real cable just plugged into it.
-func (b *Bridge) takeOverLocked(n int) [][]byte {
+func (b *Bridge) takeOverLocked(n int) mapping.Outs {
 	log.Printf("expression %d: a real pedal is plugged in, simulation off", n+1)
 	return b.simOffLocked(n)
 }

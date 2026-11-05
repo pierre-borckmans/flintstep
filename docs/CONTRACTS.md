@@ -109,19 +109,30 @@ Engine (not safe for concurrent use; the bridge serialises calls):
 
 ```go
 func NewEngine(cfg Config) *Engine
-func (e *Engine) SetConfig(cfg Config) [][]byte     // keeps toggle states where the switch is still a toggle;
+func (e *Engine) SetConfig(cfg Config) Outs         // keeps toggle states where the switch is still a toggle;
                                                     // returns the release of a trigger that must let go
-func (e *Engine) Switch(ed sparkx.Edge, at time.Time) [][]byte // MIDI to send now
-func (e *Engine) Tick(at time.Time) [][]byte        // long-press / combo / trigger off-delay timers; every ~10ms while pending
+func (e *Engine) Switch(ed sparkx.Edge, at time.Time) Outs // MIDI to send now
+func (e *Engine) Tick(at time.Time) Outs            // long-press / combo / trigger off-delay timers; every ~10ms while pending
 func (e *Engine) Pending() bool                     // whether Tick has work
-func (e *Engine) Exp(n, raw int, at time.Time) [][]byte // calibrated + inverted + hysteresis -> CC, plus the
+func (e *Engine) Exp(n, raw int, at time.Time) Outs // calibrated + inverted + hysteresis -> CC, plus the
                                                     // trigger's press (before the CC) or release (after it)
-func (e *Engine) ExpRelease(n int) [][]byte         // input n lost its cable: its trigger lets go, next value resent
+func (e *Engine) ExpRelease(n int) Outs             // input n lost its cable: its trigger lets go, next value resent
 func (e *Engine) ExpTriggers() [2]bool              // engaged now: held, or on for a CC toggle action
 func (e *Engine) Feedback(msg []byte) bool          // MIDI from the LED destination; true if Lamps() changed
 func (e *Engine) Lamps() [6]sparkx.Colour           // what the six switch lamps should show now (brightness applied)
-func (e *Engine) Reset() [][]byte                   // pedal disconnected: forget held/pending, keep toggles;
+func (e *Engine) Reset() Outs                       // pedal disconnected: forget held/pending, keep toggles;
                                                     // returns the release half of anything still sounding
+
+// Every message says what produced it (origin.go), for the activity log.
+type Outs []Out                     // in send order; Outs.Msgs() is the bare [][]byte (nil when empty)
+type Out struct { Msg []byte; Src Origin }
+type Origin struct { Source Source; Index int; Pair [2]int; Of Source }
+// Source: "switch" (Tap, both halves; a short press of a switch with a Long is its Tap)
+//         "long" | "combo" (Index = its index in Combos, Pair = its A, B) | "exp" (the CC)
+//         "trigger" (press and release, also a let-go from SetConfig or an off delay)
+//         "release": forced by Reset or ExpRelease; Of = what it lets go of, Index/Pair are that thing's
+//         "feedback": the bridge's, for MIDI in (Index -1)
+// Index: switch 0..5, exp input 0..1, combo index; -1 for none.
 
 type IndicatorState struct { Connected, Powered, Out, In bool } // Out/In: a flash is lit
 func IndicatorLamps(cfg Config, st IndicatorState) [2]sparkx.Colour // Amp, App; brightness applied
@@ -339,7 +350,12 @@ destination back, drives Manager.SetLamps, emits UI events. Interfaces so it is 
 ```go
 type Pedal interface { SetLamps([8]sparkx.Colour); Status() ble.Status } // the app owns Start/SetTarget/Stop
 type MIDIOut interface { Send([]byte) error }
-type Activity struct { Dir string `json:"dir"`; Bytes []int `json:"bytes"`; Label string `json:"label"`; At int64 `json:"at"` } // "out" | "in"
+type Activity struct {
+  Dir string `json:"dir"` // "out" | "in"
+  Bytes []int `json:"bytes"`; Label string `json:"label"`; At int64 `json:"at"`
+  Source string `json:"source"` // mapping.Origin: switch | long | combo | exp | trigger | release (out), feedback (in)
+  Index int `json:"index"`; Pair [2]int `json:"pair"`; Of string `json:"of,omitempty"` // as in mapping.Origin
+}
 type Options struct { OnActivity func(Activity); OnStatus func(ble.Status); OnTrigger func([2]bool); OnSim func(); Now func() time.Time }
 func (b *Bridge) ExpTriggers() [2]bool // Engine.ExpTriggers under the bridge's lock
 

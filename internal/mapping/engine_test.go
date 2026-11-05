@@ -29,9 +29,9 @@ func run(t *testing.T, e *Engine, steps []step) {
 	for i, s := range steps {
 		var got [][]byte
 		if s.sw < 0 {
-			got = e.Tick(at(s.ms))
+			got = e.Tick(at(s.ms)).Msgs()
 		} else {
-			got = e.Switch(sparkx.Edge{Switch: s.sw, Down: s.down}, at(s.ms))
+			got = e.Switch(sparkx.Edge{Switch: s.sw, Down: s.down}, at(s.ms)).Msgs()
 		}
 		if len(got) == 0 && len(s.want) == 0 {
 			continue
@@ -349,23 +349,23 @@ func TestEnginePending(t *testing.T) {
 	if e.Pending() {
 		t.Fatal("pending before anything happened")
 	}
-	e.Switch(sparkx.Edge{Switch: 3, Down: true}, at(0))
+	e.Switch(sparkx.Edge{Switch: 3, Down: true}, at(0)).Msgs()
 	if e.Pending() {
 		t.Fatal("a plain switch should not leave a timer")
 	}
-	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0))
+	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0)).Msgs()
 	if !e.Pending() {
 		t.Fatal("combo window should be pending")
 	}
-	e.Tick(at(60))
+	e.Tick(at(60)).Msgs()
 	if e.Pending() {
 		t.Fatal("combo window should have closed")
 	}
-	e.Switch(sparkx.Edge{Switch: 2, Down: true}, at(100))
+	e.Switch(sparkx.Edge{Switch: 2, Down: true}, at(100)).Msgs()
 	if !e.Pending() {
 		t.Fatal("long press should be pending")
 	}
-	e.Tick(at(600))
+	e.Tick(at(600)).Msgs()
 	if e.Pending() {
 		t.Fatal("long press should have fired")
 	}
@@ -401,7 +401,7 @@ func TestEngineSetConfigKeepsToggles(t *testing.T) {
 
 	// A colour edit keeps every toggle.
 	cfg.Switches[0].Colour = sparkx.Colour{R: 1}
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	lit(0, 1, 3, 4)
 	// The next press of a kept toggle turns it off.
 	run(t, e, []step{dn(2000, 0, cc(2, 30, 0)), up(2010, 0)})
@@ -410,26 +410,26 @@ func TestEngineSetConfigKeepsToggles(t *testing.T) {
 	// Turning a toggle into something else forgets it.
 	cfg.Switches[1].Long = longA
 	cfg.Combos[0].Action = combo
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	lit()
 
 	// And turning it back starts it off.
 	cfg.Switches[1].Long = ccTog
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	lit()
 }
 
 func TestEngineReleaseEndsWhatThePressSent(t *testing.T) {
 	e := NewEngine(cfgWith(func(c *Config) { c.Switches[0].Tap = note }))
 	run(t, e, []step{dn(0, 0, non(3, 60, 90))})
-	e.SetConfig(Default())
+	e.SetConfig(Default()).Msgs()
 	run(t, e, []step{up(100, 0, noff(3, 60)), dn(200, 0, cc(1, 80, 127))})
 }
 
 func TestEngineSetConfigMidCombo(t *testing.T) {
 	e := NewEngine(cfgWith(func(c *Config) { c.Combos = []Combo{{A: 0, B: 1, Action: combo}} }))
 	run(t, e, []step{dn(0, 0), dn(10, 1, non(10, 36, 127))})
-	e.SetConfig(Default())
+	e.SetConfig(Default()).Msgs()
 	run(t, e, []step{up(50, 1, noff(10, 36)), up(60, 0)})
 }
 
@@ -443,7 +443,7 @@ func TestEngineReset(t *testing.T) {
 		dn(100, 0, cc(1, 80, 127)),
 		dn(100, 2),
 	})
-	e.Reset()
+	e.Reset().Msgs()
 	if e.Pending() {
 		t.Fatal("Reset left a timer")
 	}
@@ -469,17 +469,17 @@ func TestEngineLocalLamps(t *testing.T) {
 	if e.Lamps() != ([6]sparkx.Colour{}) {
 		t.Fatal("lamps lit with nothing held")
 	}
-	e.Switch(sparkx.Edge{Switch: 2, Down: true}, at(0))
+	e.Switch(sparkx.Edge{Switch: 2, Down: true}, at(0)).Msgs()
 	if got, want := e.Lamps()[2], defaultColours[2]; got != want {
 		t.Fatalf("held lamp = %v, want %v", got, want)
 	}
-	e.Switch(sparkx.Edge{Switch: 2}, at(10))
+	e.Switch(sparkx.Edge{Switch: 2}, at(10)).Msgs()
 	if e.Lamps()[2] != (sparkx.Colour{}) {
 		t.Fatal("lamp still lit after release")
 	}
 	// A switch still waiting on a combo or long press is held, so it is lit.
-	e.SetConfig(cfgWith(func(c *Config) { c.Switches[0].Long = longA }))
-	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(100))
+	e.SetConfig(cfgWith(func(c *Config) { c.Switches[0].Long = longA })).Msgs()
+	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(100)).Msgs()
 	if e.Lamps()[0] == (sparkx.Colour{}) {
 		t.Fatal("waiting switch not lit")
 	}
@@ -505,7 +505,7 @@ func TestEngineBrightness(t *testing.T) {
 			cfg.Brightness = c.pct
 			cfg.Switches[0].Colour = c.in
 		}))
-		e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0))
+		e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0)).Msgs()
 		if got := e.Lamps()[0]; got != c.want {
 			t.Errorf("brightness %d: %v -> %v, want %v", c.pct, c.in, got, c.want)
 		}
@@ -553,7 +553,7 @@ func TestEngineFeedback(t *testing.T) {
 	}
 
 	// Pressing does not light a switch in feedback mode: the DAW decides.
-	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0))
+	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0)).Msgs()
 	if e.Lamps()[0] != (sparkx.Colour{}) {
 		t.Fatal("held switch lit in feedback mode")
 	}
@@ -564,7 +564,7 @@ func TestEngineFeedbackRecordedInLocalMode(t *testing.T) {
 	e := NewEngine(cfg)
 	e.Feedback(cc(1, 84, 127))
 	cfg.LEDMode = LEDFeedback
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	if e.Lamps()[4] == (sparkx.Colour{}) {
 		t.Fatal("feedback received in local mode not shown after switching modes")
 	}
@@ -638,18 +638,18 @@ func TestEngineExpResends(t *testing.T) {
 		t.Fatal("first value not sent")
 	}
 	// Unchanged config: still deduplicated.
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	if _, ok := expOne(e, 0, 0); ok {
 		t.Fatal("repeat sent")
 	}
 	// New CC: the controller has never heard it, so send.
 	cfg.Exp[0].CC = 1
-	e.SetConfig(cfg)
+	e.SetConfig(cfg).Msgs()
 	if msg, ok := expOne(e, 0, 0); !ok || !reflect.DeepEqual(msg, cc(1, 1, 0)) {
 		t.Fatalf("after CC change: %s %v", Describe(msg), ok)
 	}
 	// A reconnect resends too.
-	e.Reset()
+	e.Reset().Msgs()
 	if _, ok := expOne(e, 0, 0); !ok {
 		t.Fatal("not resent after Reset")
 	}
@@ -658,7 +658,7 @@ func TestEngineExpResends(t *testing.T) {
 // expOne feeds one value to an input whose trigger is off and returns the CC it sent,
 // if any.
 func expOne(e *Engine, n, raw int) ([]byte, bool) {
-	out := e.Exp(n, raw, at(0))
+	out := e.Exp(n, raw, at(0)).Msgs()
 	if len(out) == 0 {
 		return nil, false
 	}
@@ -668,7 +668,7 @@ func expOne(e *Engine, n, raw int) ([]byte, bool) {
 func TestEngineIgnoresUnknownSwitch(t *testing.T) {
 	e := NewEngine(Default())
 	for _, n := range []int{-1, 6, 99} {
-		if got := e.Switch(sparkx.Edge{Switch: n, Down: true}, at(0)); got != nil {
+		if got := e.Switch(sparkx.Edge{Switch: n, Down: true}, at(0)).Msgs(); got != nil {
 			t.Errorf("switch %d sent %v", n, got)
 		}
 	}
@@ -677,7 +677,7 @@ func TestEngineIgnoresUnknownSwitch(t *testing.T) {
 func TestNewEngineNormalizes(t *testing.T) {
 	// A blank config must not panic or send channel-0 garbage.
 	e := NewEngine(Config{})
-	got := e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0))
+	got := e.Switch(sparkx.Edge{Switch: 0, Down: true}, at(0)).Msgs()
 	if !reflect.DeepEqual(got, [][]byte{cc(1, 80, 127)}) {
 		t.Fatalf("blank config sent %s", describeAll(got))
 	}
@@ -689,10 +689,10 @@ func TestResetReleasesWhatIsSounding(t *testing.T) {
 	cfg.Switches[2].Tap = Action{Kind: KindCC, Channel: 1, Number: 82, Value: 127, Mode: Toggle}
 	e := NewEngine(cfg)
 	at := time.Unix(0, 0)
-	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at) // momentary CC 80
-	e.Switch(sparkx.Edge{Switch: 1, Down: true}, at) // note on
-	e.Switch(sparkx.Edge{Switch: 2, Down: true}, at) // toggle: stays on, nothing to release
-	got := e.Reset()
+	e.Switch(sparkx.Edge{Switch: 0, Down: true}, at).Msgs() // momentary CC 80
+	e.Switch(sparkx.Edge{Switch: 1, Down: true}, at).Msgs() // note on
+	e.Switch(sparkx.Edge{Switch: 2, Down: true}, at).Msgs() // toggle: stays on, nothing to release
+	got := e.Reset().Msgs()
 	want := [][]byte{{0xB0, 80, 0}, {0x81, 60, 0}}
 	if len(got) != len(want) {
 		t.Fatalf("Reset() = % x, want % x", got, want)
@@ -702,7 +702,7 @@ func TestResetReleasesWhatIsSounding(t *testing.T) {
 			t.Errorf("Reset()[%d] = % x, want % x", i, got[i], want[i])
 		}
 	}
-	if again := e.Reset(); len(again) != 0 {
+	if again := e.Reset().Msgs(); len(again) != 0 {
 		t.Errorf("second Reset() = % x, want nothing", again)
 	}
 }

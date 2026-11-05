@@ -46,6 +46,7 @@ type press struct {
 	phase   phase
 	due     time.Time
 	active  Action // what the press sent, so the release ends the same thing
+	src     Origin // where active came from, for the activity log
 	partner int    // comboDown: the other switch
 }
 
@@ -86,9 +87,9 @@ func NewEngine(cfg Config) *Engine {
 // It returns the release half of an expression trigger that has to let go: its input
 // was switched off, or its mode or action changed. A new threshold is only read on the
 // next value.
-func (e *Engine) SetConfig(cfg Config) [][]byte {
+func (e *Engine) SetConfig(cfg Config) Outs {
 	cfg = cfg.Normalize()
-	var out [][]byte
+	var out Outs
 	for n := range e.trig {
 		if trigKey(e.cfg.Exp[n]) != trigKey(cfg.Exp[n]) {
 			out = append(out, e.letGo(n)...)
@@ -119,7 +120,7 @@ func (e *Engine) SetConfig(cfg Config) [][]byte {
 
 // Switch takes one edge and returns the MIDI to send now. Timers due by at fire
 // first, so a late Tick never reorders what the pedal did.
-func (e *Engine) Switch(ed sparkx.Edge, at time.Time) [][]byte {
+func (e *Engine) Switch(ed sparkx.Edge, at time.Time) Outs {
 	if !validSwitch(ed.Switch) {
 		return nil
 	}
@@ -135,17 +136,18 @@ func (e *Engine) Switch(ed sparkx.Edge, at time.Time) [][]byte {
 	return append(out, e.up(n)...)
 }
 
-func (e *Engine) down(n int, at time.Time) [][]byte {
+func (e *Engine) down(n int, at time.Time) Outs {
 	s := &e.sw[n]
 	*s = press{held: true, down: at}
-	if p, a, ok := e.partner(n, at); ok {
-		e.sw[p].phase, e.sw[p].active, e.sw[p].partner = comboDown, a, n
-		s.phase, s.active, s.partner = comboDown, a, p
+	if p, a, ci, ok := e.partner(n, at); ok {
+		src := Origin{Source: SrcCombo, Index: ci, Pair: [2]int{e.cfg.Combos[ci].A, e.cfg.Combos[ci].B}}
+		e.sw[p].phase, e.sw[p].active, e.sw[p].src, e.sw[p].partner = comboDown, a, src, n
+		s.phase, s.active, s.src, s.partner = comboDown, a, src, p
 		k := pairKey(n, p)
 		on := e.comboOn[k]
 		out := e.pressHalf(a, &on)
 		e.comboOn[k] = on
-		return out
+		return tag(out, src)
 	}
 	if e.inCombo(n) {
 		s.phase, s.due = waitCombo, at.Add(comboWindow)
@@ -155,61 +157,62 @@ func (e *Engine) down(n int, at time.Time) [][]byte {
 }
 
 // partner finds a switch waiting for n to make a combo: the one that went down first.
-func (e *Engine) partner(n int, at time.Time) (int, Action, bool) {
-	best, bestA, found := -1, Action{}, false
+// It returns the switch, the combo's action and the combo's index in the config.
+func (e *Engine) partner(n int, at time.Time) (int, Action, int, bool) {
+	best, bestA, bestI, found := -1, Action{}, -1, false
 	for p := range e.sw {
 		ps := e.sw[p]
 		if p == n || ps.phase != waitCombo || !at.Before(ps.due) {
 			continue
 		}
-		a, ok := e.combo(n, p)
+		a, ci, ok := e.combo(n, p)
 		if !ok {
 			continue
 		}
 		if !found || ps.down.Before(e.sw[best].down) {
-			best, bestA, found = p, a, true
+			best, bestA, bestI, found = p, a, ci, true
 		}
 	}
-	return best, bestA, found
+	return best, bestA, bestI, found
 }
 
 // begin starts n's own action, once no combo can claim it: a switch with a Long
 // action waits, one without fires its Tap now.
-func (e *Engine) begin(n int) [][]byte {
+func (e *Engine) begin(n int) Outs {
 	s := &e.sw[n]
 	sc := e.cfg.Switches[n]
 	if sc.Long.Kind != KindOff {
 		s.phase, s.due = waitLong, s.down.Add(time.Duration(e.cfg.LongPressMS)*time.Millisecond)
 		return nil
 	}
-	s.phase, s.active = tapDown, sc.Tap
-	return e.pressHalf(sc.Tap, &e.tapOn[n])
+	s.phase, s.active, s.src = tapDown, sc.Tap, Origin{Source: SrcSwitch, Index: n}
+	return tag(e.pressHalf(sc.Tap, &e.tapOn[n]), s.src)
 }
 
-func (e *Engine) up(n int) [][]byte {
+func (e *Engine) up(n int) Outs {
 	s := &e.sw[n]
-	ph, a, p := s.phase, s.active, s.partner
+	ph, a, src, p := s.phase, s.active, s.src, s.partner
 	*s = press{}
 	switch ph {
 	case waitCombo, waitLong:
 		// Released before anything was decided: a tap, sent whole.
 		tap := e.cfg.Switches[n].Tap
-		return append(e.pressHalf(tap, &e.tapOn[n]), e.releaseHalf(tap)...)
+		return tag(append(e.pressHalf(tap, &e.tapOn[n]), e.releaseHalf(tap)...), Origin{Source: SrcSwitch, Index: n})
 	case tapDown, longDown:
-		return e.releaseHalf(a)
+		return tag(e.releaseHalf(a), src)
 	case comboDown:
 		if e.sw[p].held {
 			e.sw[p].phase = spent
 		}
-		return e.releaseHalf(a)
+		return tag(e.releaseHalf(a), src)
 	}
 	return nil
 }
 
 // Tick fires the timers due by at: combo windows that closed without a partner, and
 // long presses, and expression triggers' off delays. Called every ~10 ms while Pending.
-func (e *Engine) Tick(at time.Time) [][]byte {
-	var out [][]byte
+func (e *Engine) Tick(at time.Time) Outs {
+	var out Outs
 	for {
 		n := e.nextDue(at)
 		if n < 0 {
@@ -221,8 +224,8 @@ func (e *Engine) Tick(at time.Time) [][]byte {
 			out = append(out, e.begin(n)...)
 		case waitLong:
 			l := e.cfg.Switches[n].Long
-			s.phase, s.active = longDown, l
-			out = append(out, e.pressHalf(l, &e.longOn[n])...)
+			s.phase, s.active, s.src = longDown, l, Origin{Source: SrcLong, Index: n}
+			out = append(out, tag(e.pressHalf(l, &e.longOn[n]), s.src)...)
 		}
 	}
 }
@@ -258,17 +261,17 @@ func (e *Engine) Pending() bool {
 //
 // It returns the release half of everything still sounding, so a pedal that drops
 // mid-press does not leave a note hanging or a momentary CC stuck on in the DAW.
-func (e *Engine) Reset() [][]byte {
-	var out [][]byte
+func (e *Engine) Reset() Outs {
+	var out Outs
 	ended := map[[2]int]bool{}
 	for n, p := range e.sw {
 		switch p.phase {
 		case tapDown, longDown:
-			out = append(out, e.releaseHalf(p.active)...)
+			out = append(out, released(tag(e.releaseHalf(p.active), p.src))...)
 		case comboDown:
 			if k := pairKey(n, p.partner); !ended[k] {
 				ended[k] = true
-				out = append(out, e.releaseHalf(p.active)...)
+				out = append(out, released(tag(e.releaseHalf(p.active), p.src))...)
 			}
 		}
 	}
@@ -279,21 +282,22 @@ func (e *Engine) Reset() [][]byte {
 	return out
 }
 
-// combo is the action for switches a and b pressed together, if there is one. The
-// first matching combo wins; one that does nothing is no combo.
-func (e *Engine) combo(a, b int) (Action, bool) {
+// combo is the action for switches a and b pressed together, and its index in the
+// config, if there is one. The first matching combo wins; one that does nothing is no
+// combo.
+func (e *Engine) combo(a, b int) (Action, int, bool) {
 	k := pairKey(a, b)
-	for _, cb := range e.cfg.Combos {
+	for i, cb := range e.cfg.Combos {
 		if cb.A != cb.B && pairKey(cb.A, cb.B) == k && cb.Action.Kind != KindOff {
-			return cb.Action, true
+			return cb.Action, i, true
 		}
 	}
-	return Action{}, false
+	return Action{}, -1, false
 }
 
 func (e *Engine) inCombo(n int) bool {
 	for p := range e.sw {
-		if _, ok := e.combo(n, p); ok && p != n {
+		if _, _, ok := e.combo(n, p); ok && p != n {
 			return true
 		}
 	}
@@ -341,7 +345,7 @@ func isToggle(a Action) bool { return a.Kind == KindCC && a.Mode == Toggle }
 //
 // The same travel drives the input's trigger (trigger.go): a press half goes before
 // the CC, a release half after it. Timers due by at fire first, as in Switch.
-func (e *Engine) Exp(n, raw int, at time.Time) [][]byte {
+func (e *Engine) Exp(n, raw int, at time.Time) Outs {
 	out := e.Tick(at)
 	if n < 0 || n >= sparkx.ExpInputs || !e.cfg.Exp[n].Enabled {
 		return out
@@ -365,7 +369,7 @@ func (e *Engine) Exp(n, raw int, at time.Time) [][]byte {
 	press, release := e.trigger(n, scaled, at)
 	out = append(out, press...)
 	if v, changed := e.exp.Feed(n, scaled); changed {
-		out = append(out, ccMsg(x.Channel, x.CC, v))
+		out = append(out, Out{Msg: ccMsg(x.Channel, x.CC, v), Src: Origin{Source: SrcExp, Index: n}})
 	}
 	return append(out, release...)
 }
