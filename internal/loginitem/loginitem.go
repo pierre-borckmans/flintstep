@@ -11,10 +11,15 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"flintstep/internal/product"
 )
 
-// Label is the LaunchAgent's label and the plist's file name.
-const Label = "com.silversol.sparkxmidi"
+// Label is the LaunchAgent's label and the plist's file name: the bundle id.
+const Label = product.BundleID
+
+// LegacyLabel is the label the agent had before the rename to Flintstep.
+const LegacyLabel = product.LegacyBundleID
 
 // HiddenFlag is the argument the agent starts the app with.
 const HiddenFlag = "--hidden"
@@ -38,11 +43,39 @@ var executable = func() (string, error) {
 }
 
 func plistPath() (string, error) {
+	return agentPath(Label)
+}
+
+func agentPath(label string) (string, error) {
 	dir, err := agentsDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, Label+".plist"), nil
+	return filepath.Join(dir, label+".plist"), nil
+}
+
+// MigrateLegacy carries "launch at login" over from the app's old name. The old agent
+// only exists while the setting was on (Set(false) deletes it), so when it is there,
+// this installs the agent under the new label for the running executable and then
+// deletes the old one. It reports whether it found an old agent. On an error the old
+// agent stays, and the next launch tries again.
+func MigrateLegacy() (bool, error) {
+	old, err := agentPath(LegacyLabel)
+	if err != nil {
+		return false, fmt.Errorf("loginitem: %w", err)
+	}
+	if _, err := os.Lstat(old); errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	} else if err != nil {
+		return true, fmt.Errorf("loginitem: %w", err)
+	}
+	if err := Set(true); err != nil {
+		return true, err
+	}
+	if err := os.Remove(old); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return true, fmt.Errorf("loginitem: removing the old agent: %w", err)
+	}
+	return true, nil
 }
 
 // Enabled reports whether the agent exists and starts this executable.

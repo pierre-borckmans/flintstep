@@ -50,8 +50,8 @@ app: ## Build and sign build/bin/<PRODUCT_NAME>.app (VERSION from git)
 	@# which keeps the Bluetooth permission across rebuilds, else ad hoc.
 	scripts/release/sign.sh "$(APP)"
 
-cert: ## Create the local signing certificate (once per Mac)
-	scripts/signing/local-cert.sh
+cert: ## Create the local signing certificate (once per Mac; NEW=1 replaces a pre-rename one)
+	scripts/signing/local-cert.sh $(if $(NEW),--new)
 
 dmg: app ## Pack the .app into build/bin/<name>-<version>.dmg (no notarization)
 	scripts/release/dmg.sh "$(DMG)" "$(APP)"
@@ -66,7 +66,7 @@ product-check:
 	@scripts/product/sync.sh --check
 
 cli: dist ## Build the headless bridge into build/bin/<CLI_NAME>
-	go build -o "build/bin/$(CLI_NAME)" ./cmd/sparkx-midi
+	go build -o "build/bin/$(CLI_NAME)" ./cmd/$(CLI_NAME)
 
 frontend: ## Build the real frontend bundle (tsc + vite)
 	$(BUN) run build

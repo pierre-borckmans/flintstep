@@ -11,7 +11,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
-	"sparkbridge/internal/store"
+	"flintstep/internal/product"
+	"flintstep/internal/store"
 )
 
 //go:embed all:frontend/dist
@@ -31,7 +32,7 @@ func main() {
 	appearance, background := launchLook(app.prefs.Theme, systemIsDark())
 
 	err := wails.Run(&options.App{
-		Title:     "SparkX MIDI",
+		Title:     product.Name,
 		Width:     1180,
 		Height:    820,
 		MinWidth:  560,
@@ -48,7 +49,7 @@ func main() {
 			TitleBar:   mac.TitleBarHiddenInset(),
 			Appearance: appearance,
 			About: &mac.AboutInfo{
-				Title:   "SparkX MIDI",
+				Title:   product.Name,
 				Message: "Turns a Spark Control X into a MIDI foot controller.\nNot affiliated with Positive Grid.",
 			},
 		},

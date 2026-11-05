@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"sparkbridge/internal/rotlog"
+	"flintstep/internal/rotlog"
 )
 
 // TraceMax is the wire trace's size cap before it rotates to <path>.1. Without the

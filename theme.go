@@ -8,7 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
-	"sparkbridge/internal/store"
+	"flintstep/internal/store"
 )
 
 // THE WINDOW THEME. The webview themes itself from CSS; the native window around it (title

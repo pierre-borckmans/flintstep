@@ -5,7 +5,8 @@ import (
 	"log"
 	"os"
 
-	"sparkbridge/internal/rotlog"
+	"flintstep/internal/product"
+	"flintstep/internal/rotlog"
 )
 
 // appLogMax is app.log's size cap before it rotates to app.log.1.
@@ -22,5 +23,5 @@ func startLog(path string) {
 		return
 	}
 	log.SetOutput(io.MultiWriter(os.Stderr, f))
-	log.Printf("---- SparkX MIDI %s starting (pid %d) ----", version, os.Getpid())
+	log.Printf("---- %s %s starting (pid %d) ----", product.Name, version, os.Getpid())
 }

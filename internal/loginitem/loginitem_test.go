@@ -20,16 +20,16 @@ func fake(t *testing.T, exe string) string {
 }
 
 func TestRender(t *testing.T) {
-	got := string(Render("/Applications/SparkX MIDI.app/Contents/MacOS/SparkX & <co>"))
+	got := string(Render("/Applications/Flintstep.app/Contents/MacOS/Flintstep & <co>"))
 	want := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>com.silversol.sparkxmidi</string>
+	<string>com.silversol.flintstep</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/Applications/SparkX MIDI.app/Contents/MacOS/SparkX &amp; &lt;co&gt;</string>
+		<string>/Applications/Flintstep.app/Contents/MacOS/Flintstep &amp; &lt;co&gt;</string>
 		<string>--hidden</string>
 	</array>
 	<key>RunAtLoad</key>
@@ -74,7 +74,7 @@ func TestProgram(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
-	p := fake(t, "/Apps/SparkX MIDI.app/Contents/MacOS/sparkx")
+	p := fake(t, "/Apps/Flintstep.app/Contents/MacOS/Flintstep")
 	if Enabled() {
 		t.Fatal("enabled before Set")
 	}
@@ -88,7 +88,7 @@ func TestSet(t *testing.T) {
 		t.Fatal("not enabled after Set(true)")
 	}
 	b, err := os.ReadFile(p)
-	if err != nil || !strings.Contains(string(b), "/Apps/SparkX MIDI.app/Contents/MacOS/sparkx") {
+	if err != nil || !strings.Contains(string(b), "/Apps/Flintstep.app/Contents/MacOS/Flintstep") {
 		t.Fatalf("plist %q, %v", b, err)
 	}
 	if err := Set(true); err != nil {
@@ -106,11 +106,11 @@ func TestSet(t *testing.T) {
 }
 
 func TestEnabledOtherExecutable(t *testing.T) {
-	fake(t, "/old/place/sparkx")
+	fake(t, "/old/place/Flintstep")
 	if err := Set(true); err != nil {
 		t.Fatal(err)
 	}
-	executable = func() (string, error) { return "/new/place/sparkx", nil }
+	executable = func() (string, error) { return "/new/place/Flintstep", nil }
 	if Enabled() {
 		t.Fatal("an agent for another copy of the app counts as enabled")
 	}
@@ -119,5 +119,66 @@ func TestEnabledOtherExecutable(t *testing.T) {
 	}
 	if !Enabled() {
 		t.Fatal("Set(true) did not repoint the agent")
+	}
+}
+
+// oldAgent writes an agent under the old label, as the app shipped it, next to p.
+func oldAgent(t *testing.T, p string) string {
+	t.Helper()
+	old := filepath.Join(filepath.Dir(p), LegacyLabel+".plist")
+	plist := strings.Replace(string(Render("/Applications/SparkX MIDI.app/Contents/MacOS/SparkX MIDI")), Label, LegacyLabel, 1)
+	if err := os.MkdirAll(filepath.Dir(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(old, []byte(plist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return old
+}
+
+func TestMigrateLegacy(t *testing.T) {
+	p := fake(t, "/Applications/Flintstep.app/Contents/MacOS/Flintstep")
+	old := oldAgent(t, p)
+	found, err := MigrateLegacy()
+	if !found || err != nil {
+		t.Fatalf("MigrateLegacy() = %v, %v", found, err)
+	}
+	if !Enabled() {
+		t.Fatal("not enabled under the new label")
+	}
+	b, err := os.ReadFile(p)
+	if err != nil || !strings.Contains(string(b), "<string>"+Label+"</string>") {
+		t.Fatalf("new agent %q, %v", b, err)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatalf("old agent still there: %v", err)
+	}
+	if found, err := MigrateLegacy(); found || err != nil {
+		t.Fatalf("second run = %v, %v", found, err)
+	}
+}
+
+func TestMigrateLegacyNothingThere(t *testing.T) {
+	p := fake(t, "/Applications/Flintstep.app/Contents/MacOS/Flintstep")
+	if found, err := MigrateLegacy(); found || err != nil {
+		t.Fatalf("MigrateLegacy() = %v, %v", found, err)
+	}
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatal("an agent appeared from nothing")
+	}
+}
+
+func TestMigrateLegacyKeepsOldOnError(t *testing.T) {
+	p := fake(t, "/Applications/Flintstep.app/Contents/MacOS/Flintstep")
+	old := oldAgent(t, p)
+	executable = func() (string, error) { return "", os.ErrNotExist }
+	if found, err := MigrateLegacy(); !found || err == nil {
+		t.Fatalf("MigrateLegacy() = %v, %v; want an error", found, err)
+	}
+	if _, err := os.Stat(old); err != nil {
+		t.Fatal("old agent removed although the new one was not written:", err)
+	}
+	if _, err := os.Stat(p); !os.IsNotExist(err) {
+		t.Fatal("half a new agent:", err)
 	}
 }

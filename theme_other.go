@@ -2,7 +2,7 @@
 
 package main
 
-import "sparkbridge/internal/store"
+import "flintstep/internal/store"
 
 func setNativeTheme(store.Theme) {}
 

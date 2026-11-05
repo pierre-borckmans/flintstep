@@ -15,8 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/store"
+	"flintstep/internal/mapping"
+	"flintstep/internal/product"
+	"flintstep/internal/store"
 )
 
 // THE PRESET LIBRARY: named mappings in one file, library.json, in the data dir.
@@ -43,9 +44,13 @@ const (
 	FromCurrent = "current"
 	FromDefault = "default"
 
-	ExportFormat  = "sparkx-midi-preset"
+	ExportFormat  = "flintstep-preset"
 	ExportVersion = 1
-	exportSuffix  = ".sparkx.json"
+	exportSuffix  = ".flintstep.json"
+
+	// What exports were called before the rename to Flintstep. Import still takes them.
+	legacyExportFormat = "sparkx-midi-preset"
+	legacyExportSuffix = ".sparkx.json"
 )
 
 // Preset is one stored mapping. Times are unix milliseconds.
@@ -569,7 +574,7 @@ func withoutPedal(cfg mapping.Config) (json.RawMessage, error) {
 	return b, nil
 }
 
-// ExportFileName is "<name>.sparkx.json" with the characters Finder or the shell
+// ExportFileName is "<name>.flintstep.json" with the characters Finder or the shell
 // trip over replaced.
 func ExportFileName(name string) string {
 	n := strings.Map(func(r rune) rune {
@@ -613,7 +618,7 @@ func (l *Library) Import(data []byte, filename string) (Info, error) {
 	return l.add(uniqueName(l.f.Presets, name, ""), cfg)
 }
 
-const notAPreset = "this file is not a SparkX MIDI preset"
+const notAPreset = "this file is not a " + product.Name + " preset"
 
 func decode(data []byte) (string, mapping.Config, error) {
 	var top map[string]json.RawMessage
@@ -625,11 +630,11 @@ func decode(data []byte) (string, mapping.Config, error) {
 		if err := json.Unmarshal(data, &head); err != nil {
 			return "", mapping.Config{}, errors.New(notAPreset)
 		}
-		if head.Format != ExportFormat {
+		if head.Format != ExportFormat && head.Format != legacyExportFormat {
 			return "", mapping.Config{}, errors.New(notAPreset)
 		}
 		if head.Version > ExportVersion {
-			return "", mapping.Config{}, errors.New("this preset was made by a newer SparkX MIDI; update the app to import it")
+			return "", mapping.Config{}, errors.New("this preset was made by a newer " + product.Name + "; update the app to import it")
 		}
 		if len(head.Config) == 0 || string(head.Config) == "null" {
 			return "", mapping.Config{}, errors.New("this preset file has no mapping in it")
@@ -670,6 +675,8 @@ func nameFromFile(path string) string {
 	switch {
 	case strings.HasSuffix(lower, exportSuffix):
 		base = base[:len(base)-len(exportSuffix)]
+	case strings.HasSuffix(lower, legacyExportSuffix):
+		base = base[:len(base)-len(legacyExportSuffix)]
 	case strings.HasSuffix(lower, ".json"):
 		base = base[:len(base)-len(".json")]
 	}

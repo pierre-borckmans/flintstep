@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/mapping"
+	"flintstep/internal/sparkx"
 )
 
 func TestLoad(t *testing.T) {
@@ -128,11 +128,11 @@ func TestDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Base(dir) != "SparkX MIDI" {
+	if filepath.Base(dir) != "Flintstep" {
 		t.Fatalf("Dir() = %s", dir)
 	}
 	if runtime.GOOS == "darwin" {
-		if want := filepath.Join(home, "Library", "Application Support", "SparkX MIDI"); dir != want {
+		if want := filepath.Join(home, "Library", "Application Support", "Flintstep"); dir != want {
 			t.Fatalf("Dir() = %s, want %s", dir, want)
 		}
 	}

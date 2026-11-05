@@ -1,12 +1,14 @@
-// sparkx-midi is the bridge without the app: connect to a Spark Control X, publish the
-// virtual MIDI source, print every switch and every message. Milestone 1 of the design
-// doc, and still the quickest way to check a pedal against MIDI Monitor or Logic.
+// flintstep-cli is the bridge without the app: connect to a Spark Control X, publish the
+// virtual MIDI ports, print every switch and every message. The quickest way to check a
+// pedal against MIDI Monitor or Logic.
 //
-//	go run ./cmd/sparkx-midi            # first SparkX found, the app's saved mapping
-//	go run ./cmd/sparkx-midi -scan      # list pedals and exit
-//	go run ./cmd/sparkx-midi -addr <id> # a specific pedal
+//	go run ./cmd/flintstep-cli            # first pedal found, the app's saved mapping
+//	go run ./cmd/flintstep-cli -scan      # list pedals and exit
+//	go run ./cmd/flintstep-cli -addr <id> # a specific pedal
 //
-// It reads the app's active preset (or the defaults) but never writes anything.
+// It reads the app's active preset (or the defaults) but never writes anything. If the
+// app hasn't run since it was renamed, that preset is still in the old data folder,
+// "SparkX MIDI", and it reads it from there.
 package main
 
 import (
@@ -18,13 +20,14 @@ import (
 	"syscall"
 	"time"
 
-	"sparkbridge/internal/ble"
-	"sparkbridge/internal/bridge"
-	"sparkbridge/internal/coremidi"
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/presets"
-	"sparkbridge/internal/sparkx"
-	"sparkbridge/internal/store"
+	"flintstep/internal/ble"
+	"flintstep/internal/bridge"
+	"flintstep/internal/coremidi"
+	"flintstep/internal/mapping"
+	"flintstep/internal/presets"
+	"flintstep/internal/product"
+	"flintstep/internal/sparkx"
+	"flintstep/internal/store"
 )
 
 func main() {
@@ -32,12 +35,17 @@ func main() {
 	addr := flag.String("addr", "", "connect to this pedal (CoreBluetooth identifier)")
 	defaults := flag.Bool("defaults", false, "ignore the saved mapping, use the defaults")
 	trace := flag.String("trace", "", "write the BLE wire trace to this file")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "%s: the %s bridge without the app.\n\nUsage of %s:\n",
+			product.CLIName, product.Name, product.CLIName)
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
 	cfg := mapping.Default()
 	if !*defaults {
-		if dir, err := store.Dir(); err == nil {
+		if dir, err := store.ExistingDir(); err == nil {
 			c, err := presets.ReadActive(dir)
 			if err != nil {
 				log.Printf("config: %v (using defaults)", err)
@@ -95,13 +103,13 @@ func main() {
 		return
 	}
 
-	v, err := coremidi.NewVirtual("SparkX MIDI", "Spark Control X", "Spark Control X LEDs", b.Feedback)
+	v, err := coremidi.NewVirtual(product.Name, product.MIDIPortName, product.MIDILEDPortName, b.Feedback)
 	if err != nil {
 		log.Fatalf("midi: %v", err)
 	}
 	defer v.Close()
 	b.SetOut(v)
-	fmt.Println(`midi: virtual source "Spark Control X" is up; open MIDI Monitor or your DAW`)
+	fmt.Printf("midi: virtual source %q is up; open MIDI Monitor or your DAW\n", product.MIDIPortName)
 
 	tg := ble.Target{Address: cfg.Pedal.Address, Name: cfg.Pedal.Name}
 	if *addr != "" {

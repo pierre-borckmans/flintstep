@@ -13,21 +13,22 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"sparkbridge/internal/ble"
-	"sparkbridge/internal/bridge"
-	"sparkbridge/internal/coremidi"
-	"sparkbridge/internal/loginitem"
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/presets"
-	"sparkbridge/internal/store"
-	"sparkbridge/internal/tray"
+	"flintstep/internal/ble"
+	"flintstep/internal/bridge"
+	"flintstep/internal/coremidi"
+	"flintstep/internal/loginitem"
+	"flintstep/internal/mapping"
+	"flintstep/internal/presets"
+	"flintstep/internal/product"
+	"flintstep/internal/store"
+	"flintstep/internal/tray"
 )
 
 // Names other apps see.
 const (
-	midiClient = "SparkX MIDI"
-	midiSource = "Spark Control X"
-	midiDest   = "Spark Control X LEDs"
+	midiClient = product.Name
+	midiSource = product.MIDIPortName
+	midiDest   = product.MIDILEDPortName
 )
 
 // stateEvery is the most often the UI is sent a fresh State: the pedal's status can
@@ -122,6 +123,16 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.dir = dir
 	startLog(filepath.Join(dir, "app.log"))
+	// Carried over from the app's old name, SparkX MIDI: the data folder (moved by
+	// store.Dir, logged here now that the log is open) and the login item.
+	if m := store.LastMigration().String(); m != "" {
+		log.Print(m)
+	}
+	if found, err := loginitem.MigrateLegacy(); err != nil {
+		log.Printf("login item: %v", err)
+	} else if found {
+		log.Printf("login item: moved to %s", loginitem.Label)
+	}
 
 	// The mapping is the active preset's. Before presets it was config.json, which the
 	// library takes in on first open and leaves where it is as a backup.
@@ -176,7 +187,7 @@ func (a *App) shutdown(context.Context) {
 	if a.midi != nil {
 		a.midi.Close()
 	}
-	log.Printf("---- SparkX MIDI stopped ----")
+	log.Printf("---- %s stopped ----", product.Name)
 }
 
 func target(p mapping.PedalRef) ble.Target {
@@ -450,13 +461,13 @@ func (a *App) updateTray(st State) {
 	items = append(items, presetItems(st.Presets)...)
 	items = append(items,
 		tray.Item{Separator: true},
-		tray.Item{ID: "open", Title: "Open SparkX MIDI…"},
+		tray.Item{ID: "open", Title: "Open " + product.Name + "…"},
 		tray.Item{ID: "login", Title: "Launch at Login", Checked: st.LaunchAtLogin},
 		tray.Item{Separator: true},
-		tray.Item{ID: "quit", Title: "Quit SparkX MIDI"},
+		tray.Item{ID: "quit", Title: "Quit " + product.Name},
 	)
 	tray.SetMenu(items)
-	tray.SetTooltip("SparkX MIDI: " + statusLine(st.Pedal))
+	tray.SetTooltip(product.Name + ": " + statusLine(st.Pedal))
 }
 
 // trayPresetPrefix starts a preset item's id; the rest is the preset's id.

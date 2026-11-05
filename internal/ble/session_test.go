@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // startSession is a session on a fake conn, as the loop would start it.

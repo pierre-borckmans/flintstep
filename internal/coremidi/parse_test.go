@@ -3,6 +3,8 @@ package coremidi
 import (
 	"reflect"
 	"testing"
+
+	"flintstep/internal/product"
 )
 
 func run(packets ...[]byte) [][]byte {
@@ -68,11 +70,11 @@ func TestParserMessagesAreIndependent(t *testing.T) {
 }
 
 func TestStableUID(t *testing.T) {
-	a, b := stableUID("Spark Control X"), stableUID("Spark Control X LEDs")
+	a, b := stableUID(product.MIDIPortName), stableUID(product.MIDILEDPortName)
 	if a == b {
 		t.Fatalf("source and destination share an ID %d", a)
 	}
-	if a != stableUID("Spark Control X") {
+	if a != stableUID(product.MIDIPortName) {
 		t.Fatal("ID not stable")
 	}
 	if a == 0 || b == 0 {

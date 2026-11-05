@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"sparkbridge/internal/ble"
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/ble"
+	"flintstep/internal/mapping"
+	"flintstep/internal/sparkx"
 )
 
 // Pedal is the BLE manager as the bridge uses it.

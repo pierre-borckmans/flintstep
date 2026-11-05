@@ -29,9 +29,12 @@ load_product() {
   # Derived names. File names get hyphens instead of spaces.
   PRODUCT_FILE_NAME="${PRODUCT_NAME// /-}"
   LOCAL_SIGN_ID="$PRODUCT_NAME Local Signing"
+  # The local certificate's name from before the rename to Flintstep. A Mac that has it
+  # keeps signing with it until it has the new one; see scripts/signing/local-cert.sh.
+  LEGACY_LOCAL_SIGN_ID="SparkX MIDI Local Signing"
   APP_PATH="$ROOT/build/bin/$PRODUCT_NAME.app"
   ENTITLEMENTS="$ROOT/build/darwin/entitlements.plist"
-  export PRODUCT_FILE_NAME LOCAL_SIGN_ID APP_PATH ENTITLEMENTS
+  export PRODUCT_FILE_NAME LOCAL_SIGN_ID LEGACY_LOCAL_SIGN_ID APP_PATH ENTITLEMENTS
 }
 
 say() { printf '\033[1m==> %s\033[0m\n' "$*"; }
@@ -40,7 +43,8 @@ die() { printf '\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
 # detect_signing sets SIGN_MODE to one of
 #   developer-id  a "Developer ID Application" identity is available (or SIGN_IDENTITY names one)
-#   local         the self-signed certificate from `make cert` is in the keychain
+#   local         the self-signed certificate from `make cert` is in the keychain (under
+#                 the current name, or the one from before the rename)
 #   adhoc         neither
 # and SIGN_ID to the identity codesign should use ("-" for ad hoc).
 #
@@ -65,6 +69,8 @@ detect_signing() {
     SIGN_MODE=developer-id SIGN_ID="$devid"
   elif security find-certificate -c "$LOCAL_SIGN_ID" >/dev/null 2>&1; then
     SIGN_MODE=local SIGN_ID="$LOCAL_SIGN_ID"
+  elif security find-certificate -c "$LEGACY_LOCAL_SIGN_ID" >/dev/null 2>&1; then
+    SIGN_MODE=local SIGN_ID="$LEGACY_LOCAL_SIGN_ID"
   else
     SIGN_MODE=adhoc SIGN_ID="-"
   fi

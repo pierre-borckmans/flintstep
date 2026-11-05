@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 var (

@@ -1,4 +1,4 @@
-module sparkbridge
+module flintstep
 
 go 1.25.0
 

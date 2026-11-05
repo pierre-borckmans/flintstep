@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // THE ENGINE: switch edges and expression values in, MIDI out.

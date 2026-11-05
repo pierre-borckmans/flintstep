@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 func TestDefault(t *testing.T) {

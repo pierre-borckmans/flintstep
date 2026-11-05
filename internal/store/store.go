@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"sparkbridge/internal/mapping"
+	"flintstep/internal/mapping"
+	"flintstep/internal/product"
 )
 
 // THE SETTINGS FILE: one JSON Config in the app's data dir.
@@ -19,20 +20,53 @@ import (
 // leaves the previous settings, not half of the new ones.
 
 // AppDirName is the data dir's name under the user config dir.
-const AppDirName = "SparkX MIDI"
+const AppDirName = product.DataDirName
 
-// Dir is the app's data dir (~/Library/Application Support/SparkX MIDI on macOS),
-// created if needed.
+// Dir is the app's data dir (~/Library/Application Support/Flintstep on macOS),
+// created if needed. The first call in a process moves the folder over from its old
+// name if there is one (migrate.go). If that move failed, Dir is the old folder, so
+// the user's presets still load, and the next launch tries the move again.
 func Dir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("finding the settings folder: %w", err)
+	}
+	migrateOnceIn(base)
+	return dirIn(base, LastMigration())
+}
+
+// dirIn is Dir under base, after the migration m.
+func dirIn(base string, m Migration) (string, error) {
+	if m.Err != nil {
+		return m.From, nil //nolint:nilerr // the failed move is logged; the old folder still works
 	}
 	dir := filepath.Join(base, AppDirName)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("creating %s: %w", dir, err)
 	}
 	return dir, nil
+}
+
+// ExistingDir is the data dir for a reader that must not write: the new folder if it
+// exists, else the old-named one if that exists (the app hasn't run since the rename),
+// else the new folder's path, which then holds nothing. It creates and moves nothing.
+func ExistingDir() (string, error) {
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("finding the settings folder: %w", err)
+	}
+	return existingDirIn(base), nil
+}
+
+func existingDirIn(base string) string {
+	dir := filepath.Join(base, AppDirName)
+	if _, err := os.Stat(dir); err == nil {
+		return dir
+	}
+	if fi, err := os.Stat(filepath.Join(base, LegacyDirName)); err == nil && fi.IsDir() {
+		return filepath.Join(base, LegacyDirName)
+	}
+	return dir
 }
 
 // Load reads the Config at path, normalized. A missing file is Default() and no

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 var t0 = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)

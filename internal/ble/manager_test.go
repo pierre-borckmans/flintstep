@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 func TestBackoff(t *testing.T) {

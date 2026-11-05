@@ -4,7 +4,7 @@ The app is built by several people at once. This file is the agreement between t
 packages: names, signatures and behaviour. Change it only together with every user.
 
 Spec: the "Spark Control X MIDI bridge" design doc (summarised in README.md).
-Go module: `sparkbridge` (go.mod at repo root). Wails v2 app in package `main` at the root,
+Go module: `flintstep` (go.mod at repo root). Wails v2 app in package `main` at the root,
 frontend in `frontend/`. Same stack as the Beam app (`../beam/app`): Wails v2.17,
 React 19 + TS + Tailwind v4, bun 1.3.14, Biome, vitest, golangci-lint v2.
 

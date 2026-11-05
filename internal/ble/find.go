@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // FINDING THE PEDAL. From Beam's blefind.go.

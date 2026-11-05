@@ -41,7 +41,7 @@ static bool systemIsDark(void) {
 */
 import "C"
 
-import "sparkbridge/internal/store"
+import "flintstep/internal/store"
 
 // setNativeTheme gives the app and its window the theme's appearance and background.
 // The background is dynamic, so under "system" it follows macOS on its own.

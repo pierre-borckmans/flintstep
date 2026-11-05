@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // State is where the connection stands.

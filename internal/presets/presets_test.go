@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/store"
+	"flintstep/internal/mapping"
+	"flintstep/internal/store"
 )
 
 var pedal = mapping.PedalRef{Address: "4F1A", Name: "SparkX v4.1.23 fbfc"}
@@ -446,7 +446,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file != "Ableton live.sparkx.json" {
+	if file != "Ableton live.flintstep.json" {
 		t.Fatalf("file name = %q", file)
 	}
 	var head struct {
@@ -501,9 +501,31 @@ func TestImportBareConfig(t *testing.T) {
 	if l.Pedal() == pedal {
 		t.Fatalf("a bare import set the global pedal")
 	}
-	named, err := l.Import(b, "/tmp/Gig set.sparkx.json")
+	named, err := l.Import(b, "/tmp/Gig set.flintstep.json")
 	if err != nil || named.Name != "Gig set" {
 		t.Fatalf("name = %q, %v", named.Name, err)
+	}
+}
+
+// Exports from before the rename to Flintstep still import, named the same way.
+func TestImportLegacyExport(t *testing.T) {
+	l := open(t, t.TempDir())
+	c := custom()
+	cfg, _ := json.Marshal(c)
+	old := `{"format": "sparkx-midi-preset", "version": 1, "name": "Old gig", "config": ` + string(cfg) + `}`
+	info, err := l.Import([]byte(old), "Old gig.sparkx.json")
+	if err != nil || info.Name != "Old gig" {
+		t.Fatalf("legacy export = %+v, %v", info, err)
+	}
+	if got, _ := l.Select(info.ID); !sameConfig(got, c) {
+		t.Fatal("legacy import changed the config")
+	}
+	unnamed := `{"format": "sparkx-midi-preset", "version": 1, "config": ` + string(cfg) + `}`
+	if info, err := l.Import([]byte(unnamed), "/tmp/Night.sparkx.json"); err != nil || info.Name != "Night" {
+		t.Fatalf("legacy file name = %q, %v", info.Name, err)
+	}
+	if _, err := l.Import([]byte(`{"format": "sparkx-midi-preset", "version": 99, "config": {}}`), "x.json"); err == nil {
+		t.Fatal("a newer legacy export imported")
 	}
 }
 
@@ -518,9 +540,9 @@ func TestImportRejects(t *testing.T) {
 		"empty object":   `{}`,
 		"other app":      `{"hello": "world"}`,
 		"other format":   `{"format": "something-else", "version": 1, "config": {}}`,
-		"newer version":  `{"format": "sparkx-midi-preset", "version": 99, "name": "x", "config": {}}`,
-		"no config":      `{"format": "sparkx-midi-preset", "version": 1, "name": "x"}`,
-		"invalid config": `{"format": "sparkx-midi-preset", "version": 1, "name": "x", "config": ` + string(badCfg) + `}`,
+		"newer version":  `{"format": "flintstep-preset", "version": 99, "name": "x", "config": {}}`,
+		"no config":      `{"format": "flintstep-preset", "version": 1, "name": "x"}`,
+		"invalid config": `{"format": "flintstep-preset", "version": 1, "name": "x", "config": ` + string(badCfg) + `}`,
 	}
 	for name, data := range cases {
 		if _, err := l.Import([]byte(data), "x.json"); err == nil {
@@ -542,7 +564,7 @@ func TestImportNames(t *testing.T) {
 	if len([]rune(got.Name)) != MaxName {
 		t.Fatalf("long name kept %d chars", len([]rune(got.Name)))
 	}
-	got, _ = l.Import(mk("   "), "Night.sparkx.json")
+	got, _ = l.Import(mk("   "), "Night.flintstep.json")
 	if got.Name != "Night" {
 		t.Fatalf("blank name = %q, want the file's", got.Name)
 	}
@@ -550,9 +572,9 @@ func TestImportNames(t *testing.T) {
 
 func TestExportFileName(t *testing.T) {
 	cases := map[string]string{
-		"Ableton live": "Ableton live.sparkx.json",
-		"A/B: test":    "A-B- test.sparkx.json",
-		".hidden":      "hidden.sparkx.json",
+		"Ableton live": "Ableton live.flintstep.json",
+		"A/B: test":    "A-B- test.flintstep.json",
+		".hidden":      "hidden.flintstep.json",
 	}
 	for in, want := range cases {
 		if got := ExportFileName(in); got != want {

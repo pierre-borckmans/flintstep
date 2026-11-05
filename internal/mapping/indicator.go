@@ -1,6 +1,6 @@
 package mapping
 
-import "sparkbridge/internal/sparkx"
+import "flintstep/internal/sparkx"
 
 // THE AMP AND APP LAMPS. Two small dots above the switches with no switch under them.
 // On the stock pedal they show the amp link and the app link; here each one shows

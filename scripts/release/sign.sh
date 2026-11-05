@@ -6,7 +6,8 @@
 # The identity is picked by detect_signing in scripts/lib/common.sh:
 #   developer-id  "Developer ID Application: ..." in the keychain, or SIGN_IDENTITY.
 #                 Hardened runtime, secure timestamp, entitlements: what notarization needs.
-#   local         the self-signed "<PRODUCT_NAME> Local Signing" from `make cert`. Keeps
+#   local         the self-signed "<PRODUCT_NAME> Local Signing" from `make cert` (or the
+#                 one named before the rename, "SparkX MIDI Local Signing"). Keeps
 #                 the Bluetooth permission across rebuilds on this Mac. Nobody else's Mac
 #                 trusts it.
 #   adhoc         no identity. Runs here; Gatekeeper blocks it on other Macs.

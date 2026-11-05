@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
-	"sparkbridge/internal/bridge"
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/presets"
+	"flintstep/internal/bridge"
+	"flintstep/internal/mapping"
+	"flintstep/internal/presets"
 )
 
 type fakeDialogs struct{ save, open string }
@@ -105,12 +105,12 @@ func TestExportImportThroughDialogs(t *testing.T) {
 		t.Fatalf("cancelled import = %+v, %v", info, err)
 	}
 
-	d.save = filepath.Join(t.TempDir(), "Ableton live.sparkx.json")
+	d.save = filepath.Join(t.TempDir(), "Ableton live.flintstep.json")
 	if err := a.ExportPreset(a.lib.ActiveID()); err != nil {
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(d.save)
-	if err != nil || !strings.Contains(string(b), `"format": "sparkx-midi-preset"`) {
+	if err != nil || !strings.Contains(string(b), `"format": "flintstep-preset"`) {
 		t.Fatalf("export file: %v\n%s", err, b)
 	}
 	d.open = d.save

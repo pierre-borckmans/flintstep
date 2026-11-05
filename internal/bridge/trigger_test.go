@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/ble"
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/ble"
+	"flintstep/internal/mapping"
+	"flintstep/internal/sparkx"
 )
 
 var (

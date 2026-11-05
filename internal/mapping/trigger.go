@@ -3,7 +3,7 @@ package mapping
 import (
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // EXPRESSION TRIGGERS: a switch faked from the pedal's position.

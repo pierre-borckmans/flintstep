@@ -92,8 +92,9 @@ import (
 	"time"
 	"unsafe"
 
-	"sparkbridge/internal/coremidi"
-	"sparkbridge/internal/tray"
+	"flintstep/internal/coremidi"
+	"flintstep/internal/product"
+	"flintstep/internal/tray"
 )
 
 func init() { runtime.LockOSThread() } // AppKit wants main() on the main thread
@@ -108,7 +109,7 @@ func main() {
 	hold := flag.Duration("hold", 2*time.Second, "how long to keep the endpoints up")
 	flag.Parse()
 
-	v, err := coremidi.NewVirtual("SparkX MIDI", "Spark Control X", "Spark Control X LEDs", func(m []byte) {
+	v, err := coremidi.NewVirtual(product.Name, product.MIDIPortName, product.MIDILEDPortName, func(m []byte) {
 		fmt.Printf("onDest: % X\n", m)
 	})
 	if err != nil {
@@ -117,7 +118,7 @@ func main() {
 	}
 	defer v.Close()
 
-	src, dst := C.CString("Spark Control X"), C.CString("Spark Control X LEDs")
+	src, dst := C.CString(product.MIDIPortName), C.CString(product.MIDILEDPortName)
 	var su, du C.SInt32
 	if st := C.setupLoopback(src, dst, &su, &du); st != 0 {
 		fmt.Fprintln(os.Stderr, "loopback setup failed:", st)
@@ -157,11 +158,11 @@ func main() {
 
 	if *showTray {
 		C.appInit()
-		tray.SetTooltip("SparkX MIDI (miditest)")
+		tray.SetTooltip(product.Name + " (miditest)")
 		tray.SetMenu([]tray.Item{
 			{Title: "Connected: SparkX test", Disabled: true},
 			{Separator: true},
-			{ID: "open", Title: "Open SparkX MIDI…"},
+			{ID: "open", Title: "Open " + product.Name + "…"},
 			{ID: "login", Title: "Launch at login", Checked: true},
 			{Separator: true},
 			{ID: "quit", Title: "Quit"},

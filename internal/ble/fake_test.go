@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // fakeAir is a radio: whether Bluetooth is on, what the Mac holds, what advertises, and

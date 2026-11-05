@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // ONE CONNECTED SPARK CONTROL X.

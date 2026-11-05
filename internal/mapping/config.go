@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/sparkx"
 )
 
 // THE MAPPING: what each switch and expression input sends.

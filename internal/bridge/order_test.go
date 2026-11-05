@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/mapping"
+	"flintstep/internal/sparkx"
 )
 
 // gate makes the first call through it wait until open is closed, and says when that

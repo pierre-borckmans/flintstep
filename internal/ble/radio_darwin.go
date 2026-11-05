@@ -14,7 +14,8 @@ import (
 	"github.com/tinygo-org/cbgo"
 	"tinygo.org/x/bluetooth"
 
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/product"
+	"flintstep/internal/sparkx"
 )
 
 // THE REAL RADIO: tinygo-bluetooth on CoreBluetooth. From Beam's ble.go, blehub.go and
@@ -63,7 +64,7 @@ func (r *cbRadio) power() (bool, string) {
 	case cbgo.ManagerStatePoweredOff:
 		return false, "Bluetooth is off"
 	case cbgo.ManagerStateUnauthorized:
-		return false, "Bluetooth access is not allowed: turn it on for SparkX MIDI in System Settings > Privacy & Security > Bluetooth"
+		return false, "Bluetooth access is not allowed: turn it on for " + product.Name + " in System Settings > Privacy & Security > Bluetooth"
 	case cbgo.ManagerStateUnsupported:
 		return false, "This Mac has no Bluetooth LE"
 	}

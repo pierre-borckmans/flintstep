@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"sparkbridge/internal/ble"
-	"sparkbridge/internal/mapping"
+	"flintstep/internal/ble"
+	"flintstep/internal/mapping"
 )
 
 // Wails calls OnShutdown after it has released the window. Bridge activity (the

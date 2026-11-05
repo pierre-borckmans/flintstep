@@ -9,9 +9,10 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/presets"
-	"sparkbridge/internal/store"
+	"flintstep/internal/mapping"
+	"flintstep/internal/presets"
+	"flintstep/internal/product"
+	"flintstep/internal/store"
 )
 
 // PRESETS: the bound methods over the preset library. Every one runs under cfgMu, like
@@ -32,7 +33,7 @@ type fileDialogs interface {
 
 type wailsDialogs struct{ app *App }
 
-var jsonFilter = []runtime.FileFilter{{DisplayName: "SparkX MIDI preset (*.json)", Pattern: "*.json"}}
+var jsonFilter = []runtime.FileFilter{{DisplayName: product.Name + " preset (*.json)", Pattern: "*.json"}}
 
 func (d wailsDialogs) SaveFile(name string) (string, error) {
 	return runtime.SaveFileDialog(d.app.ctx, runtime.SaveDialogOptions{

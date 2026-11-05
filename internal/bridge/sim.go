@@ -7,9 +7,9 @@ import (
 	"math"
 	"time"
 
-	"sparkbridge/internal/ble"
-	"sparkbridge/internal/mapping"
-	"sparkbridge/internal/sparkx"
+	"flintstep/internal/ble"
+	"flintstep/internal/mapping"
+	"flintstep/internal/sparkx"
 )
 
 // A simulated expression pedal stands in for a real one on a jack with no cable, so

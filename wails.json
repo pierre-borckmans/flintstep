@@ -1,7 +1,7 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "SparkX MIDI",
-  "outputfilename": "SparkX MIDI",
+  "name": "Flintstep",
+  "outputfilename": "Flintstep",
   "frontend:install": "bun install",
   "frontend:build": "bun run build",
   "frontend:dev:watcher": "bun run dev",
@@ -12,9 +12,9 @@
   },
   "info": {
     "companyName": "silversol",
-    "productName": "SparkX MIDI",
+    "productName": "Flintstep",
     "productVersion": "0.1.0",
     "copyright": "© 2026 Pierre Borckmans",
-    "comments": "SparkX MIDI turns a Spark Control X into a MIDI foot controller. Not affiliated with Positive Grid."
+    "comments": "Flintstep turns a Spark Control X into a MIDI foot controller. Not affiliated with Positive Grid."
   }
 }

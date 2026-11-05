@@ -46,4 +46,4 @@ formatters:
     - goimports
   settings:
     goimports:
-      local-prefixes: [sparkbridge]
+      local-prefixes: [flintstep]
