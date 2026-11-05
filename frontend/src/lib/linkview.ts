@@ -1,6 +1,7 @@
 import { PRODUCT_NAME } from "../product";
 import type { Colour, Config, PedalRef, Status } from "../types";
 import { LAMP_AMP, LAMP_APP } from "../types";
+import { type OS, OS_NOW } from "./platform";
 
 // WHAT THE PEDAL VIEWER SAYS ABOUT THE LINK. Pure: a status (and the remembered pedal) in,
 // the overlay's words, rings and buttons out. LinkOverlay draws it.
@@ -57,7 +58,11 @@ function news(detail: string): string {
   return /^(looking for|connecting to)\b/i.test(d) ? "" : d;
 }
 
-export function linkView(status: Status | null, remembered: PedalRef): LinkView {
+export function linkView(
+  status: Status | null,
+  remembered: PedalRef,
+  system: OS = OS_NOW,
+): LinkView {
   if (!status || status.state === "connected") return HIDDEN;
   const pedal = remembered.name || (remembered.address ? remembered.address : "");
   const scan: LinkAction = { id: "scan", label: "Scan for pedals", kind: "plain" };
@@ -102,8 +107,16 @@ export function linkView(status: Status | null, remembered: PedalRef): LinkView 
         title,
         detail: "",
         pedal,
-        hint: `${PRODUCT_NAME} reaches the pedal over Bluetooth. Turn it on, or allow ${PRODUCT_NAME} under Privacy & Security.`,
-        actions: [{ id: "bluetooth", label: "Open Bluetooth settings", kind: "primary" }],
+        // The Bluetooth settings link is macOS's (a System Settings pane). On Linux the
+        // detail line already says what to do (start bluetoothd, unblock rfkill...).
+        hint:
+          system === "mac"
+            ? `${PRODUCT_NAME} reaches the pedal over Bluetooth. Turn it on, or allow ${PRODUCT_NAME} under Privacy & Security.`
+            : `${PRODUCT_NAME} reaches the pedal over Bluetooth, through BlueZ.`,
+        actions:
+          system === "mac"
+            ? [{ id: "bluetooth", label: "Open Bluetooth settings", kind: "primary" }]
+            : [],
       };
     }
     default: {

@@ -14,7 +14,8 @@ an Apple Developer account it still publishes a DMG, marked "not notarized".
 | `scripts/release/notarize.sh` | `notarytool submit --wait`, prints Apple's log on rejection, staples. |
 | `scripts/release/dmg.sh` | The DMG: the app and an Applications link. |
 | `scripts/release/release.sh` | All of the above in order, then verification and `SHA256SUMS.txt`. |
-| `.github/workflows/release.yml` | On a `v*` tag: import the certificate, `make release`, upload to the GitHub release. |
+| `.github/workflows/release.yml` | On a `v*` tag: import the certificate, `make release`, upload to the GitHub release. Then the Linux jobs build, smoke-test and append the experimental AppImage/.deb files and `SHA256SUMS-linux.txt`. |
+| `scripts/linux/*`, `build/linux/*` | The Linux build (`make linux`, Docker), packages and smoke test. No signing. |
 
 `make release VERSION=vX.Y.Z` runs `release.sh`. It picks its mode from what it finds:
 

@@ -1,7 +1,8 @@
-//go:build !darwin || !cgo
+//go:build !(darwin && cgo) && !(linux && cgo)
 
-// Package coremidi publishes the bridge's virtual MIDI endpoints on macOS. Elsewhere
-// (Linux CI, a darwin build without cgo) there is no CoreMIDI, and NewVirtual says so.
+// Package coremidi publishes the bridge's virtual MIDI endpoints: CoreMIDI on macOS,
+// the ALSA sequencer on Linux (both need cgo). Elsewhere (Windows for now, a build
+// without cgo) NewVirtual says it is unsupported.
 package coremidi
 
 // Virtual is never created on this platform.

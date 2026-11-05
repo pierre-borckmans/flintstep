@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Backend } from "../api";
 import { errorText } from "../api";
 import { type Apply, LONG_PRESS } from "../lib/config";
+import { revealLabel } from "../lib/platform";
 import { MIDI_LED_PORT_NAME, PRODUCT_NAME } from "../product";
 import type { Config, State } from "../types";
 import { Button } from "../ui/Button";
@@ -194,7 +195,7 @@ export function SettingsPanel({
             icon={<FolderOpen size={12} />}
             onClick={() => backend.RevealLogs().catch((e) => setErr(errorText(e)))}
           >
-            Reveal in Finder
+            {revealLabel()}
           </Button>
         </Row>
         <Row label="Mapping">

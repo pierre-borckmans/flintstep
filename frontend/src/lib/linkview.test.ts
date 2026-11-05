@@ -65,10 +65,17 @@ describe("linkView", () => {
   });
 
   it("off: no rings, Go's words as the title, a way to System Settings", () => {
-    const v = linkView(status("off", "Bluetooth is not available"), mine);
+    const v = linkView(status("off", "Bluetooth is not available"), mine, "mac");
     expect(v).toMatchObject({ tone: "off", rings: "none", title: "Bluetooth is not available" });
     expect(ids(v)).toEqual(["bluetooth"]);
-    expect(linkView(status("off"), mine).title).toBe("Bluetooth is off");
+    expect(linkView(status("off"), mine, "mac").title).toBe("Bluetooth is off");
+  });
+
+  it("off on Linux: Go's words, no System Settings link", () => {
+    const v = linkView(status("off", "No Bluetooth adapter found"), mine, "linux");
+    expect(v).toMatchObject({ tone: "off", title: "No Bluetooth adapter found" });
+    expect(v.actions).toEqual([]);
+    expect(v.hint).toContain("BlueZ");
   });
 
   it("idle: connect to the remembered pedal, or scan", () => {

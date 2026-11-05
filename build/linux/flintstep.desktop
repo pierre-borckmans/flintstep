@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Flintstep
+GenericName=MIDI foot controller bridge
+Comment=Turns a Spark Control X into a MIDI foot controller
+Exec=flintstep
+Icon=flintstep
+Terminal=false
+Categories=AudioVideo;Audio;Midi;
+Keywords=MIDI;Bluetooth;pedal;Spark;Positive Grid;
+StartupWMClass=flintstep

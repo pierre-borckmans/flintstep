@@ -8,7 +8,8 @@ A macOS menu-bar app that connects to a Positive Grid Spark Control X over Bluet
 publishes it as a normal MIDI device named **Flintstep (Spark Control X)**. Logic, Ableton, MainStage,
 a browser or anything else that takes MIDI can then use the pedal as a foot controller.
 You don't need the Spark app, a Spark amp, a firmware change or Audio MIDI Setup.
-Web page: <https://flintstep.app>.
+Web page: <https://flintstep.app>. There is also an [experimental Linux
+build](#linux-experimental).
 
 Positive Grid ships no MIDI mode. The pedal advertises the Bluetooth MIDI service but
 never sends anything on it; its switches, expression jacks, battery and LEDs all run over
@@ -64,22 +65,65 @@ sees new MIDI ports called **Flintstep (Spark Control X)** and **Flintstep LEDs 
 Control X)**: pick them again where you used the old ones. You can delete
 `SparkX MIDI.app` afterwards.
 
+## Linux (experimental)
+
+There is a Linux build. It compiles, packages and starts, and CI smoke-tests it in a
+container, but nobody has used it with a real pedal yet: the Bluetooth and MIDI code
+has never met the hardware on Linux. If you try it, please
+[open an issue](https://github.com/pierre-borckmans/flintstep/issues) and say what
+worked and what didn't (distribution, desktop, `~/.config/Flintstep/app.log`).
+
+Releases that include it carry `Flintstep-<version>-x86_64.AppImage` /
+`-aarch64.AppImage` and `flintstep_<version>_amd64.deb` / `_arm64.deb`, with
+`SHA256SUMS-linux.txt`.
+
+- **.deb** (Debian 12+, Ubuntu 22.04+): `sudo apt install ./flintstep_<version>_amd64.deb`.
+  It pulls in GTK 3, WebKitGTK 4.1 and ALSA, and recommends BlueZ.
+- **AppImage**: `chmod +x Flintstep-*.AppImage` and run it. It does not bundle GTK or
+  WebKit, so it needs `libwebkit2gtk-4.1-0` and `libasound2` installed (most desktops
+  have them), and FUSE 2 or 3 to mount itself.
+
+What it needs from the system:
+
+- **BlueZ**, running: `systemctl status bluetooth`. The app talks to `bluetoothd` over
+  the system D-Bus, as any desktop Bluetooth tool does; the default BlueZ policy lets a
+  logged-in user do that. If the app says it is not allowed, check
+  `/etc/dbus-1/system.d/bluetooth.conf`. A soft-blocked adapter shows as "blocked by
+  rfkill": `rfkill unblock bluetooth`.
+- **The ALSA sequencer** (`/dev/snd/seq`, module `snd-seq`; loaded on any desktop with
+  sound). Your user must be able to open it, which on most distributions means being
+  logged in at the seat or in the `audio` group. The pedal shows up as ALSA ports
+  **Flintstep (Spark Control X)** and **Flintstep LEDs (Spark Control X)**; PipeWire
+  and JACK applications see them through their ALSA MIDI bridges (`aconnect -l` lists
+  them).
+- **A tray**, for the menu-bar behaviour: KDE, Xfce, Cinnamon and Ubuntu's GNOME show
+  it; stock GNOME needs the AppIndicator extension. Without a tray the window's close
+  button quits the app instead of hiding it.
+
+The remembered pedal is stored per OS (a MAC address here, a CoreBluetooth identifier
+on macOS), so the first launch on Linux finds the pedal again by name. "Launch at
+login" writes `~/.config/autostart/flintstep.desktop`. Data lives in
+`~/.config/Flintstep/`. Build it yourself with `make linux` (Docker); see
+[docs/PORTING.md](docs/PORTING.md) for what was tested and how.
+
 ## Layout
 
 | Path | What |
 | --- | --- |
 | `internal/sparkx` | The pedal protocol. Pure Go, no Bluetooth. |
-| `internal/ble` | CoreBluetooth link via tinygo bluetooth: find, connect, reconnect, lamps. |
+| `internal/ble` | Bluetooth link via tinygo bluetooth (CoreBluetooth on macOS, BlueZ on Linux): find, connect, reconnect, lamps. |
 | `internal/mapping` | Config and the engine: switch edges and exp values in, MIDI and lamp colours out. |
 | `internal/bridge` | Glue between the pedal, the engine and the MIDI port. Tested with fakes. |
-| `internal/coremidi` | Virtual MIDI source and LED destination (cgo). |
-| `internal/tray`, `internal/loginitem` | Menu-bar item and LaunchAgent. |
+| `internal/coremidi` | Virtual MIDI source and LED destination (cgo): CoreMIDI, or ALSA sequencer ports on Linux. |
+| `internal/tray`, `internal/loginitem` | Menu-bar item and LaunchAgent; on Linux a StatusNotifierItem and an XDG autostart entry. |
+| `internal/platform` | The list of per-OS seams and a test pinning their signatures. |
 | `internal/presets` | The preset library (library.json), export and import. |
 | `internal/store`, `internal/rotlog` | Atomic file writes, the old config file, the data folder move, capped logs. |
 | `internal/product` | The app's names, checked against `product.env` by a test. |
 | `cmd/flintstep-cli` | The bridge as a terminal command, no UI. |
 | `frontend/` | React + Tailwind UI. |
 | `tools/probe/sparkx.swift` | The CoreBluetooth probe the protocol was checked with. |
+| `build/linux`, `scripts/linux` | The Linux Docker image, build, packaging and smoke test. |
 
 `docs/CONTRACTS.md` has the interfaces between the packages. `docs/RELEASING.md` covers
 signing, notarisation and cutting a release. Names used by the build live in `product.env`.
@@ -104,6 +148,9 @@ make dmg       # build/bin/Flintstep-<version>.dmg, version from git describe
 make release VERSION=v0.2.0   # signed DMG + checksums, notarised when credentials exist
 make cli       # build/bin/flintstep-cli
 make check     # lint + tests, what CI runs
+make linux     # Linux binary, AppImage and .deb for amd64 and arm64, in Docker
+make linux-test   # Linux vet, lint and tests with cgo, in Docker
+make linux-smoke  # start the Linux binary under Xvfb, in Docker
 ```
 
 Without the app: `go run ./cmd/flintstep-cli -scan` lists pedals, and

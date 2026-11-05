@@ -30,6 +30,8 @@ func main() {
 		app.prefs = store.LoadPrefs(app.prefsFile)
 	}
 	appearance, background := launchLook(app.prefs.Theme, systemIsDark())
+	// Hide-on-close needs a tray to come back from; the platform says whether there is one.
+	hideOnClose, startHidden := windowPolicy(hidden)
 
 	err := wails.Run(&options.App{
 		Title:     product.Name,
@@ -39,8 +41,8 @@ func main() {
 		MinHeight: 560,
 		// A menu-bar app: closing the window only hides it. The bridge keeps running and
 		// Quit lives in the menu-bar menu.
-		HideWindowOnClose: true,
-		StartHidden:       hidden,
+		HideWindowOnClose: hideOnClose,
+		StartHidden:       startHidden,
 		AssetServer:       &assetserver.Options{Assets: assets},
 		BackgroundColour:  background,
 		Mac: &mac.Options{
@@ -56,6 +58,10 @@ func main() {
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,
 		Bind:       []interface{}{app},
+
+		// Per platform (platform_<os>.go): nil on macOS.
+		SingleInstanceLock: singleInstance(app),
+		Linux:              linuxOptions(),
 	})
 	if err != nil {
 		log.Println("Error:", err.Error())

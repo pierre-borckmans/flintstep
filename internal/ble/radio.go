@@ -9,10 +9,23 @@ import (
 
 // THE RADIO SEAM.
 //
-// Everything the Manager needs from CoreBluetooth goes through radio, so the connect
-// path, the reconnect loop and the pedal session are all tested with a fake
-// (fake_test.go). The real one is radio_darwin.go; other platforms get a stub that
-// reports Bluetooth as unavailable, so the package builds and tests on Linux CI.
+// Everything the Manager needs from the OS's Bluetooth stack goes through radio, so the
+// connect path, the reconnect loop and the pedal session are all tested with a fake
+// (fake_test.go). A port to a new OS implements radio and newRadio() in radio_<os>.go:
+//
+//	radio_darwin.go  CoreBluetooth, through tinygo-bluetooth and cbgo
+//	radio_linux.go   BlueZ over the system D-Bus, through tinygo-bluetooth and godbus
+//	radio_other.go   everywhere else: Bluetooth reads as unavailable, the Manager sits
+//	                 in StateOff, and the package still builds and tests
+//
+// The tinygo-based radios share the GATT side (gatt_tinygo.go). Addresses are whatever
+// the OS identifies a peripheral by: a CoreBluetooth UUID on macOS, a MAC address on
+// Linux. The remembered pedal is therefore per OS; a pedal remembered on one is simply
+// not found by address on the other, and the name fallback takes over.
+
+// midiService is the BLE-MIDI service, which the Spark Control X advertises too. The
+// radios use it with the switch service to recognise a pedal the system already holds.
+const midiService = "03B80E5A-EDE8-4B33-A751-6CE34EC4C700"
 
 // radio is the adapter as the Manager sees it.
 type radio interface {
