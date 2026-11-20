@@ -124,7 +124,17 @@ h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.02em; }
 }
 .brand { display: inline-flex; align-items: center; gap: 0.55rem; font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; text-decoration: none; }
 .top nav { display: flex; gap: 1.4rem; font-size: 0.94rem; color: var(--muted); }
+.top nav { align-items: center; }
 .top nav a { text-decoration: none; }
+.theme-toggle { display: inline-flex; padding: 0.3rem; margin: -0.3rem; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; }
+.theme-toggle:hover { color: var(--text); }
+.theme-toggle .i-sun { display: none; }
+:root[data-theme="light"] .theme-toggle .i-sun { display: block; }
+:root[data-theme="light"] .theme-toggle .i-moon { display: none; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .theme-toggle .i-sun { display: block; }
+  :root:not([data-theme="dark"]) .theme-toggle .i-moon { display: none; }
+}
 .top nav a:hover { color: var(--text); }
 
 main > * { margin-inline: auto; padding-inline: 1rem; }
