@@ -123,3 +123,23 @@
     update();
   }).observe(stage);
 })();
+
+// Theme toggle: flips between light and dark, remembers the choice.
+(() => {
+  const btn = document.querySelector(".theme-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const root = document.documentElement;
+    const light = root.dataset.theme
+      ? root.dataset.theme === "light"
+      : matchMedia("(prefers-color-scheme: light)").matches;
+    const next = light ? "dark" : "light";
+    root.dataset.theme = next;
+    try { localStorage.setItem("theme", next); } catch (e) {}
+    document.querySelectorAll('meta[name="theme-color"]').forEach((el) => el.remove());
+    const t = document.createElement("meta");
+    t.name = "theme-color";
+    t.content = next === "light" ? "#e6e3da" : "#141514";
+    document.head.append(t);
+  });
+})();
